@@ -30,10 +30,10 @@
     </div>
 
 <script>
-    // --- НАСТРОЙКИ ---
+    // --- ТВОИ НАСТРОЙКИ ---
     const REPO_OWNER = "Sweatyeyes";
     const REPO_NAME = "Bot-Posting";
-    const VIP_USERS = [337383733] // Твой ID
+    const VIP_USERS = [337383733]; // Твой ID уже здесь
 
     const tg = window.Telegram.WebApp;
     tg.expand();
@@ -43,19 +43,23 @@
     const userId = user ? user.id : null;
     const isVip = VIP_USERS.includes(userId);
 
-    // УМНЫЙ ПОИСК ID ПОСТА (ДЛЯ МОБИЛОК И ДЕСКТОПА)
+    // УНИВЕРСАЛЬНЫЙ МЕТОД ПОИСКА ID ПОСТА
     function getPostId() {
         const urlParams = new URLSearchParams(window.location.search);
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const hash = window.location.hash.substring(1);
+        const hashParams = new URLSearchParams(hash);
         
-        // 1. Приоритет - официальный start_param
+        // 1. Из официального поля start_param
         let id = tg.initDataUnsafe?.start_param;
         
-        // 2. Если пусто (десктоп), ищем в URL
+        // 2. Из хэша (часто на десктопе/маке)
+        if (!id) id = hashParams.get('tgWebAppStartParam') || hashParams.get('startapp');
+        
+        // 3. Из параметров URL
         if (!id) id = urlParams.get('post') || urlParams.get('tgWebAppStartParam') || urlParams.get('startapp');
         
-        // 3. Если всё еще пусто, ищем в хэше
-        if (!id) id = hashParams.get('tgWebAppStartParam') || hashParams.get('startapp') || window.location.hash.replace('#', '');
+        // 4. Если всё еще пусто, проверяем сам хэш напрямую
+        if (!id && hash && hash.length > 5 && !hash.includes('=')) id = hash;
 
         return id ? id.replace(/[^0-9\-_.]/g, '') : null;
     }
@@ -72,22 +76,21 @@
     const saveBtn = document.getElementById('save-btn');
     const lockMsg = document.getElementById('lock-msg');
 
+    // Дебаг на экран
     debug.innerText = `Folder: ${postFolder || 'NOT_FOUND'} | User: ${userId || 'GUEST'} | VIP: ${isVip}`;
 
     async function fetchFiles() {
         if (!postFolder || postFolder.length < 5) {
-            cnt.innerText = "ID поста не распознан";
+            cnt.innerText = "ID поста не найден";
             return;
         }
 
-        cnt.innerText = "Подключение к GitHub...";
+        cnt.innerText = "Синхронизация с GitHub...";
 
         try {
             const folders = ["general", "vip"];
             for (const folder of folders) {
-                const url = `https://api.github.com{REPO_OWNER}/${REPO_NAME}/contents/posts/${postFolder}/${folder}`;
-                const response = await fetch(url);
-                
+                const response = await fetch(`https://api.github.com{REPO_OWNER}/${REPO_NAME}/contents/posts/${postFolder}/${folder}`);
                 if (response.ok) {
                     const data = await response.json();
                     data.forEach(file => {
