@@ -14,110 +14,120 @@
     </style>
 </head>
 <body>
-    <div id="log">🚀 Система запущена...</div>
+    <div id="log">🚀 Ожидание системы...</div>
     <div id="viewer" class="viewer"><img id="pic" src=""></div>
 
 <script>
     const log = (msg, cls) => {
         const div = document.getElementById('log');
         if (div) div.innerHTML += `<div class="${cls || ''}">${msg}</div>`;
+        console.log(msg);
     };
 
-    function startApp() {
-        try {
-            // ПРОВЕРКА SDK
-            if (!window.Telegram || !window.Telegram.WebApp) {
-                log("⏳ Ожидание SDK...", "error");
-                setTimeout(startApp, 300);
-                return;
-            }
+    function checkTelegram() {
+        // Проверяем наличие объекта Telegram каждые 100мс
+        if (typeof window.Telegram === 'undefined' || !window.Telegram.WebApp) {
+            setTimeout(checkTelegram, 100);
+            return;
+        }
+        initApp();
+    }
 
+    async function initApp() {
+        try {
             const tg = window.Telegram.WebApp;
             tg.ready();
             tg.expand();
-            log("✅ SDK OK");
+            log("✅ SDK Telegram загружен", "success");
 
-            // НАСТРОЙКИ (ТВОЙ VIP ID ВСТАВЛЕН)
+            // --- НАСТРОЙКИ ---
             const REPO = "Sweatyeyes/Bot-Posting";
-            const VIP_USERS =; 
+            const VIP_USERS = [337383733]; // Твой ID вставлен
+            
             const user = tg.initDataUnsafe?.user;
             const userId = user ? user.id : null;
             const isVip = VIP_USERS.includes(userId);
 
-            log(`👤 ID: ${userId || 'Гость'} | 💎 VIP: ${isVip ? 'ДА' : 'НЕТ'}`);
+            log(`👤 Твой ID: ${userId || 'Не определен'}`);
+            log(`💎 Статус: ${isVip ? 'VIP' : 'GUEST'}`);
 
-            // ПОИСК ПАПКИ
+            // --- ПОЛУЧЕНИЕ ПАРАМЕТРОВ ---
             const urlParams = new URLSearchParams(window.location.search);
+            // Ищем папку во всех возможных местах
             const postFolder = tg.initDataUnsafe?.start_param || urlParams.get('post') || urlParams.get('startapp');
 
             if (!postFolder) {
-                log("❌ ОШИБКА: ID папки не найден!", "error");
-                log("Проверь ссылку в Боте 1: должна быть ?startapp=...");
+                log("❌ ОШИБКА: ID папки (startapp) не получен!", "error");
+                log("Проверь кнопку в Боте 1: должна вести на k0tbezzabot/gallery?startapp=...");
                 return;
             }
 
-            log(`📂 Папка: posts/${postFolder}`, "success");
-            loadContent(postFolder, REPO, isVip);
-
-        } catch (e) {
-            log(`❌ КРИТИЧЕСКАЯ ОШИБКА: ${e.message}`, "error");
-        }
-    }
-
-    async function loadContent(folder, repo, isVip) {
-        log("📡 Запрос к GitHub API...");
-        let foundFiles = [];
-        
-        try {
+            log(`📂 Найдена папка: posts/${postFolder}`, "success");
+            
+            // --- ЗАГРУЗКА ИЗ GITHUB ---
+            log("📡 Запрос к GitHub API...");
+            let foundFiles = [];
             const folders = ["general", "vip"];
+            
             for (const fld of folders) {
-                const res = await fetch(`https://api.github.com{repo}/contents/posts/${folder}/${fld}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    log(`✅ ${fld}: ${data.length} файлов`);
-                    data.forEach(file => {
-                        if (!file.name.startsWith('blur_')) foundFiles.push(`${fld}/${file.name}`);
-                    });
-                } else {
-                    log(`⚠️ ${fld}: код ${res.status}`);
-                }
+                const apiLink = `https://api.github.com{REPO}/contents/posts/${postFolder}/${fld}`;
+                try {
+                    const res = await fetch(apiLink);
+                    if (res.ok) {
+                        const data = await res.json();
+                        log(`📦 ${fld}: найдено ${data.length} файлов`);
+                        data.forEach(file => {
+                            if (!file.name.startsWith('blur_')) foundFiles.push(`${fld}/${file.name}`);
+                        });
+                    } else {
+                        log(`⚠️ ${fld}: папка не найдена (код ${res.status})`);
+                    }
+                } catch (e) { log(`❌ Ошибка запроса ${fld}: ${e.message}`, "error"); }
             }
 
             if (foundFiles.length > 0) {
                 log("🚀 ЗАПУСК ГАЛЕРЕИ...", "success");
                 setTimeout(() => {
                     document.getElementById('viewer').style.display = 'flex';
-                    runViewer(foundFiles, folder, repo, isVip);
+                    runGallery(foundFiles, postFolder, REPO, isVip);
                 }, 1000);
             } else {
-                log("❌ Файлов на GitHub нет!", "error");
+                log("❌ Файлы в папках general/vip не найдены!", "error");
             }
-        } catch (e) {
-            log(`❌ ОШИБКА API: ${e.message}`, "error");
+
+        } catch (err) {
+            log(`❌ ФАТАЛЬНАЯ ОШИБКА: ${err.message}`, "error");
         }
     }
 
-    function runViewer(files, folder, repo, isVip) {
+    function runGallery(files, folder, repo, isVip) {
         let cur = 0;
         const pic = document.getElementById('pic');
+        const viewer = document.getElementById('viewer');
+        
         const update = () => {
             const path = files[cur];
             const baseUrl = `https://raw.githubusercontent.com{repo}/main/posts/${folder}/`;
             let url = baseUrl + path;
             
+            // Если не VIP и файл из папки VIP - подменяем на блюр
             if (!isVip && path.startsWith('vip/')) {
                 url = baseUrl + "vip/blur_" + path.split('/').pop();
             }
             pic.src = url;
+            console.log("Loading photo:", url);
         };
+
         update();
-        document.getElementById('viewer').onclick = () => { 
+        
+        viewer.onclick = () => { 
             cur = (cur + 1) % files.length;
             update();
         };
     }
 
-    startApp();
+    // Старт проверки
+    checkTelegram();
 </script>
 </body>
 </html>
