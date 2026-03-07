@@ -3,38 +3,844 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- Подключаем скрипт Telegram -->
-    <script src="https://telegram.org"></script>
+    
+    <!-- Правильный скрипт Telegram WebApp -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <title>Telegram Gallery</title>
+    
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; color: #fff; font-family: monospace; }
-        #log { padding: 15px; font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
-        .error { color: #ff453a; }
-        .success { color: #32d74b; }
-        #viewer { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 100; align-items: center; justify-content: center; }
-        img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        /* Сброс стилей */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Основные стили */
+        body, html {
+            width: 100%;
+            height: 100%;
+            background: #000;
+            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+            position: fixed;
+            touch-action: pan-y pinch-zoom;
+        }
+
+        /* Экран загрузки */
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            transition: opacity 0.3s ease;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #2ea6ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: #888;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+
+        .loading-progress {
+            width: 200px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            margin-top: 20px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: #2ea6ff;
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 2px;
+        }
+
+        /* Основной экран галереи */
+        #gallery-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: none;
+            z-index: 1000;
+        }
+
+        /* Контейнер для изображения */
+        #image-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background: #000;
+        }
+
+        /* Изображение */
+        #gallery-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            transition: opacity 0.2s ease;
+            opacity: 0;
+            will-change: transform;
+        }
+
+        #gallery-image.loaded {
+            opacity: 1;
+        }
+
+        /* Индикатор загрузки изображения */
+        .image-loader {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 255, 255, 0.2);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+
+        .image-loader.active {
+            display: block;
+        }
+
+        /* Счетчик изображений */
+        #image-counter {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 30px;
+            font-size: 15px;
+            font-weight: 500;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            z-index: 1002;
+            pointer-events: none;
+            letter-spacing: 0.5px;
+        }
+
+        /* VIP бейдж */
+        #vip-badge {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #ffd700, #ffb347);
+            color: #000;
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: bold;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+            z-index: 1001;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            letter-spacing: 0.5px;
+            display: none;
+        }
+
+        /* Кнопка назад */
+        #back-button {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 40px;
+            height: 40px;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 1001;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: background 0.2s ease;
+        }
+
+        #back-button:active {
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        /* Экран ошибки */
+        #error-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            text-align: center;
+            z-index: 3000;
+        }
+
+        .error-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.8;
+        }
+
+        .error-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #ff3b30;
+        }
+
+        .error-message {
+            font-size: 16px;
+            color: #888;
+            margin-bottom: 30px;
+            max-width: 300px;
+            line-height: 1.5;
+        }
+
+        .retry-button {
+            background: #2ea6ff;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(46, 166, 255, 0.3);
+        }
+
+        .retry-button:active {
+            transform: scale(0.95);
+            opacity: 0.8;
+        }
+
+        /* Информация о посте */
+        #post-info {
+            position: absolute;
+            top: 70px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: rgba(255, 255, 255, 0.8);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 1001;
+            max-width: calc(100% - 80px);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Подсказка для свайпа */
+        #swipe-hint {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            color: rgba(255, 255, 255, 0.7);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: opacity 0.5s ease;
+            opacity: 1;
+            z-index: 1001;
+            pointer-events: none;
+        }
+
+        #swipe-hint.fade-out {
+            opacity: 0;
+        }
+
+        /* Адаптация под Telegram */
+        .tg-dark-bg {
+            background: var(--tg-theme-bg-color, #000);
+        }
     </style>
 </head>
 <body>
-    <div id="log">🚀 Старт...</div>
-    <div id="viewer"><img id="pic" src=""></div>
+    <!-- Экран загрузки -->
+    <div id="loading-screen">
+        <div class="spinner"></div>
+        <div class="loading-text" id="loading-text">Загрузка галереи...</div>
+        <div class="loading-progress">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+    </div>
 
-<script>
-    const debug = (msg, cls) => {
-        const d = document.getElementById('log');
-        if (d) d.innerHTML += `<div class="${cls || ''}">${msg}</div>`;
-    };
-
-    // Главная функция запуска
-    async function init() {
-        debug("🔍 Проверка Telegram SDK...");
+    <!-- Основной экран галереи -->
+    <div id="gallery-screen">
+        <div id="back-button" onclick="closeGallery()">←</div>
+        <div id="post-info"></div>
+        <div id="vip-badge">VIP</div>
         
-        // Ждем до 3 секунд появления объекта Telegram
-        let attempts = 0;
-        while (!window.Telegram || !window.Telegram.WebApp) {
-            attempts++;
-            if (attempts > 30) {
-                debug("❌ ОШИБКА: Telegram SDK не загрузился за 3 сек!", "error");
-                return;
+        <div id="image-container">
+            <div class="image-loader" id="image-loader"></div>
+            <img id="gallery-image" src="" alt="Gallery image" onload="onImageLoad()" onerror="onImageError()">
+        </div>
+        
+        <div id="image-counter">1 / 1</div>
+        <div id="swipe-hint">👆 Листайте тапая или свайпая</div>
+    </div>
+
+    <!-- Экран ошибки -->
+    <div id="error-screen">
+        <div class="error-icon">😢</div>
+        <div class="error-title">Упс!</div>
+        <div class="error-message" id="error-message">Что-то пошло не так</div>
+        <button class="retry-button" onclick="location.reload()">Попробовать снова</button>
+    </div>
+
+    <script>
+        // --- КОНФИГУРАЦИЯ ---
+        const CONFIG = {
+            REPO: "Sweatyeyes/Bot-Posting",
+            BRANCH: "main",
+            GITHUB_RAW: "https://raw.githubusercontent.com",
+            GITHUB_API: "https://api.github.com/repos",
+            VIP_USERS: [337383733],  // Синхронизировать с ботом
+            TIMEOUT: 10000,  // 10 секунд
+            MAX_RETRIES: 3,
+            CACHE_TIME: 3600000,  // 1 час кэширования
+            SUPPORTED_FORMATS: ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+        };
+
+        // --- СОСТОЯНИЕ ПРИЛОЖЕНИЯ ---
+        const state = {
+            files: [],
+            currentIndex: 0,
+            isVip: false,
+            postId: null,
+            userId: null,
+            isLoading: true,
+            touchStartX: 0,
+            touchStartY: 0,
+            touchEndX: 0,
+            touchEndY: 0,
+            preloadedImages: new Set(),
+            retryCount: 0
+        };
+
+        // --- ИНИЦИАЛИЗАЦИЯ TELEGRAM WEBAPP ---
+        let tg = null;
+        
+        function initTelegram() {
+            try {
+                if (window.Telegram && window.Telegram.WebApp) {
+                    tg = window.Telegram.WebApp;
+                    tg.ready();
+                    tg.expand();
+                    tg.enableClosingConfirmation();
+                    
+                    // Настраиваем тему Telegram
+                    document.body.style.backgroundColor = tg.themeParams.bg_color || '#000';
+                    document.body.style.color = tg.themeParams.text_color || '#fff';
+                    
+                    console.log('✅ Telegram WebApp инициализирован');
+                    return true;
+                }
+            } catch (e) {
+                console.error('❌ Ошибка инициализации Telegram:', e);
+            }
+            return false;
+        }
+
+        // --- УТИЛИТЫ ---
+        function updateLoadingProgress(percent, text) {
+            const progressBar = document.getElementById('progress-bar');
+            const loadingText = document.getElementById('loading-text');
+            
+            if (progressBar) progressBar.style.width = percent + '%';
+            if (loadingText && text) loadingText.textContent = text;
+        }
+
+        function showError(message) {
+            console.error('❌ Ошибка:', message);
+            document.getElementById('loading-screen').style.display = 'none';
+            document.getElementById('gallery-screen').style.display = 'none';
+            document.getElementById('error-screen').style.display = 'flex';
+            document.getElementById('error-message').textContent = message;
+            
+            // Отправляем ошибку в бот
+            if (tg) {
+                try {
+                    tg.sendData(JSON.stringify({
+                        action: 'error',
+                        message: message,
+                        post: state.postId,
+                        userId: state.userId
+                    }));
+                } catch (e) {}
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // --- ПОЛУЧЕНИЕ ПАРАМЕТРОВ ИЗ URL ---
+        function getUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                post: params.get('post'),
+                vip: params.get('vip') === 'true',
+                user: params.get('user'),
+                t: params.get('t')
+            };
+        }
+
+        // --- ПРОВЕРКА СУЩЕСТВОВАНИЯ ПОСТА ---
+        async function checkPostExists(postId) {
+            const url = `${CONFIG.GITHUB_API}/${CONFIG.REPO}/contents/posts/${postId}`;
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUT);
+                
+                const response = await fetch(url, {
+                    signal: controller.signal,
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+                
+                clearTimeout(timeoutId);
+                return response.status === 200;
+            } catch (e) {
+                console.error('Ошибка проверки поста:', e);
+                return false;
+            }
+        }
+
+        // --- ЗАГРУЗКА ФАЙЛОВ ИЗ ПАПКИ ---
+        async function loadFilesFromFolder(postId, folder) {
+            const url = `${CONFIG.GITHUB_API}/${CONFIG.REPO}/contents/posts/${postId}/${folder}`;
+            
+            try {
+                updateLoadingProgress(30, `Загрузка ${folder} фото...`);
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUT);
+                
+                const response = await fetch(url, {
+                    signal: controller.signal,
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (response.status === 404) {
+                    return []; // Папка не существует
+                }
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (!Array.isArray(data)) {
+                    return [];
+                }
+                
+                // Фильтруем только изображения
+                return data.filter(item => {
+                    const ext = item.name.toLowerCase().slice(item.name.lastIndexOf('.'));
+                    return CONFIG.SUPPORTED_FORMATS.includes(ext) && 
+                           !item.name.startsWith('.') &&
+                           !item.name.startsWith('blur_');  // Исключаем размытые версии
+                }).map(item => ({
+                    name: item.name,
+                    path: `${folder}/${item.name}`,
+                    size: item.size,
+                    url: `${CONFIG.GITHUB_RAW}/${CONFIG.REPO}/${CONFIG.BRANCH}/posts/${postId}/${folder}/${item.name}`
+                }));
+                
+            } catch (e) {
+                if (e.name === 'AbortError') {
+                    console.error(`Таймаут загрузки ${folder}`);
+                } else {
+                    console.error(`Ошибка загрузки ${folder}:`, e);
+                }
+                return [];
+            }
+        }
+
+        // --- ЗАГРУЗКА ВСЕХ ФАЙЛОВ ПОСТА ---
+        async function loadAllFiles() {
+            const params = getUrlParams();
+            
+            if (!params.post) {
+                showError('Не указан ID поста');
+                return false;
+            }
+            
+            state.postId = params.post;
+            state.isVip = params.vip === 'true' || CONFIG.VIP_USERS.includes(parseInt(params.user));
+            state.userId = params.user;
+            
+            console.log('📁 Пост:', state.postId);
+            console.log('👑 VIP:', state.isVip);
+            console.log('👤 User:', state.userId);
+            
+            // Обновляем информацию
+            document.getElementById('post-info').textContent = `📁 ${state.postId}`;
+            
+            if (state.isVip) {
+                document.getElementById('vip-badge').style.display = 'block';
+            }
+            
+            // Проверяем существование поста
+            updateLoadingProgress(10, 'Проверка поста...');
+            const exists = await checkPostExists(state.postId);
+            
+            if (!exists) {
+                showError('Пост не найден на GitHub');
+                return false;
+            }
+            
+            // Загружаем общие фото
+            updateLoadingProgress(20, 'Загрузка общих фото...');
+            const generalFiles = await loadFilesFromFolder(state.postId, 'general');
+            console.log(`📸 Общих фото: ${generalFiles.length}`);
+            
+            // Загружаем VIP фото
+            updateLoadingProgress(50, 'Загрузка VIP фото...');
+            const vipFiles = await loadFilesFromFolder(state.postId, 'vip');
+            console.log(`🔒 VIP фото: ${vipFiles.length}`);
+            
+            // Формируем список файлов для показа
+            let filesToShow = [];
+            
+            // Добавляем общие фото
+            filesToShow.push(...generalFiles.map(f => ({
+                ...f,
+                type: 'general'
+            })));
+            
+            // Добавляем VIP фото только для VIP пользователей
+            if (state.isVip) {
+                filesToShow.push(...vipFiles.map(f => ({
+                    ...f,
+                    type: 'vip'
+                })));
+            } else {
+                // Для обычных пользователей добавляем размытые версии
+                vipFiles.forEach(file => {
+                    const blurredUrl = `${CONFIG.GITHUB_RAW}/${CONFIG.REPO}/${CONFIG.BRANCH}/posts/${state.postId}/vip/blur_${file.name}`;
+                    filesToShow.push({
+                        ...file,
+                        url: blurredUrl,
+                        type: 'vip-blurred',
+                        originalName: file.name
+                    });
+                });
+            }
+            
+            if (filesToShow.length === 0) {
+                showError('В этом посте нет изображений');
+                return false;
+            }
+            
+            // Сортируем файлы по имени
+            filesToShow.sort((a, b) => a.name.localeCompare(b.name));
+            
+            state.files = filesToShow;
+            
+            console.log(`✅ Всего загружено: ${filesToShow.length} файлов`);
+            
+            // Предзагружаем первое изображение
+            updateLoadingProgress(90, 'Подготовка галереи...');
+            await preloadImage(filesToShow[0].url);
+            
+            updateLoadingProgress(100, 'Готово!');
+            
+            return true;
+        }
+
+        // --- ПРЕДЗАГРУЗКА ИЗОБРАЖЕНИЯ ---
+        function preloadImage(url) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    state.preloadedImages.add(url);
+                    resolve();
+                };
+                img.onerror = reject;
+                img.src = url;
+            });
+        }
+
+        // --- ЗАПУСК ГАЛЕРЕИ ---
+        async function startGallery() {
+            const success = await loadAllFiles();
+            
+            if (!success) return;
+            
+            // Прячем экран загрузки
+            setTimeout(() => {
+                document.getElementById('loading-screen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('loading-screen').style.display = 'none';
+                    document.getElementById('gallery-screen').style.display = 'block';
+                    
+                    // Показываем первое изображение
+                    showImage(0);
+                    
+                    // Отправляем данные о просмотре в бот
+                    if (tg) {
+                        try {
+                            tg.sendData(JSON.stringify({
+                                action: 'view',
+                                folder: state.postId,
+                                files: state.files.length,
+                                vip: state.isVip,
+                                timestamp: Date.now()
+                            }));
+                        } catch (e) {}
+                    }
+                    
+                    // Прячем подсказку через 3 секунды
+                    setTimeout(() => {
+                        document.getElementById('swipe-hint').classList.add('fade-out');
+                    }, 3000);
+                    
+                }, 300);
+            }, 500);
+        }
+
+        // --- ПОКАЗ ИЗОБРАЖЕНИЯ ---
+        function showImage(index) {
+            if (!state.files.length) return;
+            
+            // Нормализуем индекс
+            if (index < 0) index = state.files.length - 1;
+            if (index >= state.files.length) index = 0;
+            
+            state.currentIndex = index;
+            
+            const file = state.files[index];
+            const img = document.getElementById('gallery-image');
+            const loader = document.getElementById('image-loader');
+            const counter = document.getElementById('image-counter');
+            
+            // Показываем загрузку
+            img.classList.remove('loaded');
+            loader.classList.add('active');
+            
+            // Обновляем счетчик
+            counter.textContent = `${index + 1} / ${state.files.length}`;
+            
+            // Добавляем информацию о типе фото
+            let typeInfo = '';
+            if (file.type === 'vip') {
+                typeInfo = ' (VIP)';
+                document.getElementById('vip-badge').style.display = 'block';
+            } else if (file.type === 'vip-blurred') {
+                typeInfo = ' (заблокировано)';
+            } else {
+                if (state.isVip) document.getElementById('vip-badge').style.display = 'none';
+            }
+            
+            document.getElementById('post-info').textContent = `📁 ${state.postId}${typeInfo}`;
+            
+            // Загружаем изображение
+            img.src = file.url;
+            
+            // Предзагружаем следующее изображение
+            const nextIndex = (index + 1) % state.files.length;
+            const nextFile = state.files[nextIndex];
+            if (!state.preloadedImages.has(nextFile.url)) {
+                preloadImage(nextFile.url);
+            }
+        }
+
+        // --- ОБРАБОТЧИКИ СОБЫТИЙ ИЗОБРАЖЕНИЯ ---
+        function onImageLoad() {
+            const img = document.getElementById('gallery-image');
+            const loader = document.getElementById('image-loader');
+            
+            img.classList.add('loaded');
+            loader.classList.remove('active');
+        }
+
+        function onImageError() {
+            const img = document.getElementById('gallery-image');
+            const loader = document.getElementById('image-loader');
+            
+            console.error('Ошибка загрузки изображения:', img.src);
+            
+            loader.classList.remove('active');
+            
+            // Пробуем перезагрузить с другим параметром
+            if (state.retryCount < CONFIG.MAX_RETRIES) {
+                state.retryCount++;
+                setTimeout(() => {
+                    img.src = img.src.split('?')[0] + '?retry=' + Date.now();
+                }, 1000);
+            } else {
+                showError('Не удалось загрузить изображение');
+            }
+        }
+
+        // --- НАВИГАЦИЯ ---
+        function nextImage() {
+            showImage(state.currentIndex + 1);
+        }
+
+        function prevImage() {
+            showImage(state.currentIndex - 1);
+        }
+
+        // --- ОБРАБОТЧИКИ КАСАНИЙ ---
+        function handleTouchStart(e) {
+            state.touchStartX = e.touches[0].clientX;
+            state.touchStartY = e.touches[0].clientY;
+        }
+
+        function handleTouchEnd(e) {
+            if (!state.touchStartX || !state.touchStartY) return;
+            
+            state.touchEndX = e.changedTouches[0].clientX;
+            state.touchEndY = e.changedTouches[0].clientY;
+            
+            handleSwipe();
+            
+            state.touchStartX = 0;
+            state.touchStartY = 0;
+        }
+
+        function handleSwipe() {
+            const diffX = state.touchEndX - state.touchStartX;
+            const diffY = state.touchEndY - state.touchStartY;
+            
+            // Горизонтальный свайп должен быть значительнее вертикального
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                if (diffX > 0) {
+                    prevImage(); // Свайп вправо - предыдущее
+                } else {
+                    nextImage(); // Свайп влево - следующее
+                }
+            }
+        }
+
+        // --- ЗАКРЫТИЕ ГАЛЕРЕИ ---
+        function closeGallery() {
+            if (tg) {
+                tg.close();
+            } else {
+                // Если не в Telegram, просто показываем ошибку
+                showError('Закройте вкладку');
+            }
+        }
+
+        // --- ИНИЦИАЛИЗАЦИЯ ---
+        async function init() {
+            console.log('🚀 Инициализация галереи...');
+            
+            // Инициализируем Telegram
+            if (!initTelegram()) {
+                console.warn('⚠️ Не в Telegram WebApp, работаем в обычном режиме');
+            }
+            
+            // Добавляем обработчики событий
+            const container = document.getElementById('image-container');
+            container.addEventListener('touchstart', handleTouchStart);
+            container.addEventListener('touchend', handleTouchEnd);
+            
+            // Обработчик клика для навигации
+            container.addEventListener('click', (e) => {
+                // Не переключаем если клик по кнопкам или бейджам
+                if (e.target.closest('#back-button') || 
+                    e.target.closest('#vip-badge') ||
+                    e.target.closest('#post-info')) {
+                    return;
+                }
+                
+                // Определяем сторону клика
+                const rect = container.getBoundingClientRect();
+                const clickX = e.clientX;
+                
+                if (clickX < rect.width / 2) {
+                    prevImage(); // Левая половина - предыдущее
+                } else {
+                    nextImage(); // Правая половина - следующее
+                }
+            });
+            
+            // Запускаем галерею
+            await startGallery();
+        }
+
+        // Запускаем при загрузке страницы
+        window.addEventListener('load', init);
+        
+        // Обработка ошибок
+        window.addEventListener('error', (e) => {
+            console.error('Глобальная ошибка:', e.error);
+        });
+    </script>
+</body>
+</html>                return;
             }
             await new Promise(r => setTimeout(r, 100));
         }
