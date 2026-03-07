@@ -18,7 +18,7 @@
 <body>
 
     <div class="counter" id="counter">Синхронизация...</div>
-    <div class="debug-info" id="debug">Поиск ID поста...</div>
+    <div class="debug-info" id="debug">Поиск данных...</div>
     
     <div class="viewer" id="main-zone">
         <img id="main-photo" src="" style="opacity: 0;">
@@ -30,10 +30,10 @@
     </div>
 
 <script>
-    // --- ТВОИ НАСТРОЙКИ ---
+    // --- НАСТРОЙКИ ---
     const REPO_OWNER = "Sweatyeyes";
     const REPO_NAME = "Bot-Posting";
-    const VIP_USERS = [337383733]; // Впиши свой ID здесь
+    const VIP_USERS =; // Твой ID
 
     const tg = window.Telegram.WebApp;
     tg.expand();
@@ -43,25 +43,19 @@
     const userId = user ? user.id : null;
     const isVip = VIP_USERS.includes(userId);
 
-    // УНИВЕРСАЛЬНЫЙ ПОИСК ID ПОСТА
+    // УМНЫЙ ПОИСК ID ПОСТА (ДЛЯ МОБИЛОК И ДЕСКТОПА)
     function getPostId() {
         const urlParams = new URLSearchParams(window.location.search);
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         
-        // 1. Ищем в официальном start_param от кнопки
+        // 1. Приоритет - официальный start_param
         let id = tg.initDataUnsafe?.start_param;
         
-        // 2. Ищем в параметрах URL (если открыли по прямой ссылке)
-        if (!id) id = urlParams.get('post') || urlParams.get('tgWebAppStartParam');
+        // 2. Если пусто (десктоп), ищем в URL
+        if (!id) id = urlParams.get('post') || urlParams.get('tgWebAppStartParam') || urlParams.get('startapp');
         
-        // 3. Ищем в хэше (для надежности в каналах)
-        if (!id) id = hashParams.get('tgWebAppStartParam') || hashParams.get('startapp');
-        
-        // 4. Если всё еще пусто, пробуем вытащить из сырой строки initData
-        if (!id && tg.initData) {
-            const initParams = new URLSearchParams(tg.initData);
-            id = initParams.get('start_param');
-        }
+        // 3. Если всё еще пусто, ищем в хэше
+        if (!id) id = hashParams.get('tgWebAppStartParam') || hashParams.get('startapp') || window.location.hash.replace('#', '');
 
         return id ? id.replace(/[^0-9\-_.]/g, '') : null;
     }
@@ -78,25 +72,27 @@
     const saveBtn = document.getElementById('save-btn');
     const lockMsg = document.getElementById('lock-msg');
 
-    debug.innerText = `Folder: ${postFolder || 'НЕ НАЙДЕН'} | User: ${userId || 'ГОСТЬ'} | VIP: ${isVip}`;
+    debug.innerText = `Folder: ${postFolder || 'NOT_FOUND'} | User: ${userId || 'GUEST'} | VIP: ${isVip}`;
 
     async function fetchFiles() {
-        if (!postFolder) {
-            cnt.innerText = "Ошибка: ID поста не найден";
+        if (!postFolder || postFolder.length < 5) {
+            cnt.innerText = "ID поста не распознан";
             return;
         }
 
-        cnt.innerText = "Синхронизация...";
+        cnt.innerText = "Подключение к GitHub...";
 
         try {
             const folders = ["general", "vip"];
             for (const folder of folders) {
-                const response = await fetch(`https://api.github.com{REPO_OWNER}/${REPO_NAME}/contents/posts/${postFolder}/${folder}`);
+                const url = `https://api.github.com{REPO_OWNER}/${REPO_NAME}/contents/posts/${postFolder}/${folder}`;
+                const response = await fetch(url);
+                
                 if (response.ok) {
                     const data = await response.json();
                     data.forEach(file => {
                         const name = file.name.toLowerCase();
-                        if ((name.endsWith('.jpg') || name.endsWith('.png')) && !name.startsWith('blur_')) {
+                        if ((name.endsWith('.jpg') || name.endsWith('.png') || name.endsWith('.jpeg')) && !name.startsWith('blur_')) {
                             photos.push(`${folder}/${file.name}`);
                         }
                     });
@@ -106,11 +102,11 @@
             if (photos.length > 0) {
                 updateGallery();
             } else {
-                cnt.innerText = "Галерея пуста";
-                debug.innerText += " | Files not found on GH";
+                cnt.innerText = "Фото не найдены";
+                debug.innerText += " | Проверь папку posts/" + postFolder;
             }
         } catch (e) {
-            cnt.innerText = "Ошибка сети";
+            cnt.innerText = "Ошибка API";
             debug.innerText = `Error: ${e.message}`;
         }
     }
