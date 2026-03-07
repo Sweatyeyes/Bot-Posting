@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <script src="https://telegram.org"></script>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; font-family: -apple-system, sans-serif; }
+        .counter { position: absolute; top: 20px; width: 100%; text-align: center; color: #888; font-size: 18px; z-index: 10; pointer-events: none; }
+        .viewer { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; touch-action: none; }
+        img { max-width: 100%; max-height: 100%; object-fit: contain; transition: opacity 0.2s; user-select: none; pointer-events: none; }
+        .controls { position: absolute; bottom: 40px; width: 100%; display: flex; justify-content: center; z-index: 20; }
+        .btn-save { background: rgba(255, 255, 255, 0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); padding: 12px 30px; border-radius: 50px; font-size: 15px; backdrop-filter: blur(10px); cursor: pointer; font-weight: bold; -webkit-tap-highlight-color: transparent; }
+        #lock-msg { color: #ff3b30; font-size: 14px; position: absolute; bottom: 90px; width: 100%; text-align: center; display: none; text-shadow: 0 0 10px rgba(0,0,0,0.8); }
+    </style>
+</head>
+<body>
+
+    <div class="counter" id="counter">Загрузка...</div>
+    <div id="lock-msg">⚠️ Оригинал только для подписчиков <br> "Нейроклубничка™"</div>
+    
+    <div class="viewer" id="main-zone">
+        <img id="main-photo" src="">
+    </div>
+
+    <div class="controls">
+        <button class="btn-save" id="save-btn" onclick="savePhoto()">📥 Сохранить фото</button>
+    </div>
+
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    // Получаем параметры из ссылки (их будет передавать Бот №2)
+    const urlParams = new URLSearchParams(window.location.search);
+    const postFolder = urlParams.get('post'); // Папка: 07.03_18-00
+    const isVip = urlParams.get('vip') === 'true'; // Статус пользователя
+    const rawFiles = urlParams.get('files'); // Список файлов через запятую
+
+    let photos = rawFiles ? rawFiles.split(',') : []; 
+    let cur = 0;
+
+    const img = document.getElementById('main-photo');
+    const cnt = document.getElementById('counter');
+    const zone = document.getElementById('main-zone');
+    const saveBtn = document.getElementById('save-btn');
+    const lockMsg = document.getElementById('lock-msg');
+
+    // Функция сборки ссылки на GitHub
+    function getPhotoUrl(filePath) {
+        // Базовый адрес вашего репозитория
+        const baseUrl = "https://sweatyeyes.github.io" + postFolder + "/";
+        
+        // Если фото в папке VIP и юзер НЕ VIP — подменяем на блюр-версию
+        if (!isVip && filePath.startsWith('vip/')) {
+            const fileName = filePath.replace('vip/', '');
+            return baseUrl + "vip/blur_" + fileName;
+        }
+        return baseUrl + filePath;
+    }
+
+    function updateGallery() {
+        if (photos.length === 0) return;
+        
+        img.style.opacity = 0;
+        const currentFile = photos[cur];
+
+        setTimeout(() => {
+            img.src = getPhotoUrl(currentFile);
+            cnt.innerText = (cur + 1) + " / " + photos.length;
+            
+            // Управление кнопкой сохранения и надписью
+            const isVipContent = currentFile.startsWith('vip/');
+            if (!isVip && isVipContent) {
+                saveBtn.style.display = 'none';
+                lockMsg.style.display = 'block';
+            } else {
+                saveBtn.style.display = 'block';
+                lockMsg.style.display = 'none';
+            }
+            
+            img.onload = () => { img.style.opacity = 1; };
+        }, 150);
+    }
+
+    // Инициализация
+    if (photos.length > 0) updateGallery();
+
+    // Навигация
+    function change(dir) {
+        if (photos.length === 0) return;
+        cur = (cur + dir + photos.length) % photos.length;
+        updateGallery();
+    }
+
+    zone.addEventListener('touchstart', e => { startX = e.touches[0].clientX; isMoving = false; });
+    zone.addEventListener('touchmove', () => { isMoving = true; });
+    zone.addEventListener('touchend', e => {
+        const endX = e.changedTouches[0].clientX;
+        const diffX = endX - startX;
+        if (isMoving && Math.abs(diffX) > 50) change(diffX < 0 ? 1 : -1);
+        else if (!isMoving) {
+            const sw = window.innerWidth;
+            change(endX < sw / 3 ? -1 : (endX > (sw * 2) / 3 ? 1 : 0));
+        }
+    });
+
+    function savePhoto() { window.open(getPhotoUrl(photos[cur]), '_blank'); }
+</script>
+</body>
+</html>
