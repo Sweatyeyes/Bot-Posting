@@ -18,7 +18,7 @@
 <body>
 
     <div class="counter" id="counter">Инициализация...</div>
-    <div class="debug-info" id="debug">Ожидание параметров...</div>
+    <div class="debug-info" id="debug">Поиск параметров...</div>
     
     <div class="viewer" id="main-zone">
         <img id="main-photo" src="" style="opacity: 0;">
@@ -30,22 +30,32 @@
     </div>
 
 <script>
-    // --- ТВОИ НАСТРОЙКИ ---
+    // --- НАСТРОЙКИ ---
     const REPO_OWNER = "Sweatyeyes";
     const REPO_NAME = "Bot-Posting";
-    const VIP_USERS = [337383733]; // Добавь свой ID сюда
+    const VIP_USERS = [337383733]; // Впиши свой ID здесь
 
     const tg = window.Telegram.WebApp;
     tg.expand();
     tg.ready();
 
+    // 1. ПОЛУЧЕНИЕ ID ПОЛЬЗОВАТЕЛЯ И VIP СТАТУСА
     const user = tg.initDataUnsafe?.user;
     const userId = user ? user.id : null;
     const isVip = VIP_USERS.includes(userId);
     
-    // Получаем ID поста из Direct Link (startapp) или из обычной ссылки (post)
+    // 2. ПОЛУЧЕНИЕ ID ПОСТА (start_param)
     const urlParams = new URLSearchParams(window.location.search);
-    const postFolder = tg.initDataUnsafe?.start_param || urlParams.get('post');
+    let postFolderRaw = tg.initDataUnsafe?.start_param || urlParams.get('post');
+
+    // Если не нашли в объекте, ищем в сырой строке initData
+    if (!postFolderRaw && tg.initData) {
+        const initParams = new URLSearchParams(tg.initData);
+        postFolderRaw = initParams.get('start_param');
+    }
+
+    // Очистка от мусора (Telegram иногда добавляет лишнее)
+    const postFolder = postFolderRaw ? postFolderRaw.replace(/[^0-9\-_.]/g, '') : null;
 
     let photos = [];
     let cur = 0;
@@ -58,16 +68,16 @@
     const saveBtn = document.getElementById('save-btn');
     const lockMsg = document.getElementById('lock-msg');
 
-    // Показываем дебаг-инфу
-    debug.innerText = `Folder: ${postFolder || 'NONE'} | User: ${userId || 'GUEST'} | VIP: ${isVip}`;
+    // Дебаг на экране
+    debug.innerText = `ID поста: ${postFolder || 'НЕ НАЙДЕН'} | User: ${userId || 'ГОСТЬ'}`;
 
     async function fetchFiles() {
         if (!postFolder) {
-            cnt.innerText = "ID поста не найден";
+            cnt.innerText = "Ошибка: ID поста не найден";
             return;
         }
 
-        cnt.innerText = "Синхронизация с GitHub...";
+        cnt.innerText = "Синхронизация...";
 
         try {
             const folders = ["general", "vip"];
@@ -78,11 +88,9 @@
                 if (response.ok) {
                     const data = await response.json();
                     data.forEach(file => {
-                        if (file.name.toLowerCase().endsWith('.jpg') || file.name.toLowerCase().endsWith('.png')) {
-                            // Берем только оригиналы (не blur_)
-                            if (!file.name.startsWith('blur_')) {
-                                photos.push(`${folder}/${file.name}`);
-                            }
+                        const name = file.name.toLowerCase();
+                        if ((name.endsWith('.jpg') || name.endsWith('.png')) && !name.startsWith('blur_')) {
+                            photos.push(`${folder}/${file.name}`);
                         }
                     });
                 }
@@ -91,19 +99,16 @@
             if (photos.length > 0) {
                 updateGallery();
             } else {
-                cnt.innerText = "В папке нет фото";
-                debug.innerText += " | API OK, but empty";
+                cnt.innerText = "Галерея пуста";
             }
         } catch (e) {
-            cnt.innerText = "Ошибка сети";
+            cnt.innerText = "Ошибка GitHub";
             debug.innerText = `Error: ${e.message}`;
         }
     }
 
     function getPhotoUrl(filePath) {
         const baseUrl = `https://raw.githubusercontent.com{REPO_OWNER}/${REPO_NAME}/main/posts/${postFolder}/`;
-        
-        // Логика подмены на блюр для не-VIP
         if (!isVip && filePath.startsWith('vip/')) {
             const fileName = filePath.split('/').pop();
             return baseUrl + "vip/blur_" + fileName;
@@ -114,9 +119,7 @@
     function updateGallery() {
         img.style.opacity = 0;
         const currentFile = photos[cur];
-        
-        const finalUrl = getPhotoUrl(currentFile);
-        img.src = finalUrl;
+        img.src = getPhotoUrl(currentFile);
         cnt.innerText = `${cur + 1} / ${photos.length}`;
         
         const isVipContent = currentFile.startsWith('vip/');
@@ -141,7 +144,7 @@
     zone.addEventListener('touchend', e => {
         const endX = e.changedTouches[0].clientX;
         const diff = endX - startX;
-        if (Math.abs(diff) > 50) change(diff < 0 ? 1 : -1);
+        if (Math.abs(diff) > 40) change(diff < 0 ? 1 : -1);
         else {
             const sw = window.innerWidth;
             if (endX < sw / 3) change(-1);
@@ -155,7 +158,6 @@
         }
     }
 
-    // Старт
     fetchFiles();
 </script>
 </body>
