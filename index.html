@@ -6,35 +6,45 @@
     <script src="https://telegram.org"></script>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; font-family: -apple-system, sans-serif; }
-        .counter { position: absolute; top: 20px; width: 100%; text-align: center; color: #fff; font-size: 16px; z-index: 10; text-shadow: 0 2px 4px rgba(0,0,0,0.5); font-weight: bold; }
+        .counter { position: absolute; top: 20px; width: 100%; text-align: center; color: #fff; font-size: 16px; z-index: 10; text-shadow: 0 2px 4px rgba(0,0,0,0.8); font-weight: bold; }
         .viewer { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; touch-action: none; }
         img { max-width: 100%; max-height: 100%; object-fit: contain; transition: opacity 0.3s ease; user-select: none; pointer-events: none; }
-        .controls { position: absolute; bottom: 30px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 20; }
-        .btn-save { background: rgba(255, 255, 255, 0.2); color: #fff; border: 1px solid rgba(255,255,255,0.4); padding: 12px 35px; border-radius: 50px; font-size: 14px; backdrop-filter: blur(15px); cursor: pointer; font-weight: 600; -webkit-tap-highlight-color: transparent; }
-        #lock-msg { color: #ff453a; font-size: 13px; text-align: center; display: none; text-shadow: 0 0 10px rgba(0,0,0,0.8); background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 10px; }
+        .controls { position: absolute; bottom: 30px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; z-index: 20; }
+        .btn-save { background: rgba(255, 255, 255, 0.2); color: #fff; border: 1px solid rgba(255,255,255,0.4); padding: 12px 40px; border-radius: 50px; font-size: 14px; backdrop-filter: blur(15px); cursor: pointer; font-weight: 600; -webkit-tap-highlight-color: transparent; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        #lock-msg { color: #ff453a; font-size: 13px; text-align: center; display: none; text-shadow: 0 0 10px rgba(0,0,0,0.8); background: rgba(0,0,0,0.6); padding: 8px 20px; border-radius: 12px; font-weight: 500; }
+        .status-badge { position: absolute; top: 50px; width: 100%; text-align: center; font-size: 10px; color: rgba(255,255,255,0.4); }
     </style>
 </head>
 <body>
 
     <div class="counter" id="counter">Загрузка...</div>
+    <div class="status-badge" id="status-badge"></div>
     
     <div class="viewer" id="main-zone">
         <img id="main-photo" src="" style="opacity: 0;">
     </div>
 
     <div class="controls">
-        <div id="lock-msg">⚠️ Оригинал только для подписчиков</div>
-        <button class="btn-save" id="save-btn" onclick="savePhoto()">📥 Сохранить фото</button>
+        <div id="lock-msg">⚠️ Оригинал доступен только VIP</div>
+        <button class="btn-save" id="save-btn" onclick="savePhoto()">📥 Сохранить оригинал</button>
     </div>
 
 <script>
+    // --- НАСТРОЙКИ VIP ---
+    const VIP_USERS = [337383733]; // Добавь сюда ID через запятую
+
     const tg = window.Telegram.WebApp;
-    tg.expand(); // Разворачиваем на весь экран
+    tg.expand();
     tg.ready();
 
+    // Получаем данные пользователя
+    const user = tg.initDataUnsafe?.user;
+    const userId = user ? user.id : null;
+    const isVip = VIP_USERS.includes(userId);
+
+    // Параметры из ссылки
     const urlParams = new URLSearchParams(window.location.search);
-    const postFolder = urlParams.get('post'); // Формат: 07-03_16-40
-    const isVip = urlParams.get('vip') === 'true';
+    const postFolder = urlParams.get('post'); 
     const rawFiles = urlParams.get('files');
 
     let photos = rawFiles ? rawFiles.split(',') : [];
@@ -46,13 +56,15 @@
     const zone = document.getElementById('main-zone');
     const saveBtn = document.getElementById('save-btn');
     const lockMsg = document.getElementById('lock-msg');
+    const statusBadge = document.getElementById('status-badge');
 
-    // ФОРМИРОВАНИЕ ССЫЛКИ НА КАРТИНКУ
+    // Отображаем статус для отладки (можно потом убрать)
+    statusBadge.innerText = isVip ? "Status: VIP 💎" : `ID: ${userId || 'Unknown'} (Guest)`;
+
     function getPhotoUrl(filePath) {
-        // Используем прямые ссылки raw.githubusercontent для обхода кэша и корректного отображения
         const baseUrl = `https://raw.githubusercontent.com{postFolder}/`;
         
-        // Если это VIP-папка и юзер НЕ VIP - подменяем на блюр
+        // Если это VIP контент и пользователь НЕ в списке - отдаем блюр
         if (!isVip && filePath.includes('vip/')) {
             const fileName = filePath.split('/').pop();
             return baseUrl + "vip/blur_" + fileName;
@@ -62,7 +74,7 @@
 
     function updateGallery() {
         if (photos.length === 0) {
-            cnt.innerText = "Галерея пуста";
+            cnt.innerText = "Пусто";
             return;
         }
         
@@ -70,56 +82,52 @@
         const currentFile = photos[cur];
 
         setTimeout(() => {
-            const finalUrl = getPhotoUrl(currentFile);
-            img.src = finalUrl;
+            img.src = getPhotoUrl(currentFile);
             cnt.innerText = `${cur + 1} / ${photos.length}`;
             
-            // Логика блокировки сохранения для не-VIP
-            const isVipFile = currentFile.includes('vip/');
-            if (!isVip && isVipFile) {
-                saveBtn.style.visibility = 'hidden';
+            const isVipContent = currentFile.includes('vip/');
+            
+            if (!isVip && isVipContent) {
+                saveBtn.style.display = 'none';
                 lockMsg.style.display = 'block';
             } else {
-                saveBtn.style.visibility = 'visible';
+                saveBtn.style.display = 'block';
                 lockMsg.style.display = 'none';
             }
             
             img.onload = () => { img.style.opacity = 1; };
-        }, 200);
+            img.onerror = () => { cnt.innerText = "Ошибка загрузки файла"; };
+        }, 150);
     }
 
-    // Навигация
+    // Навигация (свайпы и клики)
     function change(dir) {
         if (photos.length <= 1) return;
         cur = (cur + dir + photos.length) % photos.length;
         updateGallery();
     }
 
-    // Обработка свайпов и кликов
     zone.addEventListener('touchstart', e => { startX = e.touches[0].clientX; });
     zone.addEventListener('touchend', e => {
         const endX = e.changedTouches[0].clientX;
-        const diffX = endX - startX;
-        if (Math.abs(diffX) > 50) {
-            change(diffX < 0 ? 1 : -1);
-        } else {
-            // Клик по краям экрана для перелистывания
-            const sw = window.innerWidth;
-            if (endX < sw / 3) change(-1);
-            else if (endX > (sw * 2) / 3) change(1);
+        const diff = endX - startX;
+        if (Math.abs(diff) > 40) change(diff < 0 ? 1 : -1);
+        else {
+            if (endX < window.innerWidth / 3) change(-1);
+            else if (endX > window.innerWidth * 2 / 3) change(1);
         }
     });
 
     function savePhoto() {
-        if (img.src) window.open(img.src, '_blank');
+        if (img.src && !img.src.includes('blur_')) {
+            const link = document.createElement('a');
+            link.href = img.src;
+            link.download = `photo_${cur}.jpg`;
+            link.click();
+        }
     }
 
-    // Старт
-    if (photos.length > 0) {
-        updateGallery();
-    } else {
-        cnt.innerText = "Файлы не найдены";
-    }
+    if (photos.length > 0) updateGallery();
 </script>
 </body>
 </html>
