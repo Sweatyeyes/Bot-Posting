@@ -30,29 +30,39 @@
     </div>
 
 <script>
-    // --- НАСТРОЙКИ ---
+    // --- ТВОИ НАСТРОЙКИ ---
     const REPO_OWNER = "Sweatyeyes";
     const REPO_NAME = "Bot-Posting";
-    const VIP_USERS = [337383733]; // Впиши сюда свой ID
+    const VIP_USERS = [337383733]; // Впиши свой ID здесь
 
     const tg = window.Telegram.WebApp;
     tg.expand();
     tg.ready();
 
-    // 1. Получаем ID пользователя и проверяем VIP
-    const userId = tg.initDataUnsafe?.user?.id;
+    const user = tg.initDataUnsafe?.user;
+    const userId = user ? user.id : null;
     const isVip = VIP_USERS.includes(userId);
-    
-    // 2. Универсальный поиск ID поста (из кнопки или ссылки)
+
+    // УНИВЕРСАЛЬНЫЙ ПОИСК ID ПОСТА
     function getPostId() {
         const urlParams = new URLSearchParams(window.location.search);
-        // Проверяем: параметр startapp (от кнопки), параметр post (от ссылки) или хеш
-        let id = tg.initDataUnsafe?.start_param || urlParams.get('post') || urlParams.get('tgWebAppStartParam');
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
         
-        if (!id && window.location.hash) {
-            const hashParams = new URLSearchParams(window.location.hash.substring(1));
-            id = hashParams.get('tgWebAppStartParam');
+        // 1. Ищем в официальном start_param от кнопки
+        let id = tg.initDataUnsafe?.start_param;
+        
+        // 2. Ищем в параметрах URL (если открыли по прямой ссылке)
+        if (!id) id = urlParams.get('post') || urlParams.get('tgWebAppStartParam');
+        
+        // 3. Ищем в хэше (для надежности в каналах)
+        if (!id) id = hashParams.get('tgWebAppStartParam') || hashParams.get('startapp');
+        
+        // 4. Если всё еще пусто, пробуем вытащить из сырой строки initData
+        if (!id && tg.initData) {
+            const initParams = new URLSearchParams(tg.initData);
+            id = initParams.get('start_param');
         }
+
         return id ? id.replace(/[^0-9\-_.]/g, '') : null;
     }
 
@@ -68,14 +78,15 @@
     const saveBtn = document.getElementById('save-btn');
     const lockMsg = document.getElementById('lock-msg');
 
-    debug.innerText = `Folder: ${postFolder || 'НЕ НАЙДЕН'} | User: ${userId || 'GUEST'} | VIP: ${isVip}`;
+    debug.innerText = `Folder: ${postFolder || 'НЕ НАЙДЕН'} | User: ${userId || 'ГОСТЬ'} | VIP: ${isVip}`;
 
-    // 3. Загрузка списка файлов напрямую через GitHub API
     async function fetchFiles() {
         if (!postFolder) {
             cnt.innerText = "Ошибка: ID поста не найден";
             return;
         }
+
+        cnt.innerText = "Синхронизация...";
 
         try {
             const folders = ["general", "vip"];
@@ -95,10 +106,11 @@
             if (photos.length > 0) {
                 updateGallery();
             } else {
-                cnt.innerText = "Галерея пуста (проверьте GitHub)";
+                cnt.innerText = "Галерея пуста";
+                debug.innerText += " | Files not found on GH";
             }
         } catch (e) {
-            cnt.innerText = "Ошибка GitHub";
+            cnt.innerText = "Ошибка сети";
             debug.innerText = `Error: ${e.message}`;
         }
     }
@@ -136,9 +148,9 @@
         updateGallery();
     }
 
-    zone.addEventListener('touchstart', e => { startX = e.touches[0].clientX; });
+    zone.addEventListener('touchstart', e => { startX = e.touches.clientX; });
     zone.addEventListener('touchend', e => {
-        const endX = e.changedTouches[0].clientX;
+        const endX = e.changedTouches.clientX;
         const diff = endX - startX;
         if (Math.abs(diff) > 40) change(diff < 0 ? 1 : -1);
         else {
@@ -150,7 +162,10 @@
 
     function savePhoto() {
         if (img.src && !img.src.includes('blur_')) {
-            window.open(img.src, '_blank');
+            const link = document.createElement('a');
+            link.href = img.src;
+            link.target = '_blank';
+            link.click();
         }
     }
 
