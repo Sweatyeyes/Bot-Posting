@@ -6,97 +6,101 @@
     <script src="https://telegram.org"></script>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #1a1a1a; color: #fff; font-family: monospace; }
-        #log { padding: 20px; font-size: 12px; line-height: 1.4; white-space: pre-wrap; word-break: break-all; }
+        #log { padding: 20px; font-size: 11px; line-height: 1.4; white-space: pre-wrap; word-break: break-all; }
         .error { color: #ff453a; font-weight: bold; }
-        .success { color: #32d74b; }
+        .success { color: #32d74b; font-weight: bold; }
         .viewer { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 100; align-items: center; justify-content: center; }
         img { max-width: 100%; max-height: 100%; object-fit: contain; }
     </style>
 </head>
 <body>
-    <div id="log">🚀 Запуск системы логов...</div>
+    <div id="log">🚀 Система запущена...</div>
     <div id="viewer" class="viewer"><img id="pic" src=""></div>
 
 <script>
     const log = (msg, cls) => {
         const div = document.getElementById('log');
-        div.innerHTML += `<div class="${cls || ''}">${msg}</div>`;
+        if (div) div.innerHTML += `<div class="${cls || ''}">${msg}</div>`;
     };
 
-    // Ожидаем загрузки Telegram SDK
-    window.onload = () => {
+    function startApp() {
         try {
-            const tg = window.Telegram.WebApp;
-            tg.expand();
-            tg.ready();
+            // ПРОВЕРКА SDK
+            if (!window.Telegram || !window.Telegram.WebApp) {
+                log("⏳ Ожидание SDK...", "error");
+                setTimeout(startApp, 300);
+                return;
+            }
 
-            // ПАРАМЕТРЫ (ТВОЙ ID ВНУТРИ СКОБОК)
+            const tg = window.Telegram.WebApp;
+            tg.ready();
+            tg.expand();
+            log("✅ SDK OK");
+
+            // НАСТРОЙКИ (ТВОЙ VIP ID ВСТАВЛЕН)
             const REPO = "Sweatyeyes/Bot-Posting";
-            const VIP_USERS = [337383733]; 
+            const VIP_USERS =; 
             const user = tg.initDataUnsafe?.user;
             const userId = user ? user.id : null;
             const isVip = VIP_USERS.includes(userId);
 
-            log(`👤 UserID: ${userId || 'Не определен'}`);
-            log(`💎 VIP: ${isVip ? 'ДА' : 'НЕТ'}`);
+            log(`👤 ID: ${userId || 'Гость'} | 💎 VIP: ${isVip ? 'ДА' : 'НЕТ'}`);
 
-            // ПОЛУЧЕНИЕ ID ПАПКИ
+            // ПОИСК ПАПКИ
             const urlParams = new URLSearchParams(window.location.search);
-            const startParam = tg.initDataUnsafe?.start_param;
-            // Ищем везде: в start_param, в ?post=, в ?startapp=
-            const postFolder = startParam || urlParams.get('post') || urlParams.get('startapp');
+            const postFolder = tg.initDataUnsafe?.start_param || urlParams.get('post') || urlParams.get('startapp');
 
             if (!postFolder) {
-                log("❌ ОШИБКА: ID поста не найден!", "error");
-                log("Проверь ссылку в Боте 1");
-            } else {
-                log(`✅ ID поста получен: ${postFolder}`, "success");
-                fetchFromGithub(postFolder, REPO, isVip);
+                log("❌ ОШИБКА: ID папки не найден!", "error");
+                log("Проверь ссылку в Боте 1: должна быть ?startapp=...");
+                return;
             }
-        } catch (e) {
-            log(`❌ ОШИБКА ИНИЦИАЛИЗАЦИИ: ${e.message}`, "error");
-        }
-    };
 
-    async function fetchFromGithub(folder, repo, isVip) {
-        log(`📡 Запрос к GitHub API: posts/${folder}...`);
+            log(`📂 Папка: posts/${postFolder}`, "success");
+            loadContent(postFolder, REPO, isVip);
+
+        } catch (e) {
+            log(`❌ КРИТИЧЕСКАЯ ОШИБКА: ${e.message}`, "error");
+        }
+    }
+
+    async function loadContent(folder, repo, isVip) {
+        log("📡 Запрос к GitHub API...");
         let foundFiles = [];
         
         try {
             const folders = ["general", "vip"];
             for (const fld of folders) {
-                const apiLink = `https://api.github.com{repo}/contents/posts/${folder}/${fld}`;
-                const res = await fetch(apiLink);
-                
+                const res = await fetch(`https://api.github.com{repo}/contents/posts/${folder}/${fld}`);
                 if (res.ok) {
                     const data = await res.json();
-                    log(`✅ Папка ${fld}: найдено ${data.length} файлов`);
+                    log(`✅ ${fld}: ${data.length} файлов`);
                     data.forEach(file => {
                         if (!file.name.startsWith('blur_')) foundFiles.push(`${fld}/${file.name}`);
                     });
                 } else {
-                    log(`⚠️ Папка ${fld}: ошибка ${res.status}`);
+                    log(`⚠️ ${fld}: код ${res.status}`);
                 }
             }
 
             if (foundFiles.length > 0) {
-                log(`🚀 ЗАПУСК ГАЛЕРЕИ...`, "success");
+                log("🚀 ЗАПУСК ГАЛЕРЕИ...", "success");
                 setTimeout(() => {
                     document.getElementById('viewer').style.display = 'flex';
-                    startGallery(foundFiles, folder, repo, isVip);
-                }, 1500);
+                    runViewer(foundFiles, folder, repo, isVip);
+                }, 1000);
             } else {
-                log("❌ Файлы не найдены в GitHub!", "error");
+                log("❌ Файлов на GitHub нет!", "error");
             }
         } catch (e) {
             log(`❌ ОШИБКА API: ${e.message}`, "error");
         }
     }
 
-    function startGallery(files, folder, repo, isVip) {
+    function runViewer(files, folder, repo, isVip) {
         let cur = 0;
         const pic = document.getElementById('pic');
-        const show = () => {
+        const update = () => {
             const path = files[cur];
             const baseUrl = `https://raw.githubusercontent.com{repo}/main/posts/${folder}/`;
             let url = baseUrl + path;
@@ -105,14 +109,15 @@
                 url = baseUrl + "vip/blur_" + path.split('/').pop();
             }
             pic.src = url;
-            console.log("Show:", url);
         };
-        show();
+        update();
         document.getElementById('viewer').onclick = () => { 
             cur = (cur + 1) % files.length;
-            show();
+            update();
         };
     }
+
+    startApp();
 </script>
 </body>
 </html>
