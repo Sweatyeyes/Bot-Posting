@@ -23,82 +23,89 @@
         div.innerHTML += `<div class="${cls || ''}">${msg}</div>`;
     };
 
-    const tg = window.Telegram.WebApp;
-    tg.expand();
+    // Ожидаем загрузки Telegram SDK
+    window.onload = () => {
+        try {
+            const tg = window.Telegram.WebApp;
+            tg.expand();
+            tg.ready();
 
-    // ПАРАМЕТРЫ
-    const REPO = "Sweatyeyes/Bot-Posting";
-    const VIP_USERS =; 
-    const userId = tg.initDataUnsafe?.user?.id;
-    const isVip = VIP_USERS.includes(userId);
+            // ПАРАМЕТРЫ (ТВОЙ ID ВНУТРИ СКОБОК)
+            const REPO = "Sweatyeyes/Bot-Posting";
+            const VIP_USERS = [337383733]; 
+            const user = tg.initDataUnsafe?.user;
+            const userId = user ? user.id : null;
+            const isVip = VIP_USERS.includes(userId);
 
-    log(`👤 UserID: ${userId || 'Не определен'}`);
-    log(`💎 VIP: ${isVip ? 'ДА' : 'НЕТ'}`);
+            log(`👤 UserID: ${userId || 'Не определен'}`);
+            log(`💎 VIP: ${isVip ? 'ДА' : 'НЕТ'}`);
 
-    // ЛОВУШКА 1: ПРОВЕРКА ID ПАПКИ
-    const urlParams = new URLSearchParams(window.location.search);
-    const startParam = tg.initDataUnsafe?.start_param;
-    const postFolder = startParam || urlParams.get('post');
+            // ПОЛУЧЕНИЕ ID ПАПКИ
+            const urlParams = new URLSearchParams(window.location.search);
+            const startParam = tg.initDataUnsafe?.start_param;
+            // Ищем везде: в start_param, в ?post=, в ?startapp=
+            const postFolder = startParam || urlParams.get('post') || urlParams.get('startapp');
 
-    if (!postFolder) {
-        log("❌ ОШИБКА: ID поста (folder) не найден ни в start_param, ни в URL!", "error");
-    } else {
-        log(`✅ ID поста: ${postFolder}`, "success");
-        fetchFromGithub(postFolder);
-    }
+            if (!postFolder) {
+                log("❌ ОШИБКА: ID поста не найден!", "error");
+                log("Проверь ссылку в Боте 1");
+            } else {
+                log(`✅ ID поста получен: ${postFolder}`, "success");
+                fetchFromGithub(postFolder, REPO, isVip);
+            }
+        } catch (e) {
+            log(`❌ ОШИБКА ИНИЦИАЛИЗАЦИИ: ${e.message}`, "error");
+        }
+    };
 
-    async function fetchFromGithub(folder) {
-        log(`📂 Ищу папку: posts/${folder}...`);
+    async function fetchFromGithub(folder, repo, isVip) {
+        log(`📡 Запрос к GitHub API: posts/${folder}...`);
+        let foundFiles = [];
         
         try {
-            // ЛОВУШКА 2: ПРОВЕРКА API
             const folders = ["general", "vip"];
-            let foundFiles = [];
-
             for (const fld of folders) {
-                const apiLink = `https://api.github.com{REPO}/contents/posts/${folder}/${fld}`;
-                log(`📡 Запрос к API: ${fld}...`);
-                
+                const apiLink = `https://api.github.com{repo}/contents/posts/${folder}/${fld}`;
                 const res = await fetch(apiLink);
+                
                 if (res.ok) {
                     const data = await res.json();
-                    log(`✅ Найдено в ${fld}: ${data.length} файлов`);
+                    log(`✅ Папка ${fld}: найдено ${data.length} файлов`);
                     data.forEach(file => {
                         if (!file.name.startsWith('blur_')) foundFiles.push(`${fld}/${file.name}`);
                     });
                 } else {
-                    log(`⚠️ Папка ${fld} не ответила (код ${res.status})`);
+                    log(`⚠️ Папка ${fld}: ошибка ${res.status}`);
                 }
             }
 
             if (foundFiles.length > 0) {
-                log(`🚀 ЗАПУСК ГАЛЕРЕИ... (${foundFiles.length} фото)`, "success");
+                log(`🚀 ЗАПУСК ГАЛЕРЕИ...`, "success");
                 setTimeout(() => {
                     document.getElementById('viewer').style.display = 'flex';
-                    startGallery(foundFiles, folder);
-                }, 2000);
+                    startGallery(foundFiles, folder, repo, isVip);
+                }, 1500);
             } else {
-                log("❌ ОШИБКА: Ни одного файла не найдено. Проверь пути в GitHub!", "error");
+                log("❌ Файлы не найдены в GitHub!", "error");
             }
-
         } catch (e) {
-            log(`❌ КРИТИЧЕСКАЯ ОШИБКА: ${e.message}`, "error");
+            log(`❌ ОШИБКА API: ${e.message}`, "error");
         }
     }
 
-    function startGallery(files, folder) {
+    function startGallery(files, folder, repo, isVip) {
         let cur = 0;
         const pic = document.getElementById('pic');
         const show = () => {
             const path = files[cur];
-            const baseUrl = `https://raw.githubusercontent.com{REPO}/main/posts/${folder}/`;
+            const baseUrl = `https://raw.githubusercontent.com{repo}/main/posts/${folder}/`;
             let url = baseUrl + path;
             
             if (!isVip && path.startsWith('vip/')) {
                 url = baseUrl + "vip/blur_" + path.split('/').pop();
             }
             pic.src = url;
-            log(`📸 Ссылка фото: ${url}`);
+            console.log("Show:", url);
         };
         show();
         document.getElementById('viewer').onclick = () => { 
