@@ -5,22 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <script src="https://telegram.org"></script>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; font-family: -apple-system, sans-serif; }
-        .counter { position: absolute; top: 20px; width: 100%; text-align: center; color: #fff; font-size: 16px; z-index: 10; text-shadow: 0 2px 4px rgba(0,0,0,0.8); font-weight: bold; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; font-family: -apple-system, sans-serif; color: #fff; }
+        .counter { position: absolute; top: 20px; width: 100%; text-align: center; font-size: 16px; z-index: 10; text-shadow: 0 2px 4px rgba(0,0,0,0.8); font-weight: bold; }
         .viewer { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; touch-action: none; }
         img { max-width: 100%; max-height: 100%; object-fit: contain; transition: opacity 0.3s ease; user-select: none; pointer-events: none; }
         .controls { position: absolute; bottom: 30px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; z-index: 20; }
-        .btn-save { background: rgba(255, 255, 255, 0.2); color: #fff; border: 1px solid rgba(255,255,255,0.4); padding: 12px 40px; border-radius: 50px; font-size: 14px; backdrop-filter: blur(15px); cursor: pointer; font-weight: 600; -webkit-tap-highlight-color: transparent; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-        #lock-msg { color: #ff453a; font-size: 13px; text-align: center; display: none; text-shadow: 0 0 10px rgba(0,0,0,0.8); background: rgba(0,0,0,0.6); padding: 8px 20px; border-radius: 12px; font-weight: 500; }
-        .status-badge { position: absolute; top: 50px; width: 100%; text-align: center; font-size: 10px; color: rgba(255,255,255,0.4); }
+        .btn-save { background: rgba(255, 255, 255, 0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); padding: 12px 40px; border-radius: 50px; font-size: 14px; backdrop-filter: blur(15px); cursor: pointer; font-weight: 600; -webkit-tap-highlight-color: transparent; }
+        #lock-msg { color: #ff453a; font-size: 13px; text-align: center; display: none; background: rgba(0,0,0,0.7); padding: 8px 20px; border-radius: 12px; }
+        .loader { position: absolute; font-size: 14px; color: #888; }
     </style>
 </head>
 <body>
 
-    <div class="counter" id="counter">Загрузка...</div>
-    <div class="status-badge" id="status-badge"></div>
+    <div class="counter" id="counter">Инициализация...</div>
     
     <div class="viewer" id="main-zone">
+        <div class="loader" id="loader">Загрузка медиа...</div>
         <img id="main-photo" src="" style="opacity: 0;">
     </div>
 
@@ -30,24 +30,22 @@
     </div>
 
 <script>
-    // --- НАСТРОЙКИ VIP ---
-    const VIP_USERS = [337383733]; // Добавь сюда ID через запятую
+    // --- ТВОИ НАСТРОЙКИ ---
+    const REPO_OWNER = "Sweatyeyes";
+    const REPO_NAME = "Bot-Posting";
+    const VIP_USERS =; // Добавь сюда свой ID
 
     const tg = window.Telegram.WebApp;
     tg.expand();
     tg.ready();
 
-    // Получаем данные пользователя
-    const user = tg.initDataUnsafe?.user;
-    const userId = user ? user.id : null;
+    const userId = tg.initDataUnsafe?.user?.id;
     const isVip = VIP_USERS.includes(userId);
+    
+    // Получаем ID поста из Direct Link (startapp) или из URL
+    const postFolder = tg.initDataUnsafe?.start_param || new URLSearchParams(window.location.search).get('post');
 
-    // Параметры из ссылки
-    const urlParams = new URLSearchParams(window.location.search);
-    const postFolder = urlParams.get('post'); 
-    const rawFiles = urlParams.get('files');
-
-    let photos = rawFiles ? rawFiles.split(',') : [];
+    let photos = [];
     let cur = 0;
     let startX = 0;
 
@@ -56,16 +54,49 @@
     const zone = document.getElementById('main-zone');
     const saveBtn = document.getElementById('save-btn');
     const lockMsg = document.getElementById('lock-msg');
-    const statusBadge = document.getElementById('status-badge');
+    const loader = document.getElementById('loader');
 
-    // Отображаем статус для отладки (можно потом убрать)
-    statusBadge.innerText = isVip ? "Status: VIP 💎" : `ID: ${userId || 'Unknown'} (Guest)`;
+    // ФУНКЦИЯ ПОЛУЧЕНИЯ СПИСКА ФАЙЛОВ ИЗ GITHUB API
+    async function fetchFiles() {
+        if (!postFolder) {
+            cnt.innerText = "Ошибка: Пост не найден";
+            return;
+        }
+
+        try {
+            const folders = ["general", "vip"];
+            for (const folder of folders) {
+                const url = `https://api.github.com{REPO_OWNER}/${REPO_NAME}/contents/posts/${postFolder}/${folder}`;
+                const response = await fetch(url);
+                if (response.ok) {
+                    const data = await response.json();
+                    data.forEach(file => {
+                        if (file.name.toLowerCase().endsWith('.jpg') || file.name.toLowerCase().endsWith('.png')) {
+                            // Игнорируем заблюренные копии в списке оригиналов
+                            if (!file.name.startsWith('blur_')) {
+                                photos.push(`${folder}/${file.name}`);
+                            }
+                        }
+                    });
+                }
+            }
+            
+            if (photos.length > 0) {
+                loader.style.display = 'none';
+                updateGallery();
+            } else {
+                cnt.innerText = "Галерея пуста или еще не загружена";
+            }
+        } catch (e) {
+            cnt.innerText = "Ошибка GitHub API";
+        }
+    }
 
     function getPhotoUrl(filePath) {
-        const baseUrl = `https://raw.githubusercontent.com{postFolder}/`;
+        const baseUrl = `https://raw.githubusercontent.com{REPO_OWNER}/${REPO_NAME}/main/posts/${postFolder}/`;
         
-        // Если это VIP контент и пользователь НЕ в списке - отдаем блюр
-        if (!isVip && filePath.includes('vip/')) {
+        // Логика подмены на блюр для не-VIP
+        if (!isVip && filePath.startsWith('vip/')) {
             const fileName = filePath.split('/').pop();
             return baseUrl + "vip/blur_" + fileName;
         }
@@ -73,61 +104,51 @@
     }
 
     function updateGallery() {
-        if (photos.length === 0) {
-            cnt.innerText = "Пусто";
-            return;
-        }
-        
         img.style.opacity = 0;
         const currentFile = photos[cur];
-
-        setTimeout(() => {
-            img.src = getPhotoUrl(currentFile);
-            cnt.innerText = `${cur + 1} / ${photos.length}`;
-            
-            const isVipContent = currentFile.includes('vip/');
-            
-            if (!isVip && isVipContent) {
-                saveBtn.style.display = 'none';
-                lockMsg.style.display = 'block';
-            } else {
-                saveBtn.style.display = 'block';
-                lockMsg.style.display = 'none';
-            }
-            
-            img.onload = () => { img.style.opacity = 1; };
-            img.onerror = () => { cnt.innerText = "Ошибка загрузки файла"; };
-        }, 150);
+        
+        img.src = getPhotoUrl(currentFile);
+        cnt.innerText = `${cur + 1} / ${photos.length}`;
+        
+        const isVipContent = currentFile.startsWith('vip/');
+        if (!isVip && isVipContent) {
+            saveBtn.style.display = 'none';
+            lockMsg.style.display = 'block';
+        } else {
+            saveBtn.style.display = 'block';
+            lockMsg.style.display = 'none';
+        }
+        
+        img.onload = () => { img.style.opacity = 1; };
     }
 
-    // Навигация (свайпы и клики)
+    // Навигация
     function change(dir) {
         if (photos.length <= 1) return;
         cur = (cur + dir + photos.length) % photos.length;
         updateGallery();
     }
 
-    zone.addEventListener('touchstart', e => { startX = e.touches[0].clientX; });
+    zone.addEventListener('touchstart', e => { startX = e.touches.clientX; });
     zone.addEventListener('touchend', e => {
-        const endX = e.changedTouches[0].clientX;
+        const endX = e.changedTouches.clientX;
         const diff = endX - startX;
         if (Math.abs(diff) > 40) change(diff < 0 ? 1 : -1);
         else {
-            if (endX < window.innerWidth / 3) change(-1);
-            else if (endX > window.innerWidth * 2 / 3) change(1);
+            const sw = window.innerWidth;
+            if (endX < sw / 3) change(-1);
+            else if (endX > sw * 2 / 3) change(1);
         }
     });
 
     function savePhoto() {
         if (img.src && !img.src.includes('blur_')) {
-            const link = document.createElement('a');
-            link.href = img.src;
-            link.download = `photo_${cur}.jpg`;
-            link.click();
+            window.open(img.src, '_blank');
         }
     }
 
-    if (photos.length > 0) updateGallery();
+    // Запуск
+    fetchFiles();
 </script>
 </body>
 </html>
