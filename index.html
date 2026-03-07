@@ -12,15 +12,15 @@
         .controls { position: absolute; bottom: 30px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; z-index: 20; }
         .btn-save { background: rgba(255, 255, 255, 0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); padding: 12px 40px; border-radius: 50px; font-size: 14px; backdrop-filter: blur(15px); cursor: pointer; font-weight: 600; -webkit-tap-highlight-color: transparent; }
         #lock-msg { color: #ff453a; font-size: 13px; text-align: center; display: none; background: rgba(0,0,0,0.7); padding: 8px 20px; border-radius: 12px; }
-        .loader { position: absolute; font-size: 14px; color: #888; }
+        .debug-info { position: absolute; top: 50px; width: 100%; text-align: center; font-size: 10px; color: rgba(255,255,255,0.3); pointer-events: none; }
     </style>
 </head>
 <body>
 
     <div class="counter" id="counter">Инициализация...</div>
+    <div class="debug-info" id="debug">Ожидание параметров...</div>
     
     <div class="viewer" id="main-zone">
-        <div class="loader" id="loader">Загрузка медиа...</div>
         <img id="main-photo" src="" style="opacity: 0;">
     </div>
 
@@ -33,17 +33,19 @@
     // --- ТВОИ НАСТРОЙКИ ---
     const REPO_OWNER = "Sweatyeyes";
     const REPO_NAME = "Bot-Posting";
-    const VIP_USERS =; // Добавь сюда свой ID
+    const VIP_USERS = [337383733]; // Добавь свой ID сюда
 
     const tg = window.Telegram.WebApp;
     tg.expand();
     tg.ready();
 
-    const userId = tg.initDataUnsafe?.user?.id;
+    const user = tg.initDataUnsafe?.user;
+    const userId = user ? user.id : null;
     const isVip = VIP_USERS.includes(userId);
     
-    // Получаем ID поста из Direct Link (startapp) или из URL
-    const postFolder = tg.initDataUnsafe?.start_param || new URLSearchParams(window.location.search).get('post');
+    // Получаем ID поста из Direct Link (startapp) или из обычной ссылки (post)
+    const urlParams = new URLSearchParams(window.location.search);
+    const postFolder = tg.initDataUnsafe?.start_param || urlParams.get('post');
 
     let photos = [];
     let cur = 0;
@@ -51,28 +53,33 @@
 
     const img = document.getElementById('main-photo');
     const cnt = document.getElementById('counter');
+    const debug = document.getElementById('debug');
     const zone = document.getElementById('main-zone');
     const saveBtn = document.getElementById('save-btn');
     const lockMsg = document.getElementById('lock-msg');
-    const loader = document.getElementById('loader');
 
-    // ФУНКЦИЯ ПОЛУЧЕНИЯ СПИСКА ФАЙЛОВ ИЗ GITHUB API
+    // Показываем дебаг-инфу
+    debug.innerText = `Folder: ${postFolder || 'NONE'} | User: ${userId || 'GUEST'} | VIP: ${isVip}`;
+
     async function fetchFiles() {
         if (!postFolder) {
-            cnt.innerText = "Ошибка: Пост не найден";
+            cnt.innerText = "ID поста не найден";
             return;
         }
+
+        cnt.innerText = "Синхронизация с GitHub...";
 
         try {
             const folders = ["general", "vip"];
             for (const folder of folders) {
                 const url = `https://api.github.com{REPO_OWNER}/${REPO_NAME}/contents/posts/${postFolder}/${folder}`;
                 const response = await fetch(url);
+                
                 if (response.ok) {
                     const data = await response.json();
                     data.forEach(file => {
                         if (file.name.toLowerCase().endsWith('.jpg') || file.name.toLowerCase().endsWith('.png')) {
-                            // Игнорируем заблюренные копии в списке оригиналов
+                            // Берем только оригиналы (не blur_)
                             if (!file.name.startsWith('blur_')) {
                                 photos.push(`${folder}/${file.name}`);
                             }
@@ -82,13 +89,14 @@
             }
             
             if (photos.length > 0) {
-                loader.style.display = 'none';
                 updateGallery();
             } else {
-                cnt.innerText = "Галерея пуста или еще не загружена";
+                cnt.innerText = "В папке нет фото";
+                debug.innerText += " | API OK, but empty";
             }
         } catch (e) {
-            cnt.innerText = "Ошибка GitHub API";
+            cnt.innerText = "Ошибка сети";
+            debug.innerText = `Error: ${e.message}`;
         }
     }
 
@@ -107,7 +115,8 @@
         img.style.opacity = 0;
         const currentFile = photos[cur];
         
-        img.src = getPhotoUrl(currentFile);
+        const finalUrl = getPhotoUrl(currentFile);
+        img.src = finalUrl;
         cnt.innerText = `${cur + 1} / ${photos.length}`;
         
         const isVipContent = currentFile.startsWith('vip/');
@@ -122,18 +131,17 @@
         img.onload = () => { img.style.opacity = 1; };
     }
 
-    // Навигация
     function change(dir) {
         if (photos.length <= 1) return;
         cur = (cur + dir + photos.length) % photos.length;
         updateGallery();
     }
 
-    zone.addEventListener('touchstart', e => { startX = e.touches.clientX; });
+    zone.addEventListener('touchstart', e => { startX = e.touches[0].clientX; });
     zone.addEventListener('touchend', e => {
-        const endX = e.changedTouches.clientX;
+        const endX = e.changedTouches[0].clientX;
         const diff = endX - startX;
-        if (Math.abs(diff) > 40) change(diff < 0 ? 1 : -1);
+        if (Math.abs(diff) > 50) change(diff < 0 ? 1 : -1);
         else {
             const sw = window.innerWidth;
             if (endX < sw / 3) change(-1);
@@ -147,7 +155,7 @@
         }
     }
 
-    // Запуск
+    // Старт
     fetchFiles();
 </script>
 </body>
