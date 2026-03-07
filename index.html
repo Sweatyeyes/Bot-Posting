@@ -33,7 +33,7 @@
     // --- ТВОИ НАСТРОЙКИ ---
     const REPO_OWNER = "Sweatyeyes";
     const REPO_NAME = "Bot-Posting";
-    const VIP_USERS = [337383733]; // Твой ID уже здесь
+    const VIP_USERS = [337383733]; // Твой ID
 
     const tg = window.Telegram.WebApp;
     tg.expand();
@@ -43,24 +43,21 @@
     const userId = user ? user.id : null;
     const isVip = VIP_USERS.includes(userId);
 
-    // УНИВЕРСАЛЬНЫЙ МЕТОД ПОИСКА ID ПОСТА
+    // УНИВЕРСАЛЬНЫЙ ПОИСК ID ПОСТА
     function getPostId() {
         const urlParams = new URLSearchParams(window.location.search);
-        const hash = window.location.hash.substring(1);
-        const hashParams = new URLSearchParams(hash);
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
         
-        // 1. Из официального поля start_param
+        // 1. Из официального start_param (кнопка в канале)
         let id = tg.initDataUnsafe?.start_param;
         
-        // 2. Из хэша (часто на десктопе/маке)
-        if (!id) id = hashParams.get('tgWebAppStartParam') || hashParams.get('startapp');
-        
-        // 3. Из параметров URL
+        // 2. Из параметров URL (десктоп/браузер)
         if (!id) id = urlParams.get('post') || urlParams.get('tgWebAppStartParam') || urlParams.get('startapp');
         
-        // 4. Если всё еще пусто, проверяем сам хэш напрямую
-        if (!id && hash && hash.length > 5 && !hash.includes('=')) id = hash;
-
+        // 3. Из хэша (запасной вариант для Mac/Desktop)
+        if (!id) id = hashParams.get('tgWebAppStartParam') || hashParams.get('startapp');
+        
+        // 4. Очистка от лишних символов
         return id ? id.replace(/[^0-9\-_.]/g, '') : null;
     }
 
@@ -77,10 +74,10 @@
     const lockMsg = document.getElementById('lock-msg');
 
     // Дебаг на экран
-    debug.innerText = `Folder: ${postFolder || 'NOT_FOUND'} | User: ${userId || 'GUEST'} | VIP: ${isVip}`;
+    debug.innerText = `Folder: ${postFolder || 'НЕ НАЙДЕН'} | User: ${userId || 'ГОСТЬ'} | VIP: ${isVip}`;
 
     async function fetchFiles() {
-        if (!postFolder || postFolder.length < 5) {
+        if (!postFolder) {
             cnt.innerText = "ID поста не найден";
             return;
         }
@@ -88,6 +85,7 @@
         cnt.innerText = "Синхронизация с GitHub...";
 
         try {
+            // Опрашиваем по очереди папки general и vip
             const folders = ["general", "vip"];
             for (const folder of folders) {
                 const response = await fetch(`https://api.github.com{REPO_OWNER}/${REPO_NAME}/contents/posts/${postFolder}/${folder}`);
@@ -95,6 +93,7 @@
                     const data = await response.json();
                     data.forEach(file => {
                         const name = file.name.toLowerCase();
+                        // Берем только картинки и только оригиналы (без префикса blur_)
                         if ((name.endsWith('.jpg') || name.endsWith('.png') || name.endsWith('.jpeg')) && !name.startsWith('blur_')) {
                             photos.push(`${folder}/${file.name}`);
                         }
@@ -105,17 +104,18 @@
             if (photos.length > 0) {
                 updateGallery();
             } else {
-                cnt.innerText = "Фото не найдены";
-                debug.innerText += " | Проверь папку posts/" + postFolder;
+                cnt.innerText = "Галерея пуста";
+                debug.innerText += " | Files not found";
             }
         } catch (e) {
-            cnt.innerText = "Ошибка API";
+            cnt.innerText = "Ошибка сети";
             debug.innerText = `Error: ${e.message}`;
         }
     }
 
     function getPhotoUrl(filePath) {
         const baseUrl = `https://raw.githubusercontent.com{REPO_OWNER}/${REPO_NAME}/main/posts/${postFolder}/`;
+        // Если это VIP-контент и пользователь не в списке — отдаем блюр-версию
         if (!isVip && filePath.startsWith('vip/')) {
             const fileName = filePath.split('/').pop();
             return baseUrl + "vip/blur_" + fileName;
@@ -129,6 +129,7 @@
         img.src = getPhotoUrl(currentFile);
         cnt.innerText = `${cur + 1} / ${photos.length}`;
         
+        // Управление кнопкой сохранения и предупреждением
         const isVipContent = currentFile.startsWith('vip/');
         if (!isVip && isVipContent) {
             saveBtn.style.display = 'none';
@@ -147,9 +148,10 @@
         updateGallery();
     }
 
-    zone.addEventListener('touchstart', e => { startX = e.touches.clientX; });
+    // Навигация свайпами
+    zone.addEventListener('touchstart', e => { startX = e.touches[0].clientX; });
     zone.addEventListener('touchend', e => {
-        const endX = e.changedTouches.clientX;
+        const endX = e.changedTouches[0].clientX;
         const diff = endX - startX;
         if (Math.abs(diff) > 40) change(diff < 0 ? 1 : -1);
         else {
