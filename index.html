@@ -118,6 +118,7 @@
             transition: opacity 0.2s ease;
             opacity: 0;
             will-change: transform;
+            pointer-events: none; /* Важно для Android */
         }
 
         #gallery-image.loaded {
@@ -134,6 +135,7 @@
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
             display: none;
+            z-index: 1001;
         }
 
         .image-loader.active {
@@ -179,6 +181,7 @@
             border: 1px solid rgba(255, 255, 255, 0.3);
             letter-spacing: 0.5px;
             display: none;
+            pointer-events: none; /* Важно для Android */
         }
 
         /* Кнопка назад */
@@ -186,8 +189,8 @@
             position: absolute;
             top: 20px;
             left: 20px;
-            width: 40px;
-            height: 40px;
+            width: 44px; /* Увеличен для Android */
+            height: 44px; /* Увеличен для Android */
             background: rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
@@ -201,6 +204,7 @@
             z-index: 1001;
             border: 1px solid rgba(255, 255, 255, 0.1);
             transition: background 0.2s ease;
+            -webkit-tap-highlight-color: transparent;
         }
 
         #back-button:active {
@@ -256,6 +260,7 @@
             cursor: pointer;
             transition: all 0.2s ease;
             box-shadow: 0 4px 15px rgba(46, 166, 255, 0.3);
+            -webkit-tap-highlight-color: transparent;
         }
 
         .retry-button:active {
@@ -281,6 +286,7 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            pointer-events: none; /* Важно для Android */
         }
 
         /* Подсказка для свайпа */
@@ -307,49 +313,44 @@
             opacity: 0;
         }
 
-        /* Отладочная панель (только для разработки) */
-        #debug-panel {
+        /* Навигационные зоны (для Android) */
+        .nav-zone {
             position: absolute;
-            bottom: 120px;
-            left: 20px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            color: #0f0;
-            padding: 10px;
-            border-radius: 10px;
-            font-size: 11px;
-            font-family: monospace;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            z-index: 1003;
-            display: none;
-            max-height: 150px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-break: break-all;
+            top: 0;
+            width: 30%;
+            height: 100%;
+            z-index: 1000;
+            -webkit-tap-highlight-color: transparent;
         }
 
-        #debug-toggle {
-            position: absolute;
-            bottom: 270px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.5);
-            color: white;
-            width: 30px;
-            height: 30px;
-            border-radius: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-            cursor: pointer;
-            z-index: 1004;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+        #nav-left {
+            left: 0;
+        }
+
+        #nav-right {
+            right: 0;
+        }
+
+        /* Оптимизация для Android */
+        @media (pointer: coarse) {
+            #back-button {
+                width: 48px;
+                height: 48px;
+                font-size: 28px;
+            }
+            
+            .retry-button {
+                padding: 18px 48px;
+                font-size: 18px;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- Навигационные зоны (для Android) -->
+    <div id="nav-left" class="nav-zone" onclick="prevImage()"></div>
+    <div id="nav-right" class="nav-zone" onclick="nextImage()"></div>
+
     <!-- Экран загрузки -->
     <div id="loading-screen">
         <div class="spinner"></div>
@@ -357,7 +358,6 @@
         <div class="loading-progress">
             <div class="progress-bar" id="progress-bar"></div>
         </div>
-        <div style="margin-top: 20px; font-size: 12px; color: #444;" id="debug-info"></div>
     </div>
 
     <!-- Основной экран галереи -->
@@ -372,11 +372,7 @@
         </div>
         
         <div id="image-counter">1 / 1</div>
-        <div id="swipe-hint">👆 Листайте тапая или свайпая</div>
-        
-        <!-- Отладочные элементы (можно скрыть в продакшене) -->
-        <div id="debug-toggle" onclick="toggleDebug()">🐛</div>
-        <div id="debug-panel"></div>
+        <div id="swipe-hint">👆 Листайте тапая по краям</div>
     </div>
 
     <!-- Экран ошибки -->
@@ -394,11 +390,12 @@
             BRANCH: "main",
             GITHUB_RAW: "https://raw.githubusercontent.com",
             GITHUB_API: "https://api.github.com/repos",
-            VIP_USERS: [337383733],  // Синхронизировать с ботом
-            TIMEOUT: 10000,  // 10 секунд
+            VIP_USERS: [337383733],
+            TIMEOUT: 15000,  // Увеличен для Android
             MAX_RETRIES: 3,
             SUPPORTED_FORMATS: ['.jpg', '.jpeg', '.png', '.gif', '.webp'],
-            DEBUG: true  // Включить отладку
+            MAX_IMAGE_SIZE: 20 * 1024 * 1024, // 20MB максимальный размер
+            CACHE_SIZE: 5 // Кэшировать 5 изображений
         };
 
         // --- СОСТОЯНИЕ ПРИЛОЖЕНИЯ ---
@@ -411,41 +408,13 @@
             isLoading: true,
             touchStartX: 0,
             touchStartY: 0,
-            touchEndX: 0,
-            touchEndY: 0,
-            preloadedImages: new Set(),
+            preloadedImages: [],
             retryCount: 0,
-            debugLog: []
+            isAndroid: /Android/i.test(navigator.userAgent),
+            imageCache: new Map()
         };
 
-        // --- ОТЛАДКА ---
-        function debugLog(message, type = 'info') {
-            const timestamp = new Date().toLocaleTimeString();
-            const logEntry = `[${timestamp}] ${message}`;
-            
-            console.log(`🔍 ${logEntry}`);
-            
-            state.debugLog.push(logEntry);
-            if (state.debugLog.length > 20) state.debugLog.shift();
-            
-            const debugInfo = document.getElementById('debug-info');
-            if (debugInfo) {
-                debugInfo.textContent = message;
-            }
-            
-            const debugPanel = document.getElementById('debug-panel');
-            if (debugPanel && CONFIG.DEBUG) {
-                debugPanel.innerHTML = state.debugLog.map(msg => `> ${msg}`).join('<br>');
-                debugPanel.scrollTop = debugPanel.scrollHeight;
-            }
-        }
-
-        function toggleDebug() {
-            const panel = document.getElementById('debug-panel');
-            if (panel) {
-                panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-            }
-        }
+        console.log('📱 Платформа:', state.isAndroid ? 'Android' : 'iOS');
 
         // --- ИНИЦИАЛИЗАЦИЯ TELEGRAM WEBAPP ---
         let tg = null;
@@ -454,187 +423,124 @@
             try {
                 if (window.Telegram && window.Telegram.WebApp) {
                     tg = window.Telegram.WebApp;
-                    tg.ready();
-                    tg.expand();
-                    tg.enableClosingConfirmation();
                     
-                    // Настраиваем тему Telegram
-                    document.body.style.backgroundColor = tg.themeParams.bg_color || '#000';
-                    document.body.style.color = tg.themeParams.text_color || '#fff';
+                    // Важно для Android: небольшая задержка
+                    setTimeout(() => {
+                        tg.ready();
+                        tg.expand();
+                        
+                        // Не включаем подтверждение закрытия на Android
+                        if (!state.isAndroid) {
+                            tg.enableClosingConfirmation();
+                        }
+                    }, 100);
                     
-                    debugLog('✅ Telegram WebApp инициализирован');
-                    
-                    // Показываем всю информацию о initDataUnsafe
-                    if (CONFIG.DEBUG) {
-                        debugLog(`Telegram initDataUnsafe: ${JSON.stringify(tg.initDataUnsafe)}`);
-                    }
-                    
+                    console.log('✅ Telegram WebApp инициализирован');
                     return true;
                 } else {
-                    debugLog('❌ Telegram WebApp не найден', 'error');
+                    console.log('❌ Telegram WebApp не найден');
                     return false;
                 }
             } catch (e) {
-                debugLog(`❌ Ошибка инициализации Telegram: ${e.message}`, 'error');
+                console.error('❌ Ошибка инициализации Telegram:', e);
                 return false;
             }
         }
 
-        // --- ПОЛУЧЕНИЕ ПАРАМЕТРОВ ИЗ URL (ИСПРАВЛЕННАЯ ВЕРСИЯ) ---
+        // --- ПОЛУЧЕНИЕ ПАРАМЕТРОВ ---
         function getUrlParams() {
-            debugLog('🔍 Получение параметров...');
+            console.log('🔍 Получение параметров...');
             
             const params = new URLSearchParams(window.location.search);
             let postId = null;
-            let source = 'unknown';
             
-            // 1. Сначала проверяем start_param из Telegram (самый надежный)
+            // 1. Сначала проверяем start_param из Telegram
             if (window.Telegram?.WebApp?.initDataUnsafe?.start_param) {
                 postId = window.Telegram.WebApp.initDataUnsafe.start_param;
-                source = 'telegram_start_param';
-                debugLog(`📦 Получен start_param из Telegram: "${postId}"`);
+                console.log('📦 start_param из Telegram:', postId);
             }
             
-            // 2. Если нет, пробуем из URL параметров
+            // 2. Если нет, пробуем из URL
             if (!postId) {
-                postId = params.get('startapp');
-                if (postId) {
-                    source = 'url_startapp';
-                    debugLog(`📦 Получен параметр startapp из URL: "${postId}"`);
-                }
+                postId = params.get('startapp') || params.get('post') || params.get('id');
+                console.log('📦 Параметр из URL:', postId);
             }
             
-            if (!postId) {
-                postId = params.get('post');
-                if (postId) {
-                    source = 'url_post';
-                    debugLog(`📦 Получен параметр post из URL: "${postId}"`);
-                }
-            }
-            
-            if (!postId) {
-                postId = params.get('id');
-                if (postId) {
-                    source = 'url_id';
-                    debugLog(`📦 Получен параметр id из URL: "${postId}"`);
-                }
-            }
-            
-            // 3. Если всё еще нет, пробуем из хеша
-            if (!postId && window.location.hash) {
-                const hash = window.location.hash.substring(1);
-                if (hash) {
-                    postId = hash;
-                    source = 'hash';
-                    debugLog(`📦 Получен ID из хеша: "${hash}"`);
-                }
-            }
-            
-            // Очищаем от возможных префиксов
+            // Очищаем от префиксов
             if (postId && postId.startsWith('gallery_')) {
                 postId = postId.replace('gallery_', '');
-                debugLog(`🧹 Удален префикс gallery_, осталось: "${postId}"`);
             }
-            
-            debugLog(`✅ Итоговый ID поста: "${postId || 'НЕ НАЙДЕН'}" (источник: ${source})`);
             
             return {
                 post: postId,
                 vip: params.get('vip') === 'true',
-                user: params.get('user'),
-                t: params.get('t'),
-                source: source
+                user: params.get('user')
             };
         }
 
         // --- ФУНКЦИИ ДЛЯ РАБОТЫ С GITHUB ---
-        async function checkPostExists(postId) {
-            const url = `${CONFIG.GITHUB_API}/${CONFIG.REPO}/contents/posts/${postId}`;
-            debugLog(`🔍 Проверка поста: ${url}`);
+        async function fetchWithTimeout(url, options = {}) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUT);
             
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUT);
-                
                 const response = await fetch(url, {
+                    ...options,
                     signal: controller.signal,
                     headers: {
-                        'Accept': 'application/vnd.github.v3+json'
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...options.headers
                     }
                 });
-                
                 clearTimeout(timeoutId);
-                
-                const exists = response.status === 200;
-                debugLog(`📡 GitHub API ответ: ${response.status} - ${exists ? '✅ найден' : '❌ не найден'}`);
-                
-                return exists;
+                return response;
+            } catch (error) {
+                clearTimeout(timeoutId);
+                throw error;
+            }
+        }
+
+        async function checkPostExists(postId) {
+            const url = `${CONFIG.GITHUB_API}/${CONFIG.REPO}/contents/posts/${postId}`;
+            
+            try {
+                const response = await fetchWithTimeout(url);
+                return response.status === 200;
             } catch (e) {
-                if (e.name === 'AbortError') {
-                    debugLog('⏱️ Таймаут при проверке поста', 'error');
-                } else {
-                    debugLog(`❌ Ошибка проверки поста: ${e.message}`, 'error');
-                }
+                console.error('Ошибка проверки поста:', e);
                 return false;
             }
         }
 
         async function loadFilesFromFolder(postId, folder) {
             const url = `${CONFIG.GITHUB_API}/${CONFIG.REPO}/contents/posts/${postId}/${folder}`;
-            debugLog(`📂 Загрузка из ${folder}: ${url}`);
             
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUT);
+                const response = await fetchWithTimeout(url);
                 
-                const response = await fetch(url, {
-                    signal: controller.signal,
-                    headers: {
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
-                });
-                
-                clearTimeout(timeoutId);
-                
-                if (response.status === 404) {
-                    debugLog(`📁 Папка ${folder} не найдена (404)`);
-                    return [];
-                }
-                
-                if (!response.ok) {
-                    debugLog(`❌ Ошибка API ${folder}: ${response.status}`, 'error');
-                    return [];
-                }
+                if (response.status === 404) return [];
+                if (!response.ok) return [];
                 
                 const data = await response.json();
                 
-                if (!Array.isArray(data)) {
-                    debugLog(`⚠️ Неожиданный формат данных для ${folder}`, 'warning');
-                    return [];
-                }
+                if (!Array.isArray(data)) return [];
                 
-                // Фильтруем только изображения
-                const images = data.filter(item => {
-                    const ext = item.name.toLowerCase().slice(item.name.lastIndexOf('.'));
-                    const isImage = CONFIG.SUPPORTED_FORMATS.includes(ext);
-                    const isNotBlurred = !item.name.startsWith('blur_');
-                    return isImage && isNotBlurred;
-                }).map(item => ({
-                    name: item.name,
-                    path: `${folder}/${item.name}`,
-                    url: `${CONFIG.GITHUB_RAW}/${CONFIG.REPO}/${CONFIG.BRANCH}/posts/${postId}/${folder}/${item.name}`,
-                    size: item.size
-                }));
-                
-                debugLog(`✅ Загружено ${images.length} изображений из ${folder}`);
-                return images;
+                return data
+                    .filter(item => {
+                        const ext = item.name.toLowerCase().slice(item.name.lastIndexOf('.'));
+                        return CONFIG.SUPPORTED_FORMATS.includes(ext) && 
+                               !item.name.startsWith('blur_') &&
+                               item.size < CONFIG.MAX_IMAGE_SIZE; // Фильтр по размеру
+                    })
+                    .map(item => ({
+                        name: item.name,
+                        path: `${folder}/${item.name}`,
+                        url: `${CONFIG.GITHUB_RAW}/${CONFIG.REPO}/${CONFIG.BRANCH}/posts/${postId}/${folder}/${item.name}`,
+                        size: item.size
+                    }));
                 
             } catch (e) {
-                if (e.name === 'AbortError') {
-                    debugLog(`⏱️ Таймаут при загрузке ${folder}`, 'error');
-                } else {
-                    debugLog(`❌ Ошибка загрузки ${folder}: ${e.message}`, 'error');
-                }
+                console.error(`Ошибка загрузки ${folder}:`, e);
                 return [];
             }
         }
@@ -645,46 +551,30 @@
             
             if (progressBar) progressBar.style.width = percent + '%';
             if (loadingText && text) loadingText.textContent = text;
-            
-            debugLog(`${percent}% - ${text}`);
         }
 
         function showError(message) {
-            debugLog(`❌ ОШИБКА: ${message}`, 'error');
+            console.error('❌ Ошибка:', message);
             document.getElementById('loading-screen').style.display = 'none';
             document.getElementById('gallery-screen').style.display = 'none';
             document.getElementById('error-screen').style.display = 'flex';
             document.getElementById('error-message').textContent = message;
-            
-            // Отправляем ошибку в бот
-            if (tg) {
-                try {
-                    tg.sendData(JSON.stringify({
-                        action: 'error',
-                        message: message,
-                        post: state.postId,
-                        userId: state.userId
-                    }));
-                } catch (e) {}
-            }
         }
 
         // --- ЗАГРУЗКА ГАЛЕРЕИ ---
         async function loadGallery(postId, isVip, userId) {
-            debugLog(`🚀 Загрузка галереи: postId=${postId}, vip=${isVip}, userId=${userId}`);
+            console.log(`🚀 Загрузка галереи: ${postId}, VIP: ${isVip}`);
             
             updateLoadingProgress(10, 'Проверка поста...');
             
             try {
-                // Проверяем существование поста
                 const exists = await checkPostExists(postId);
                 
                 if (!exists) {
-                    showError(`Пост "${postId}" не найден на GitHub.\n\nПроверьте название папки в репозитории.`);
+                    showError(`Пост "${postId}" не найден`);
                     return;
                 }
                 
-                // Загружаем файлы
                 updateLoadingProgress(30, 'Загрузка изображений...');
                 
                 const [generalFiles, vipFiles] = await Promise.all([
@@ -692,37 +582,23 @@
                     loadFilesFromFolder(postId, 'vip')
                 ]);
                 
-                // Формируем список файлов
                 let files = [];
                 
                 // Добавляем общие фото
-                files.push(...generalFiles.map(f => ({
-                    ...f,
-                    type: 'general'
-                })));
+                files.push(...generalFiles.map(f => ({...f, type: 'general'})));
                 
                 // Добавляем VIP фото
                 if (isVip) {
-                    // Для VIP - оригиналы
-                    files.push(...vipFiles.map(f => ({
-                        ...f,
-                        type: 'vip'
-                    })));
-                    debugLog(`👑 VIP пользователь: добавлено ${vipFiles.length} оригинальных VIP фото`);
+                    files.push(...vipFiles.map(f => ({...f, type: 'vip'})));
                 } else {
-                    // Для обычных - размытые версии
                     vipFiles.forEach(file => {
-                        const blurredUrl = file.url.replace('/vip/', '/vip/blur_');
                         files.push({
                             ...file,
-                            url: blurredUrl,
+                            url: file.url.replace('/vip/', '/vip/blur_'),
                             type: 'vip-blurred',
                             isBlurred: true
                         });
                     });
-                    if (vipFiles.length > 0) {
-                        debugLog(`🔒 Обычный пользователь: добавлено ${vipFiles.length} размытых VIP фото`);
-                    }
                 }
                 
                 if (files.length === 0) {
@@ -730,10 +606,8 @@
                     return;
                 }
                 
-                // Сортируем файлы по имени
                 files.sort((a, b) => a.name.localeCompare(b.name));
                 
-                // Сохраняем в состоянии
                 state.files = files;
                 state.postId = postId;
                 state.isVip = isVip;
@@ -741,14 +615,13 @@
                 
                 updateLoadingProgress(100, `Готово! ${files.length} фото`);
                 
-                // Обновляем информацию
-                document.getElementById('post-info').textContent = `📁 ${postId} (${files.length} фото)`;
+                document.getElementById('post-info').textContent = `📁 ${postId}`;
                 
                 if (isVip) {
                     document.getElementById('vip-badge').style.display = 'block';
                 }
                 
-                // Запускаем галерею
+                // Небольшая задержка для Android
                 setTimeout(() => {
                     document.getElementById('loading-screen').style.opacity = '0';
                     setTimeout(() => {
@@ -756,37 +629,48 @@
                         document.getElementById('gallery-screen').style.display = 'block';
                         showImage(0);
                         
-                        // Отправляем статистику
-                        if (tg) {
+                        // Отправляем статистику с задержкой для Android
+                        if (tg && !state.isAndroid) {
                             try {
                                 tg.sendData(JSON.stringify({
                                     action: 'view',
                                     post: postId,
-                                    files: files.length,
-                                    vip: isVip,
-                                    time: Date.now()
+                                    files: files.length
                                 }));
                             } catch (e) {}
                         }
                         
-                        // Прячем подсказку через 3 секунды
                         setTimeout(() => {
                             document.getElementById('swipe-hint').classList.add('fade-out');
                         }, 3000);
                     }, 300);
-                }, 500);
+                }, state.isAndroid ? 200 : 100);
                 
             } catch (error) {
-                debugLog(`❌ Ошибка загрузки: ${error.message}`, 'error');
+                console.error('❌ Ошибка загрузки:', error);
                 showError(`Ошибка загрузки: ${error.message}`);
             }
         }
 
         // --- ФУНКЦИИ ГАЛЕРЕИ ---
+        function preloadImage(url) {
+            if (state.imageCache.has(url)) return;
+            
+            const img = new Image();
+            img.onload = () => {
+                state.imageCache.set(url, img);
+                // Ограничиваем размер кэша
+                if (state.imageCache.size > CONFIG.CACHE_SIZE) {
+                    const firstKey = state.imageCache.keys().next().value;
+                    state.imageCache.delete(firstKey);
+                }
+            };
+            img.src = url;
+        }
+
         function showImage(index) {
             if (!state.files.length) return;
             
-            // Нормализуем индекс
             if (index < 0) index = state.files.length - 1;
             if (index >= state.files.length) index = 0;
             
@@ -797,41 +681,37 @@
             const loader = document.getElementById('image-loader');
             const counter = document.getElementById('image-counter');
             
-            // Показываем загрузку
             img.classList.remove('loaded');
             loader.classList.add('active');
             
-            // Обновляем счетчик
             counter.textContent = `${index + 1} / ${state.files.length}`;
             
-            // Добавляем информацию о типе фото
+            // Обновляем информацию о посте
             let typeInfo = '';
             if (file.type === 'vip') {
                 typeInfo = ' (VIP)';
                 document.getElementById('vip-badge').style.display = 'block';
-            } else if (file.type === 'vip-blurred') {
-                typeInfo = ' (заблокировано)';
-                document.getElementById('vip-badge').style.display = 'none';
             } else {
                 document.getElementById('vip-badge').style.display = 'none';
             }
             
-            document.getElementById('post-info').textContent = `📁 ${state.postId}${typeInfo} — ${index + 1}/${state.files.length}`;
-            
-            debugLog(`🖼 Показ ${index + 1}: ${file.name} (${file.type})`);
+            document.getElementById('post-info').textContent = `📁 ${state.postId}${typeInfo}`;
             
             // Загружаем изображение
             img.src = file.url;
             
-            // Предзагружаем следующее изображение
-            const nextIndex = (index + 1) % state.files.length;
-            const nextFile = state.files[nextIndex];
-            if (!state.preloadedImages.has(nextFile.url)) {
-                const preloadImg = new Image();
-                preloadImg.src = nextFile.url;
-                state.preloadedImages.add(nextFile.url);
-                debugLog(`⏳ Предзагрузка ${nextIndex + 1}: ${nextFile.name}`);
-            }
+            // Предзагружаем следующие
+            const nextIndices = [
+                (index + 1) % state.files.length,
+                (index + 2) % state.files.length
+            ];
+            
+            nextIndices.forEach(i => {
+                const nextFile = state.files[i];
+                if (nextFile && !state.imageCache.has(nextFile.url)) {
+                    preloadImage(nextFile.url);
+                }
+            });
         }
 
         function onImageLoad() {
@@ -840,50 +720,50 @@
             
             img.classList.add('loaded');
             loader.classList.remove('active');
-            
-            debugLog(`✅ Изображение загружено`);
         }
 
         function onImageError() {
             const img = document.getElementById('gallery-image');
             const loader = document.getElementById('image-loader');
             
-            debugLog(`❌ Ошибка загрузки изображения: ${img.src}`, 'error');
+            console.error('Ошибка загрузки изображения');
             
             loader.classList.remove('active');
             
-            // Пробуем перезагрузить с другим параметром
             if (state.retryCount < CONFIG.MAX_RETRIES) {
                 state.retryCount++;
-                debugLog(`🔄 Повторная попытка ${state.retryCount}/${CONFIG.MAX_RETRIES}...`);
                 setTimeout(() => {
                     img.src = img.src.split('?')[0] + '?retry=' + Date.now();
                 }, 1000);
             } else {
-                // Показываем заглушку
-                img.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23333"/><text x="50" y="50" font-family="Arial" font-size="14" fill="%23fff" text-anchor="middle" dy=".3em">Ошибка</text></svg>';
                 img.classList.add('loaded');
             }
         }
 
         // --- НАВИГАЦИЯ ---
         function nextImage() {
+            if (!state.files.length) return;
             showImage(state.currentIndex + 1);
         }
 
         function prevImage() {
+            if (!state.files.length) return;
             showImage(state.currentIndex - 1);
         }
 
         function closeGallery() {
             if (tg) {
-                tg.close();
+                try {
+                    tg.close();
+                } catch (e) {
+                    window.close();
+                }
             } else {
-                showError('Закройте вкладку браузера');
+                window.close();
             }
         }
 
-        // --- ОБРАБОТЧИКИ КАСАНИЙ ---
+        // --- ОБРАБОТЧИКИ КАСАНИЙ (для свайпов) ---
         function handleTouchStart(e) {
             state.touchStartX = e.touches[0].clientX;
             state.touchStartY = e.touches[0].clientY;
@@ -892,95 +772,71 @@
         function handleTouchEnd(e) {
             if (!state.touchStartX || !state.touchStartY) return;
             
-            state.touchEndX = e.changedTouches[0].clientX;
-            state.touchEndY = e.changedTouches[0].clientY;
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
             
-            handleSwipe();
+            const diffX = touchEndX - state.touchStartX;
+            const diffY = touchEndY - state.touchStartY;
+            
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                if (diffX > 0) {
+                    prevImage();
+                } else {
+                    nextImage();
+                }
+            }
             
             state.touchStartX = 0;
             state.touchStartY = 0;
         }
 
-        function handleSwipe() {
-            const diffX = state.touchEndX - state.touchStartX;
-            const diffY = state.touchEndY - state.touchStartY;
-            
-            // Горизонтальный свайп должен быть значительнее вертикального
-            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
-                if (diffX > 0) {
-                    prevImage(); // Свайп вправо - предыдущее
-                    debugLog('👆 Свайп вправо');
-                } else {
-                    nextImage(); // Свайп влево - следующее
-                    debugLog('👆 Свайп влево');
-                }
-            }
-        }
-
-        // --- ГЛАВНАЯ ФУНКЦИЯ ИНИЦИАЛИЗАЦИИ ---
+        // --- ГЛАВНАЯ ФУНКЦИЯ ---
         async function init() {
-            debugLog('🚀 Инициализация галереи...');
+            console.log('🚀 Инициализация...');
             
-            // Инициализируем Telegram
             initTelegram();
             
-            // Получаем параметры
             const params = getUrlParams();
             
             if (!params.post) {
-                showError('Не указан ID поста.\n\nСсылка должна содержать ?startapp=НАЗВАНИЕ_ПАПКИ\n\nНапример: ?startapp=15-03_22-55');
-                debugLog('❌ Нет ID поста в параметрах', 'error');
+                showError('Не указан ID поста.\n\nСсылка должна содержать ?startapp=НАЗВАНИЕ_ПАПКИ');
                 return;
             }
             
-            // Очищаем ID поста от недопустимых символов
             const cleanPostId = params.post.replace(/[^a-zA-Z0-9_\-]/g, '');
+            const isVip = params.vip || CONFIG.VIP_USERS.includes(parseInt(params.user));
             
-            if (cleanPostId !== params.post) {
-                debugLog(`🧹 Очищенный ID: "${cleanPostId}" (был "${params.post}")`);
-            }
-            
-            // Определяем VIP статус
-            const isVip = params.vip || (params.user && CONFIG.VIP_USERS.includes(parseInt(params.user)));
-            
-            // Загружаем галерею
             await loadGallery(cleanPostId, isVip, params.user);
         }
 
         // --- ОБРАБОТЧИКИ СОБЫТИЙ ---
         window.addEventListener('load', init);
         
-        window.addEventListener('error', (e) => {
-            debugLog(`❌ Глобальная ошибка: ${e.message}`, 'error');
-        });
+        // Оптимизация для Android
+        if (/Android/i.test(navigator.userAgent)) {
+            // Отключаем двойной тап для зума
+            document.addEventListener('touchstart', (e) => {
+                if (e.touches.length > 1) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+        }
 
-        // Добавляем обработчики касаний
+        // Добавляем обработчики свайпов
         document.addEventListener('DOMContentLoaded', () => {
             const container = document.getElementById('image-container');
             if (container) {
-                container.addEventListener('touchstart', handleTouchStart);
+                container.addEventListener('touchstart', handleTouchStart, { passive: true });
                 container.addEventListener('touchend', handleTouchEnd);
-                
-                // Обработчик клика для навигации
-                container.addEventListener('click', (e) => {
-                    if (e.target.closest('#back-button') || 
-                        e.target.closest('#vip-badge') ||
-                        e.target.closest('#post-info') ||
-                        e.target.closest('#debug-toggle')) {
-                        return;
-                    }
-                    
-                    const rect = container.getBoundingClientRect();
-                    const clickX = e.clientX;
-                    
-                    if (clickX < rect.width / 2) {
-                        prevImage();
-                    } else {
-                        nextImage();
-                    }
-                });
             }
         });
+
+        // Экспортируем функции в глобальную область
+        window.nextImage = nextImage;
+        window.prevImage = prevImage;
+        window.closeGallery = closeGallery;
+        window.onImageLoad = onImageLoad;
+        window.onImageError = onImageError;
     </script>
 </body>
 </html>
