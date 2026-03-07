@@ -46,6 +46,7 @@
             justify-content: center;
             z-index: 2000;
             transition: opacity 0.3s ease;
+            padding: 20px;
         }
 
         .spinner {
@@ -66,6 +67,7 @@
             color: #888;
             font-size: 16px;
             margin-top: 10px;
+            text-align: center;
         }
 
         .loading-progress {
@@ -305,9 +307,45 @@
             opacity: 0;
         }
 
-        /* Адаптация под Telegram */
-        .tg-dark-bg {
-            background: var(--tg-theme-bg-color, #000);
+        /* Отладочная панель (только для разработки) */
+        #debug-panel {
+            position: absolute;
+            bottom: 120px;
+            left: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: #0f0;
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-family: monospace;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 1003;
+            display: none;
+            max-height: 150px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        #debug-toggle {
+            position: absolute;
+            bottom: 270px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            cursor: pointer;
+            z-index: 1004;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
     </style>
 </head>
@@ -319,6 +357,7 @@
         <div class="loading-progress">
             <div class="progress-bar" id="progress-bar"></div>
         </div>
+        <div style="margin-top: 20px; font-size: 12px; color: #444;" id="debug-info"></div>
     </div>
 
     <!-- Основной экран галереи -->
@@ -334,6 +373,10 @@
         
         <div id="image-counter">1 / 1</div>
         <div id="swipe-hint">👆 Листайте тапая или свайпая</div>
+        
+        <!-- Отладочные элементы (можно скрыть в продакшене) -->
+        <div id="debug-toggle" onclick="toggleDebug()">🐛</div>
+        <div id="debug-panel"></div>
     </div>
 
     <!-- Экран ошибки -->
@@ -354,8 +397,8 @@
             VIP_USERS: [337383733],  // Синхронизировать с ботом
             TIMEOUT: 10000,  // 10 секунд
             MAX_RETRIES: 3,
-            CACHE_TIME: 3600000,  // 1 час кэширования
-            SUPPORTED_FORMATS: ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+            SUPPORTED_FORMATS: ['.jpg', '.jpeg', '.png', '.gif', '.webp'],
+            DEBUG: true  // Включить отладку
         };
 
         // --- СОСТОЯНИЕ ПРИЛОЖЕНИЯ ---
@@ -371,8 +414,38 @@
             touchEndX: 0,
             touchEndY: 0,
             preloadedImages: new Set(),
-            retryCount: 0
+            retryCount: 0,
+            debugLog: []
         };
+
+        // --- ОТЛАДКА ---
+        function debugLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            
+            console.log(`🔍 ${logEntry}`);
+            
+            state.debugLog.push(logEntry);
+            if (state.debugLog.length > 20) state.debugLog.shift();
+            
+            const debugInfo = document.getElementById('debug-info');
+            if (debugInfo) {
+                debugInfo.textContent = message;
+            }
+            
+            const debugPanel = document.getElementById('debug-panel');
+            if (debugPanel && CONFIG.DEBUG) {
+                debugPanel.innerHTML = state.debugLog.map(msg => `> ${msg}`).join('<br>');
+                debugPanel.scrollTop = debugPanel.scrollHeight;
+            }
+        }
+
+        function toggleDebug() {
+            const panel = document.getElementById('debug-panel');
+            if (panel) {
+                panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+            }
+        }
 
         // --- ИНИЦИАЛИЗАЦИЯ TELEGRAM WEBAPP ---
         let tg = null;
@@ -389,26 +462,195 @@
                     document.body.style.backgroundColor = tg.themeParams.bg_color || '#000';
                     document.body.style.color = tg.themeParams.text_color || '#fff';
                     
-                    console.log('✅ Telegram WebApp инициализирован');
+                    debugLog('✅ Telegram WebApp инициализирован');
+                    
+                    // Показываем всю информацию о initDataUnsafe
+                    if (CONFIG.DEBUG) {
+                        debugLog(`Telegram initDataUnsafe: ${JSON.stringify(tg.initDataUnsafe)}`);
+                    }
+                    
                     return true;
+                } else {
+                    debugLog('❌ Telegram WebApp не найден', 'error');
+                    return false;
                 }
             } catch (e) {
-                console.error('❌ Ошибка инициализации Telegram:', e);
+                debugLog(`❌ Ошибка инициализации Telegram: ${e.message}`, 'error');
+                return false;
             }
-            return false;
         }
 
-        // --- УТИЛИТЫ ---
+        // --- ПОЛУЧЕНИЕ ПАРАМЕТРОВ ИЗ URL (ИСПРАВЛЕННАЯ ВЕРСИЯ) ---
+        function getUrlParams() {
+            debugLog('🔍 Получение параметров...');
+            
+            const params = new URLSearchParams(window.location.search);
+            let postId = null;
+            let source = 'unknown';
+            
+            // 1. Сначала проверяем start_param из Telegram (самый надежный)
+            if (window.Telegram?.WebApp?.initDataUnsafe?.start_param) {
+                postId = window.Telegram.WebApp.initDataUnsafe.start_param;
+                source = 'telegram_start_param';
+                debugLog(`📦 Получен start_param из Telegram: "${postId}"`);
+            }
+            
+            // 2. Если нет, пробуем из URL параметров
+            if (!postId) {
+                postId = params.get('startapp');
+                if (postId) {
+                    source = 'url_startapp';
+                    debugLog(`📦 Получен параметр startapp из URL: "${postId}"`);
+                }
+            }
+            
+            if (!postId) {
+                postId = params.get('post');
+                if (postId) {
+                    source = 'url_post';
+                    debugLog(`📦 Получен параметр post из URL: "${postId}"`);
+                }
+            }
+            
+            if (!postId) {
+                postId = params.get('id');
+                if (postId) {
+                    source = 'url_id';
+                    debugLog(`📦 Получен параметр id из URL: "${postId}"`);
+                }
+            }
+            
+            // 3. Если всё еще нет, пробуем из хеша
+            if (!postId && window.location.hash) {
+                const hash = window.location.hash.substring(1);
+                if (hash) {
+                    postId = hash;
+                    source = 'hash';
+                    debugLog(`📦 Получен ID из хеша: "${hash}"`);
+                }
+            }
+            
+            // Очищаем от возможных префиксов
+            if (postId && postId.startsWith('gallery_')) {
+                postId = postId.replace('gallery_', '');
+                debugLog(`🧹 Удален префикс gallery_, осталось: "${postId}"`);
+            }
+            
+            debugLog(`✅ Итоговый ID поста: "${postId || 'НЕ НАЙДЕН'}" (источник: ${source})`);
+            
+            return {
+                post: postId,
+                vip: params.get('vip') === 'true',
+                user: params.get('user'),
+                t: params.get('t'),
+                source: source
+            };
+        }
+
+        // --- ФУНКЦИИ ДЛЯ РАБОТЫ С GITHUB ---
+        async function checkPostExists(postId) {
+            const url = `${CONFIG.GITHUB_API}/${CONFIG.REPO}/contents/posts/${postId}`;
+            debugLog(`🔍 Проверка поста: ${url}`);
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUT);
+                
+                const response = await fetch(url, {
+                    signal: controller.signal,
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+                
+                clearTimeout(timeoutId);
+                
+                const exists = response.status === 200;
+                debugLog(`📡 GitHub API ответ: ${response.status} - ${exists ? '✅ найден' : '❌ не найден'}`);
+                
+                return exists;
+            } catch (e) {
+                if (e.name === 'AbortError') {
+                    debugLog('⏱️ Таймаут при проверке поста', 'error');
+                } else {
+                    debugLog(`❌ Ошибка проверки поста: ${e.message}`, 'error');
+                }
+                return false;
+            }
+        }
+
+        async function loadFilesFromFolder(postId, folder) {
+            const url = `${CONFIG.GITHUB_API}/${CONFIG.REPO}/contents/posts/${postId}/${folder}`;
+            debugLog(`📂 Загрузка из ${folder}: ${url}`);
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUT);
+                
+                const response = await fetch(url, {
+                    signal: controller.signal,
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (response.status === 404) {
+                    debugLog(`📁 Папка ${folder} не найдена (404)`);
+                    return [];
+                }
+                
+                if (!response.ok) {
+                    debugLog(`❌ Ошибка API ${folder}: ${response.status}`, 'error');
+                    return [];
+                }
+                
+                const data = await response.json();
+                
+                if (!Array.isArray(data)) {
+                    debugLog(`⚠️ Неожиданный формат данных для ${folder}`, 'warning');
+                    return [];
+                }
+                
+                // Фильтруем только изображения
+                const images = data.filter(item => {
+                    const ext = item.name.toLowerCase().slice(item.name.lastIndexOf('.'));
+                    const isImage = CONFIG.SUPPORTED_FORMATS.includes(ext);
+                    const isNotBlurred = !item.name.startsWith('blur_');
+                    return isImage && isNotBlurred;
+                }).map(item => ({
+                    name: item.name,
+                    path: `${folder}/${item.name}`,
+                    url: `${CONFIG.GITHUB_RAW}/${CONFIG.REPO}/${CONFIG.BRANCH}/posts/${postId}/${folder}/${item.name}`,
+                    size: item.size
+                }));
+                
+                debugLog(`✅ Загружено ${images.length} изображений из ${folder}`);
+                return images;
+                
+            } catch (e) {
+                if (e.name === 'AbortError') {
+                    debugLog(`⏱️ Таймаут при загрузке ${folder}`, 'error');
+                } else {
+                    debugLog(`❌ Ошибка загрузки ${folder}: ${e.message}`, 'error');
+                }
+                return [];
+            }
+        }
+
         function updateLoadingProgress(percent, text) {
             const progressBar = document.getElementById('progress-bar');
             const loadingText = document.getElementById('loading-text');
             
             if (progressBar) progressBar.style.width = percent + '%';
             if (loadingText && text) loadingText.textContent = text;
+            
+            debugLog(`${percent}% - ${text}`);
         }
 
         function showError(message) {
-            console.error('❌ Ошибка:', message);
+            debugLog(`❌ ОШИБКА: ${message}`, 'error');
             document.getElementById('loading-screen').style.display = 'none';
             document.getElementById('gallery-screen').style.display = 'none';
             document.getElementById('error-screen').style.display = 'flex';
@@ -427,248 +669,120 @@
             }
         }
 
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 B';
-            const k = 1024;
-            const sizes = ['B', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
-
-        // --- ПОЛУЧЕНИЕ ПАРАМЕТРОВ ИЗ URL ---
-        function getUrlParams() {
-            const params = new URLSearchParams(window.location.search);
-            return {
-                post: params.get('post'),
-                vip: params.get('vip') === 'true',
-                user: params.get('user'),
-                t: params.get('t')
-            };
-        }
-
-        // --- ПРОВЕРКА СУЩЕСТВОВАНИЯ ПОСТА ---
-        async function checkPostExists(postId) {
-            const url = `${CONFIG.GITHUB_API}/${CONFIG.REPO}/contents/posts/${postId}`;
+        // --- ЗАГРУЗКА ГАЛЕРЕИ ---
+        async function loadGallery(postId, isVip, userId) {
+            debugLog(`🚀 Загрузка галереи: postId=${postId}, vip=${isVip}, userId=${userId}`);
             
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUT);
-                
-                const response = await fetch(url, {
-                    signal: controller.signal,
-                    headers: {
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
-                });
-                
-                clearTimeout(timeoutId);
-                return response.status === 200;
-            } catch (e) {
-                console.error('Ошибка проверки поста:', e);
-                return false;
-            }
-        }
-
-        // --- ЗАГРУЗКА ФАЙЛОВ ИЗ ПАПКИ ---
-        async function loadFilesFromFolder(postId, folder) {
-            const url = `${CONFIG.GITHUB_API}/${CONFIG.REPO}/contents/posts/${postId}/${folder}`;
-            
-            try {
-                updateLoadingProgress(30, `Загрузка ${folder} фото...`);
-                
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUT);
-                
-                const response = await fetch(url, {
-                    signal: controller.signal,
-                    headers: {
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
-                });
-                
-                clearTimeout(timeoutId);
-                
-                if (response.status === 404) {
-                    return []; // Папка не существует
-                }
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                
-                const data = await response.json();
-                
-                if (!Array.isArray(data)) {
-                    return [];
-                }
-                
-                // Фильтруем только изображения
-                return data.filter(item => {
-                    const ext = item.name.toLowerCase().slice(item.name.lastIndexOf('.'));
-                    return CONFIG.SUPPORTED_FORMATS.includes(ext) && 
-                           !item.name.startsWith('.') &&
-                           !item.name.startsWith('blur_');  // Исключаем размытые версии
-                }).map(item => ({
-                    name: item.name,
-                    path: `${folder}/${item.name}`,
-                    size: item.size,
-                    url: `${CONFIG.GITHUB_RAW}/${CONFIG.REPO}/${CONFIG.BRANCH}/posts/${postId}/${folder}/${item.name}`
-                }));
-                
-            } catch (e) {
-                if (e.name === 'AbortError') {
-                    console.error(`Таймаут загрузки ${folder}`);
-                } else {
-                    console.error(`Ошибка загрузки ${folder}:`, e);
-                }
-                return [];
-            }
-        }
-
-        // --- ЗАГРУЗКА ВСЕХ ФАЙЛОВ ПОСТА ---
-        async function loadAllFiles() {
-            const params = getUrlParams();
-            
-            if (!params.post) {
-                showError('Не указан ID поста');
-                return false;
-            }
-            
-            state.postId = params.post;
-            state.isVip = params.vip === 'true' || CONFIG.VIP_USERS.includes(parseInt(params.user));
-            state.userId = params.user;
-            
-            console.log('📁 Пост:', state.postId);
-            console.log('👑 VIP:', state.isVip);
-            console.log('👤 User:', state.userId);
-            
-            // Обновляем информацию
-            document.getElementById('post-info').textContent = `📁 ${state.postId}`;
-            
-            if (state.isVip) {
-                document.getElementById('vip-badge').style.display = 'block';
-            }
-            
-            // Проверяем существование поста
             updateLoadingProgress(10, 'Проверка поста...');
-            const exists = await checkPostExists(state.postId);
             
-            if (!exists) {
-                showError('Пост не найден на GitHub');
-                return false;
-            }
-            
-            // Загружаем общие фото
-            updateLoadingProgress(20, 'Загрузка общих фото...');
-            const generalFiles = await loadFilesFromFolder(state.postId, 'general');
-            console.log(`📸 Общих фото: ${generalFiles.length}`);
-            
-            // Загружаем VIP фото
-            updateLoadingProgress(50, 'Загрузка VIP фото...');
-            const vipFiles = await loadFilesFromFolder(state.postId, 'vip');
-            console.log(`🔒 VIP фото: ${vipFiles.length}`);
-            
-            // Формируем список файлов для показа
-            let filesToShow = [];
-            
-            // Добавляем общие фото
-            filesToShow.push(...generalFiles.map(f => ({
-                ...f,
-                type: 'general'
-            })));
-            
-            // Добавляем VIP фото только для VIP пользователей
-            if (state.isVip) {
-                filesToShow.push(...vipFiles.map(f => ({
+            try {
+                // Проверяем существование поста
+                const exists = await checkPostExists(postId);
+                
+                if (!exists) {
+                    showError(`Пост "${postId}" не найден на GitHub.\n\nПроверьте название папки в репозитории.`);
+                    return;
+                }
+                
+                // Загружаем файлы
+                updateLoadingProgress(30, 'Загрузка изображений...');
+                
+                const [generalFiles, vipFiles] = await Promise.all([
+                    loadFilesFromFolder(postId, 'general'),
+                    loadFilesFromFolder(postId, 'vip')
+                ]);
+                
+                // Формируем список файлов
+                let files = [];
+                
+                // Добавляем общие фото
+                files.push(...generalFiles.map(f => ({
                     ...f,
-                    type: 'vip'
+                    type: 'general'
                 })));
-            } else {
-                // Для обычных пользователей добавляем размытые версии
-                vipFiles.forEach(file => {
-                    const blurredUrl = `${CONFIG.GITHUB_RAW}/${CONFIG.REPO}/${CONFIG.BRANCH}/posts/${state.postId}/vip/blur_${file.name}`;
-                    filesToShow.push({
-                        ...file,
-                        url: blurredUrl,
-                        type: 'vip-blurred',
-                        originalName: file.name
+                
+                // Добавляем VIP фото
+                if (isVip) {
+                    // Для VIP - оригиналы
+                    files.push(...vipFiles.map(f => ({
+                        ...f,
+                        type: 'vip'
+                    })));
+                    debugLog(`👑 VIP пользователь: добавлено ${vipFiles.length} оригинальных VIP фото`);
+                } else {
+                    // Для обычных - размытые версии
+                    vipFiles.forEach(file => {
+                        const blurredUrl = file.url.replace('/vip/', '/vip/blur_');
+                        files.push({
+                            ...file,
+                            url: blurredUrl,
+                            type: 'vip-blurred',
+                            isBlurred: true
+                        });
                     });
-                });
-            }
-            
-            if (filesToShow.length === 0) {
-                showError('В этом посте нет изображений');
-                return false;
-            }
-            
-            // Сортируем файлы по имени
-            filesToShow.sort((a, b) => a.name.localeCompare(b.name));
-            
-            state.files = filesToShow;
-            
-            console.log(`✅ Всего загружено: ${filesToShow.length} файлов`);
-            
-            // Предзагружаем первое изображение
-            updateLoadingProgress(90, 'Подготовка галереи...');
-            await preloadImage(filesToShow[0].url);
-            
-            updateLoadingProgress(100, 'Готово!');
-            
-            return true;
-        }
-
-        // --- ПРЕДЗАГРУЗКА ИЗОБРАЖЕНИЯ ---
-        function preloadImage(url) {
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.onload = () => {
-                    state.preloadedImages.add(url);
-                    resolve();
-                };
-                img.onerror = reject;
-                img.src = url;
-            });
-        }
-
-        // --- ЗАПУСК ГАЛЕРЕИ ---
-        async function startGallery() {
-            const success = await loadAllFiles();
-            
-            if (!success) return;
-            
-            // Прячем экран загрузки
-            setTimeout(() => {
-                document.getElementById('loading-screen').style.opacity = '0';
-                setTimeout(() => {
-                    document.getElementById('loading-screen').style.display = 'none';
-                    document.getElementById('gallery-screen').style.display = 'block';
-                    
-                    // Показываем первое изображение
-                    showImage(0);
-                    
-                    // Отправляем данные о просмотре в бот
-                    if (tg) {
-                        try {
-                            tg.sendData(JSON.stringify({
-                                action: 'view',
-                                folder: state.postId,
-                                files: state.files.length,
-                                vip: state.isVip,
-                                timestamp: Date.now()
-                            }));
-                        } catch (e) {}
+                    if (vipFiles.length > 0) {
+                        debugLog(`🔒 Обычный пользователь: добавлено ${vipFiles.length} размытых VIP фото`);
                     }
-                    
-                    // Прячем подсказку через 3 секунды
+                }
+                
+                if (files.length === 0) {
+                    showError('В этом посте нет изображений');
+                    return;
+                }
+                
+                // Сортируем файлы по имени
+                files.sort((a, b) => a.name.localeCompare(b.name));
+                
+                // Сохраняем в состоянии
+                state.files = files;
+                state.postId = postId;
+                state.isVip = isVip;
+                state.userId = userId;
+                
+                updateLoadingProgress(100, `Готово! ${files.length} фото`);
+                
+                // Обновляем информацию
+                document.getElementById('post-info').textContent = `📁 ${postId} (${files.length} фото)`;
+                
+                if (isVip) {
+                    document.getElementById('vip-badge').style.display = 'block';
+                }
+                
+                // Запускаем галерею
+                setTimeout(() => {
+                    document.getElementById('loading-screen').style.opacity = '0';
                     setTimeout(() => {
-                        document.getElementById('swipe-hint').classList.add('fade-out');
-                    }, 3000);
-                    
-                }, 300);
-            }, 500);
+                        document.getElementById('loading-screen').style.display = 'none';
+                        document.getElementById('gallery-screen').style.display = 'block';
+                        showImage(0);
+                        
+                        // Отправляем статистику
+                        if (tg) {
+                            try {
+                                tg.sendData(JSON.stringify({
+                                    action: 'view',
+                                    post: postId,
+                                    files: files.length,
+                                    vip: isVip,
+                                    time: Date.now()
+                                }));
+                            } catch (e) {}
+                        }
+                        
+                        // Прячем подсказку через 3 секунды
+                        setTimeout(() => {
+                            document.getElementById('swipe-hint').classList.add('fade-out');
+                        }, 3000);
+                    }, 300);
+                }, 500);
+                
+            } catch (error) {
+                debugLog(`❌ Ошибка загрузки: ${error.message}`, 'error');
+                showError(`Ошибка загрузки: ${error.message}`);
+            }
         }
 
-        // --- ПОКАЗ ИЗОБРАЖЕНИЯ ---
+        // --- ФУНКЦИИ ГАЛЕРЕИ ---
         function showImage(index) {
             if (!state.files.length) return;
             
@@ -697,11 +811,14 @@
                 document.getElementById('vip-badge').style.display = 'block';
             } else if (file.type === 'vip-blurred') {
                 typeInfo = ' (заблокировано)';
+                document.getElementById('vip-badge').style.display = 'none';
             } else {
-                if (state.isVip) document.getElementById('vip-badge').style.display = 'none';
+                document.getElementById('vip-badge').style.display = 'none';
             }
             
-            document.getElementById('post-info').textContent = `📁 ${state.postId}${typeInfo}`;
+            document.getElementById('post-info').textContent = `📁 ${state.postId}${typeInfo} — ${index + 1}/${state.files.length}`;
+            
+            debugLog(`🖼 Показ ${index + 1}: ${file.name} (${file.type})`);
             
             // Загружаем изображение
             img.src = file.url;
@@ -710,35 +827,42 @@
             const nextIndex = (index + 1) % state.files.length;
             const nextFile = state.files[nextIndex];
             if (!state.preloadedImages.has(nextFile.url)) {
-                preloadImage(nextFile.url);
+                const preloadImg = new Image();
+                preloadImg.src = nextFile.url;
+                state.preloadedImages.add(nextFile.url);
+                debugLog(`⏳ Предзагрузка ${nextIndex + 1}: ${nextFile.name}`);
             }
         }
 
-        // --- ОБРАБОТЧИКИ СОБЫТИЙ ИЗОБРАЖЕНИЯ ---
         function onImageLoad() {
             const img = document.getElementById('gallery-image');
             const loader = document.getElementById('image-loader');
             
             img.classList.add('loaded');
             loader.classList.remove('active');
+            
+            debugLog(`✅ Изображение загружено`);
         }
 
         function onImageError() {
             const img = document.getElementById('gallery-image');
             const loader = document.getElementById('image-loader');
             
-            console.error('Ошибка загрузки изображения:', img.src);
+            debugLog(`❌ Ошибка загрузки изображения: ${img.src}`, 'error');
             
             loader.classList.remove('active');
             
             // Пробуем перезагрузить с другим параметром
             if (state.retryCount < CONFIG.MAX_RETRIES) {
                 state.retryCount++;
+                debugLog(`🔄 Повторная попытка ${state.retryCount}/${CONFIG.MAX_RETRIES}...`);
                 setTimeout(() => {
                     img.src = img.src.split('?')[0] + '?retry=' + Date.now();
                 }, 1000);
             } else {
-                showError('Не удалось загрузить изображение');
+                // Показываем заглушку
+                img.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23333"/><text x="50" y="50" font-family="Arial" font-size="14" fill="%23fff" text-anchor="middle" dy=".3em">Ошибка</text></svg>';
+                img.classList.add('loaded');
             }
         }
 
@@ -749,6 +873,14 @@
 
         function prevImage() {
             showImage(state.currentIndex - 1);
+        }
+
+        function closeGallery() {
+            if (tg) {
+                tg.close();
+            } else {
+                showError('Закройте вкладку браузера');
+            }
         }
 
         // --- ОБРАБОТЧИКИ КАСАНИЙ ---
@@ -777,157 +909,78 @@
             if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
                 if (diffX > 0) {
                     prevImage(); // Свайп вправо - предыдущее
+                    debugLog('👆 Свайп вправо');
                 } else {
                     nextImage(); // Свайп влево - следующее
+                    debugLog('👆 Свайп влево');
                 }
             }
         }
 
-        // --- ЗАКРЫТИЕ ГАЛЕРЕИ ---
-        function closeGallery() {
-            if (tg) {
-                tg.close();
-            } else {
-                // Если не в Telegram, просто показываем ошибку
-                showError('Закройте вкладку');
-            }
-        }
-
-        // --- ИНИЦИАЛИЗАЦИЯ ---
+        // --- ГЛАВНАЯ ФУНКЦИЯ ИНИЦИАЛИЗАЦИИ ---
         async function init() {
-            console.log('🚀 Инициализация галереи...');
+            debugLog('🚀 Инициализация галереи...');
             
             // Инициализируем Telegram
-            if (!initTelegram()) {
-                console.warn('⚠️ Не в Telegram WebApp, работаем в обычном режиме');
+            initTelegram();
+            
+            // Получаем параметры
+            const params = getUrlParams();
+            
+            if (!params.post) {
+                showError('Не указан ID поста.\n\nСсылка должна содержать ?startapp=НАЗВАНИЕ_ПАПКИ\n\nНапример: ?startapp=15-03_22-55');
+                debugLog('❌ Нет ID поста в параметрах', 'error');
+                return;
             }
             
-            // Добавляем обработчики событий
-            const container = document.getElementById('image-container');
-            container.addEventListener('touchstart', handleTouchStart);
-            container.addEventListener('touchend', handleTouchEnd);
+            // Очищаем ID поста от недопустимых символов
+            const cleanPostId = params.post.replace(/[^a-zA-Z0-9_\-]/g, '');
             
-            // Обработчик клика для навигации
-            container.addEventListener('click', (e) => {
-                // Не переключаем если клик по кнопкам или бейджам
-                if (e.target.closest('#back-button') || 
-                    e.target.closest('#vip-badge') ||
-                    e.target.closest('#post-info')) {
-                    return;
-                }
-                
-                // Определяем сторону клика
-                const rect = container.getBoundingClientRect();
-                const clickX = e.clientX;
-                
-                if (clickX < rect.width / 2) {
-                    prevImage(); // Левая половина - предыдущее
-                } else {
-                    nextImage(); // Правая половина - следующее
-                }
-            });
+            if (cleanPostId !== params.post) {
+                debugLog(`🧹 Очищенный ID: "${cleanPostId}" (был "${params.post}")`);
+            }
             
-            // Запускаем галерею
-            await startGallery();
+            // Определяем VIP статус
+            const isVip = params.vip || (params.user && CONFIG.VIP_USERS.includes(parseInt(params.user)));
+            
+            // Загружаем галерею
+            await loadGallery(cleanPostId, isVip, params.user);
         }
 
-        // Запускаем при загрузке страницы
+        // --- ОБРАБОТЧИКИ СОБЫТИЙ ---
         window.addEventListener('load', init);
         
-        // Обработка ошибок
         window.addEventListener('error', (e) => {
-            console.error('Глобальная ошибка:', e.error);
+            debugLog(`❌ Глобальная ошибка: ${e.message}`, 'error');
+        });
+
+        // Добавляем обработчики касаний
+        document.addEventListener('DOMContentLoaded', () => {
+            const container = document.getElementById('image-container');
+            if (container) {
+                container.addEventListener('touchstart', handleTouchStart);
+                container.addEventListener('touchend', handleTouchEnd);
+                
+                // Обработчик клика для навигации
+                container.addEventListener('click', (e) => {
+                    if (e.target.closest('#back-button') || 
+                        e.target.closest('#vip-badge') ||
+                        e.target.closest('#post-info') ||
+                        e.target.closest('#debug-toggle')) {
+                        return;
+                    }
+                    
+                    const rect = container.getBoundingClientRect();
+                    const clickX = e.clientX;
+                    
+                    if (clickX < rect.width / 2) {
+                        prevImage();
+                    } else {
+                        nextImage();
+                    }
+                });
+            }
         });
     </script>
-</body>
-</html>                return;
-            }
-            await new Promise(r => setTimeout(r, 100));
-        }
-
-        const tg = window.Telegram.WebApp;
-        tg.ready();
-        tg.expand();
-        debug("✅ SDK Telegram найден!", "success");
-
-        // --- НАСТРОЙКИ ---
-        const REPO = "Sweatyeyes/Bot-Posting";
-        const VIP_USERS = [337383733]; 
-        const user = tg.initDataUnsafe?.user;
-        const userId = user ? user.id : null;
-        const isVip = VIP_USERS.includes(userId);
-
-        debug(`👤 Юзер: ${userId || 'Неизвестен'} | VIP: ${isVip ? 'ДА' : 'НЕТ'}`);
-
-        // --- ПОЛУЧЕНИЕ ID ПОСТА ---
-        const urlParams = new URLSearchParams(window.location.search);
-        // Пробуем взять из start_param (для кнопок в канале) или из URL (для десктопа)
-        const postFolder = tg.initDataUnsafe?.start_param || urlParams.get('post') || urlParams.get('startapp');
-
-        if (!postFolder) {
-            debug("❌ ОШИБКА: Папка поста (ID) не найдена!", "error");
-            debug("Проверь ссылку в Боте 1: должно быть ?startapp=...");
-            return;
-        }
-
-        debug(`📂 Цель: posts/${postFolder}`, "success");
-
-        // --- ЗАГРУЗКА ФАЙЛОВ ---
-        debug("📡 Связь с GitHub API...");
-        let files = [];
-        const subfolders = ["general", "vip"];
-
-        for (const fld of subfolders) {
-            try {
-                const res = await fetch(`https://api.github.com{REPO}/contents/posts/${postFolder}/${fld}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    debug(`📦 ${fld}: ${data.length} файлов`);
-                    data.forEach(item => {
-                        if (!item.name.startsWith('blur_')) files.push(`${fld}/${item.name}`);
-                    });
-                } else {
-                    debug(`⚠️ ${fld}: код ${res.status}`);
-                }
-            } catch (e) {
-                debug(`❌ Ошибка сети: ${e.message}`, "error");
-            }
-        }
-
-        if (files.length > 0) {
-            debug("🚀 ЗАПУСК ГАЛЕРЕИ...", "success");
-            setTimeout(() => {
-                document.getElementById('log').style.display = 'none';
-                document.getElementById('viewer').style.display = 'flex';
-                runGallery(files, postFolder, REPO, isVip);
-            }, 1000);
-        } else {
-            debug("❌ Файлы не найдены!", "error");
-        }
-    }
-
-    function runGallery(files, folder, repo, isVip) {
-        let cur = 0;
-        const pic = document.getElementById('pic');
-        const update = () => {
-            const file = files[cur];
-            const baseUrl = `https://raw.githubusercontent.com{repo}/main/posts/${folder}/`;
-            let url = baseUrl + file;
-            
-            if (!isVip && file.startsWith('vip/')) {
-                url = baseUrl + "vip/blur_" + file.split('/').pop();
-            }
-            pic.src = url;
-        };
-        update();
-        document.getElementById('viewer').onclick = () => {
-            cur = (cur + 1) % files.length;
-            update();
-        };
-    }
-
-    // Запускаем инициализацию
-    init();
-</script>
 </body>
 </html>
