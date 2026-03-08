@@ -97,7 +97,7 @@
             flex-direction: column;
         }
 
-        /* Верхняя панель */
+        /* Верхняя панель (только кнопка назад) */
         #top-bar {
             position: absolute;
             top: 0;
@@ -108,7 +108,6 @@
             z-index: 1002;
             display: flex;
             align-items: center;
-            justify-content: space-between;
             padding: 0 15px;
             pointer-events: none;
         }
@@ -135,23 +134,11 @@
             background: rgba(0, 0, 0, 0.8);
         }
 
-        #post-info {
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            color: rgba(255, 255, 255, 0.8);
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            pointer-events: auto;
-            max-width: 50%;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
+        /* VIP бейдж */
         #vip-badge {
+            position: absolute;
+            top: 20px;
+            right: 20px;
             background: linear-gradient(135deg, #ffd700, #ffb347);
             color: #000;
             padding: 6px 12px;
@@ -161,7 +148,7 @@
             backdrop-filter: blur(5px);
             -webkit-backdrop-filter: blur(5px);
             box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
-            pointer-events: auto;
+            z-index: 1002;
             display: none;
         }
 
@@ -194,7 +181,7 @@
         .nav-zone {
             position: absolute;
             top: 60px;
-            bottom: 80px;
+            bottom: 70px;
             width: 30%;
             z-index: 1001;
             -webkit-tap-highlight-color: transparent;
@@ -264,7 +251,7 @@
             bottom: 0;
             left: 0;
             right: 0;
-            height: 80px;
+            height: 70px;
             background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.7));
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
@@ -280,7 +267,7 @@
         #bottom-bar > div:first-child {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 15px;
         }
 
         /* Ссылка на клубничку */
@@ -288,32 +275,27 @@
             text-decoration: none;
         }
 
-        /* Кнопка с клубничкой */
+        /* Кнопка с клубничкой (только иконка) */
         #strawberry-button {
+            width: 48px;
+            height: 48px;
             background: linear-gradient(135deg, #ff3b6f, #ff8c5a);
             color: white;
             border: none;
-            padding: 8px 16px;
-            border-radius: 30px;
-            font-size: 14px;
-            font-weight: 600;
+            border-radius: 50%;
             cursor: pointer;
             transition: all 0.2s ease;
             box-shadow: 0 4px 15px rgba(255, 59, 111, 0.3);
             border: 1px solid rgba(255, 255, 255, 0.2);
             display: flex;
             align-items: center;
-            gap: 6px;
-            white-space: nowrap;
+            justify-content: center;
+            font-size: 24px;
         }
 
         #strawberry-button:active {
-            transform: scale(0.95);
+            transform: scale(0.9);
             opacity: 0.8;
-        }
-
-        #strawberry-button span {
-            font-size: 18px;
         }
 
         /* Счетчик изображений */
@@ -328,27 +310,26 @@
             white-space: nowrap;
         }
 
-        /* Кнопка сохранить */
+        /* Кнопка сохранить (только иконка) */
         #save-button {
+            width: 48px;
+            height: 48px;
             background: linear-gradient(135deg, #2ea6ff, #1e7ebf);
             color: white;
             border: none;
-            padding: 10px 24px;
-            border-radius: 30px;
-            font-size: 16px;
-            font-weight: 600;
+            border-radius: 50%;
             cursor: pointer;
             transition: all 0.2s ease;
             box-shadow: 0 4px 15px rgba(46, 166, 255, 0.3);
             border: 1px solid rgba(255, 255, 255, 0.2);
             display: flex;
             align-items: center;
-            gap: 8px;
-            white-space: nowrap;
+            justify-content: center;
+            font-size: 24px;
         }
 
         #save-button:active {
-            transform: scale(0.95);
+            transform: scale(0.9);
             opacity: 0.8;
         }
 
@@ -384,7 +365,7 @@
         /* Уведомление */
         #notification {
             position: fixed;
-            bottom: 100px;
+            bottom: 90px;
             left: 20px;
             right: 20px;
             background: rgba(0, 0, 0, 0.9);
@@ -471,29 +452,48 @@
             transform: scale(0.95);
         }
 
+        /* Всплывающие подсказки при наведении */
+        #strawberry-button, #save-button {
+            position: relative;
+        }
+
+        #strawberry-button:hover::after,
+        #save-button:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 1004;
+        }
+
         /* Адаптация для маленьких экранов */
         @media (max-width: 400px) {
             #bottom-bar {
-                padding: 0 12px;
+                padding: 0 15px;
+                height: 60px;
             }
             
-            #strawberry-button {
-                padding: 6px 12px;
-                font-size: 13px;
-            }
-            
-            #strawberry-button span {
-                font-size: 16px;
-            }
-            
-            #save-button {
-                padding: 8px 18px;
-                font-size: 14px;
+            #strawberry-button, #save-button {
+                width: 42px;
+                height: 42px;
+                font-size: 20px;
             }
             
             #image-counter {
                 padding: 4px 10px;
                 font-size: 13px;
+            }
+            
+            .nav-zone {
+                bottom: 60px;
             }
         }
     </style>
@@ -510,12 +510,13 @@
 
     <!-- Основной экран галереи -->
     <div id="gallery-screen">
-        <!-- Верхняя панель -->
+        <!-- Верхняя панель (только кнопка назад) -->
         <div id="top-bar">
             <div id="back-button" onclick="closeGallery()">←</div>
-            <div id="post-info"></div>
-            <div id="vip-badge">VIP</div>
         </div>
+
+        <!-- VIP бейдж -->
+        <div id="vip-badge">VIP</div>
 
         <!-- Навигационные зоны -->
         <div id="nav-left" class="nav-zone" onclick="prevImage()">
@@ -533,19 +534,19 @@
 
         <!-- Нижняя панель -->
         <div id="bottom-bar">
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <!-- Кнопка Нейроклубничка -->
-                <a href="https://t.me" target="_blank" id="strawberry-link">
-                    <button id="strawberry-button">
-                        <span>🍓</span> Нейроклубничка™
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <!-- Кнопка Нейроклубничка (только иконка) -->
+                <a href="https://t.me/neuroticababes_bot" target="_blank" id="strawberry-link">
+                    <button id="strawberry-button" title="Нейроклубничка™">
+                        <span>🍓</span>
                     </button>
                 </a>
                 <!-- Счетчик изображений -->
                 <div id="image-counter">1 / 1</div>
             </div>
-            <!-- Кнопка Сохранить -->
-            <button id="save-button" onclick="handleSave()">
-                <span>💾</span> Сохранить
+            <!-- Кнопка Сохранить (только иконка) -->
+            <button id="save-button" onclick="handleSave()" title="Сохранить">
+                <span>💾</span>
             </button>
         </div>
 
@@ -747,9 +748,7 @@
             
             updateLoadingProgress(100, `Готово! ${files.length} фото`);
             
-            // Обновляем интерфейс
-            document.getElementById('post-info').textContent = `📁 ${state.postId}`;
-            
+            // Показываем VIP бейдж если нужно
             if (state.isVip) {
                 document.getElementById('vip-badge').style.display = 'block';
                 document.getElementById('save-button').classList.remove('vip-only');
@@ -792,15 +791,12 @@
             
             counter.textContent = `${index + 1} / ${state.files.length}`;
             
-            let typeInfo = '';
+            // Показываем VIP бейдж только для VIP фото
             if (file.type === 'vip') {
-                typeInfo = ' (VIP)';
                 document.getElementById('vip-badge').style.display = 'block';
             } else {
                 document.getElementById('vip-badge').style.display = 'none';
             }
-            
-            document.getElementById('post-info').textContent = `📁 ${state.postId}${typeInfo}`;
             
             img.src = file.url;
             
