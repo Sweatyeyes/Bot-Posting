@@ -259,23 +259,15 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0 20px;
+            padding: 0 30px;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        /* Левая группа элементов */
-        #bottom-bar > div:first-child {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        /* Ссылка на клубничку */
+        /* Кнопка с клубничкой (слева) */
         #strawberry-link {
             text-decoration: none;
         }
 
-        /* Кнопка с клубничкой (только иконка) */
         #strawberry-button {
             width: 48px;
             height: 48px;
@@ -291,6 +283,7 @@
             align-items: center;
             justify-content: center;
             font-size: 24px;
+            position: relative;
         }
 
         #strawberry-button:active {
@@ -298,19 +291,24 @@
             opacity: 0.8;
         }
 
-        /* Счетчик изображений */
+        /* Счетчик изображений (по центру) */
         #image-counter {
             color: white;
-            font-size: 15px;
+            font-size: 16px;
             font-weight: 500;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 6px 14px;
+            background: rgba(255, 255, 255, 0.15);
+            padding: 8px 20px;
             border-radius: 30px;
             border: 1px solid rgba(255, 255, 255, 0.1);
             white-space: nowrap;
+            letter-spacing: 0.5px;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 15px;
         }
 
-        /* Кнопка сохранить (только иконка) */
+        /* Кнопка сохранить (справа) */
         #save-button {
             width: 48px;
             height: 48px;
@@ -477,7 +475,7 @@
         /* Адаптация для маленьких экранов */
         @media (max-width: 400px) {
             #bottom-bar {
-                padding: 0 15px;
+                padding: 0 20px;
                 height: 60px;
             }
             
@@ -488,8 +486,9 @@
             }
             
             #image-counter {
-                padding: 4px 10px;
-                font-size: 13px;
+                padding: 6px 16px;
+                font-size: 14px;
+                bottom: 12px;
             }
             
             .nav-zone {
@@ -534,17 +533,17 @@
 
         <!-- Нижняя панель -->
         <div id="bottom-bar">
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <!-- Кнопка Нейроклубничка (только иконка) -->
-                <a href="https://t.me/neuroticababes_bot" target="_blank" id="strawberry-link">
-                    <button id="strawberry-button" title="Нейроклубничка™">
-                        <span>🍓</span>
-                    </button>
-                </a>
-                <!-- Счетчик изображений -->
-                <div id="image-counter">1 / 1</div>
-            </div>
-            <!-- Кнопка Сохранить (только иконка) -->
+            <!-- Кнопка Нейроклубничка (слева) -->
+            <a href="https://t.me/neuroticababes_bot" target="_blank" id="strawberry-link">
+                <button id="strawberry-button" title="Нейроклубничка™">
+                    <span>🍓</span>
+                </button>
+            </a>
+            
+            <!-- Счетчик изображений (по центру) -->
+            <div id="image-counter">1 / 1</div>
+            
+            <!-- Кнопка Сохранить (справа) -->
             <button id="save-button" onclick="handleSave()" title="Сохранить">
                 <span>💾</span>
             </button>
