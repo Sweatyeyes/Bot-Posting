@@ -265,7 +265,7 @@
             left: 0;
             right: 0;
             height: 80px;
-            background: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.5));
+            background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.7));
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             z-index: 1002;
@@ -276,16 +276,59 @@
             border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        #image-counter {
-            color: white;
-            font-size: 16px;
-            font-weight: 500;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 8px 16px;
-            border-radius: 30px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        /* Левая группа элементов */
+        #bottom-bar > div:first-child {
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
 
+        /* Ссылка на клубничку */
+        #strawberry-link {
+            text-decoration: none;
+        }
+
+        /* Кнопка с клубничкой */
+        #strawberry-button {
+            background: linear-gradient(135deg, #ff3b6f, #ff8c5a);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(255, 59, 111, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        #strawberry-button:active {
+            transform: scale(0.95);
+            opacity: 0.8;
+        }
+
+        #strawberry-button span {
+            font-size: 18px;
+        }
+
+        /* Счетчик изображений */
+        #image-counter {
+            color: white;
+            font-size: 15px;
+            font-weight: 500;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 6px 14px;
+            border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            white-space: nowrap;
+        }
+
+        /* Кнопка сохранить */
         #save-button {
             background: linear-gradient(135deg, #2ea6ff, #1e7ebf);
             color: white;
@@ -301,6 +344,7 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            white-space: nowrap;
         }
 
         #save-button:active {
@@ -311,6 +355,30 @@
         #save-button.vip-only {
             background: linear-gradient(135deg, #666, #444);
             box-shadow: none;
+            opacity: 0.7;
+        }
+
+        /* Подсказка */
+        #swipe-hint {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: rgba(255, 255, 255, 0.9);
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-size: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: opacity 0.5s ease;
+            opacity: 1;
+            z-index: 1003;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        #swipe-hint.fade-out {
+            opacity: 0;
         }
 
         /* Уведомление */
@@ -403,27 +471,30 @@
             transform: scale(0.95);
         }
 
-        /* Подсказка */
-        #swipe-hint {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.7);
-            color: rgba(255, 255, 255, 0.9);
-            padding: 10px 20px;
-            border-radius: 30px;
-            font-size: 14px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            transition: opacity 0.5s ease;
-            opacity: 1;
-            z-index: 1003;
-            pointer-events: none;
-            white-space: nowrap;
-        }
-
-        #swipe-hint.fade-out {
-            opacity: 0;
+        /* Адаптация для маленьких экранов */
+        @media (max-width: 400px) {
+            #bottom-bar {
+                padding: 0 12px;
+            }
+            
+            #strawberry-button {
+                padding: 6px 12px;
+                font-size: 13px;
+            }
+            
+            #strawberry-button span {
+                font-size: 16px;
+            }
+            
+            #save-button {
+                padding: 8px 18px;
+                font-size: 14px;
+            }
+            
+            #image-counter {
+                padding: 4px 10px;
+                font-size: 13px;
+            }
         }
     </style>
 </head>
@@ -462,7 +533,17 @@
 
         <!-- Нижняя панель -->
         <div id="bottom-bar">
-            <div id="image-counter">1 / 1</div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <!-- Кнопка Нейроклубничка -->
+                <a href="https://t.me" target="_blank" id="strawberry-link">
+                    <button id="strawberry-button">
+                        <span>🍓</span> Нейроклубничка™
+                    </button>
+                </a>
+                <!-- Счетчик изображений -->
+                <div id="image-counter">1 / 1</div>
+            </div>
+            <!-- Кнопка Сохранить -->
             <button id="save-button" onclick="handleSave()">
                 <span>💾</span> Сохранить
             </button>
@@ -495,7 +576,6 @@
             BRANCH: "main",
             GITHUB_RAW: "https://raw.githubusercontent.com",
             GITHUB_API: "https://api.github.com/repos",
-            VIP_GROUP_ID: -1001234567890,  // ID вашей VIP группы
             TIMEOUT: 10000,
             MAX_RETRIES: 3,
             SUPPORTED_FORMATS: ['.jpg', '.jpeg', '.png', '.gif', '.webp']
@@ -546,14 +626,16 @@
             // Получаем из start_param
             if (window.Telegram?.WebApp?.initDataUnsafe?.start_param) {
                 postId = window.Telegram.WebApp.initDataUnsafe.start_param;
+                console.log('📦 start_param:', postId);
             }
             
             // Или из URL
             if (!postId) {
                 postId = params.get('startapp') || params.get('post');
+                console.log('📦 URL param:', postId);
             }
             
-            // VIP статус из URL (будет переопределен проверкой)
+            // VIP статус из URL
             const urlVip = params.get('vip') === 'true';
             
             return {
@@ -561,22 +643,6 @@
                 vip: urlVip,
                 user: params.get('user')
             };
-        }
-
-        // --- ПРОВЕРКА VIP СТАТУСА ---
-        async function checkVipStatus(userId) {
-            // Если есть прямой параметр VIP из бота, используем его
-            const params = getUrlParams();
-            if (params.vip) {
-                console.log('👑 VIP статус из параметров');
-                return true;
-            }
-            
-            // TODO: Здесь можно сделать запрос к вашему бэкенду
-            // для проверки через getChatMember
-            
-            // Пока возвращаем false для примера
-            return false;
         }
 
         // --- ФУНКЦИИ GITHUB ---
@@ -610,16 +676,30 @@
             }
         }
 
+        // --- ПРОВЕРКА VIP СТАТУСА ---
+        async function checkVipStatus(userId) {
+            // Если есть прямой параметр VIP из бота, используем его
+            const params = getUrlParams();
+            if (params.vip) {
+                console.log('👑 VIP статус из параметров');
+                return true;
+            }
+            
+            // TODO: Здесь можно сделать запрос к вашему бэкенду
+            return false;
+        }
+
         // --- ЗАГРУЗКА ГАЛЕРЕИ ---
         async function loadGallery() {
             const params = getUrlParams();
             
             if (!params.post) {
-                showError('Не указан ID поста');
+                showError('Не указан ID поста.\n\nСсылка должна содержать ?startapp=НАЗВАНИЕ_ПАПКИ');
                 return;
             }
             
-            state.postId = params.post;
+            // Очищаем ID от лишних символов
+            state.postId = params.post.replace(/[^a-zA-Z0-9_\-]/g, '');
             state.isVip = await checkVipStatus(state.userId);
             
             console.log('📁 Пост:', state.postId);
@@ -640,6 +720,7 @@
             // Добавляем VIP фото
             if (state.isVip) {
                 files.push(...vipFiles.map(f => ({...f, type: 'vip'})));
+                console.log(`👑 Загружено ${vipFiles.length} VIP фото`);
             } else {
                 vipFiles.forEach(file => {
                     files.push({
@@ -649,6 +730,9 @@
                         isBlurred: true
                     });
                 });
+                if (vipFiles.length > 0) {
+                    console.log(`🔒 Загружено ${vipFiles.length} размытых VIP фото`);
+                }
             }
             
             if (files.length === 0) {
@@ -656,6 +740,7 @@
                 return;
             }
             
+            // Сортируем по имени
             files.sort((a, b) => a.name.localeCompare(b.name));
             
             state.files = files;
@@ -680,6 +765,7 @@
                     document.getElementById('gallery-screen').style.display = 'flex';
                     showImage(0);
                     
+                    // Прячем подсказку через 3 секунды
                     setTimeout(() => {
                         document.getElementById('swipe-hint').classList.add('fade-out');
                     }, 3000);
@@ -718,11 +804,12 @@
             
             img.src = file.url;
             
-            // Предзагрузка
+            // Предзагрузка следующего
             const nextIndex = (index + 1) % state.files.length;
             const nextFile = state.files[nextIndex];
             if (nextFile && !state.preloadedImages.has(nextFile.url)) {
-                new Image().src = nextFile.url;
+                const preloadImg = new Image();
+                preloadImg.src = nextFile.url;
                 state.preloadedImages.add(nextFile.url);
             }
         }
@@ -752,7 +839,6 @@
             
             const currentFile = state.files[state.currentIndex];
             
-            // Для VIP пользователей - сохраняем фото
             if (currentFile.type === 'vip' || currentFile.type === 'general') {
                 // Создаем ссылку для скачивания
                 const link = document.createElement('a');
@@ -804,19 +890,6 @@
             }
         }
 
-        // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
-        function updateLoadingProgress(percent, text) {
-            document.getElementById('progress-bar').style.width = percent + '%';
-            document.getElementById('loading-text').textContent = text;
-        }
-
-        function showError(message) {
-            document.getElementById('loading-screen').style.display = 'none';
-            document.getElementById('gallery-screen').style.display = 'none';
-            document.getElementById('error-screen').style.display = 'flex';
-            document.getElementById('error-message').textContent = message;
-        }
-
         // --- ОБРАБОТЧИКИ КАСАНИЙ ДЛЯ СВАЙПОВ ---
         function handleTouchStart(e) {
             state.touchStartX = e.touches[0].clientX;
@@ -839,22 +912,35 @@
             state.touchStartX = 0;
         }
 
+        // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
+        function updateLoadingProgress(percent, text) {
+            document.getElementById('progress-bar').style.width = percent + '%';
+            document.getElementById('loading-text').textContent = text;
+        }
+
+        function showError(message) {
+            document.getElementById('loading-screen').style.display = 'none';
+            document.getElementById('gallery-screen').style.display = 'none';
+            document.getElementById('error-screen').style.display = 'flex';
+            document.getElementById('error-message').textContent = message;
+        }
+
         // --- ИНИЦИАЛИЗАЦИЯ ---
         async function init() {
-            console.log('🚀 Инициализация...');
+            console.log('🚀 Инициализация галереи...');
             
             initTelegram();
             await loadGallery();
             
-            // Добавляем обработчики
+            // Добавляем обработчики свайпов
             document.addEventListener('touchstart', handleTouchStart, { passive: true });
             document.addEventListener('touchend', handleTouchEnd);
         }
 
-        // Запуск
+        // Запуск при загрузке страницы
         window.addEventListener('load', init);
         
-        // Экспортируем функции
+        // Экспортируем функции в глобальную область
         window.nextImage = nextImage;
         window.prevImage = prevImage;
         window.closeGallery = closeGallery;
