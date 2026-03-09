@@ -610,21 +610,23 @@
             const params = new URLSearchParams(window.location.search);
             let postId = null;
             
-            // Получаем из start_param (приоритет)
+            // 1️⃣ САМОЕ ВАЖНОЕ: получаем start_param из Telegram (приходит из кнопки)
             if (window.Telegram?.WebApp?.initDataUnsafe?.start_param) {
                 postId = window.Telegram.WebApp.initDataUnsafe.start_param;
-                console.log('📦 start_param:', postId);
+                console.log('📦 start_param из Telegram:', postId);
             }
             
-            // Или из URL
+            // 2️⃣ Если нет start_param, пробуем из URL параметров
             if (!postId) {
                 postId = params.get('startapp') || params.get('post');
                 console.log('📦 URL param:', postId);
             }
             
-            // Получаем VIP статус из URL параметра
+            // Получаем VIP статус из URL параметра (если есть)
             const urlVip = params.get('vip') === 'true';
-            console.log('👑 VIP из URL:', urlVip);
+            if (urlVip) {
+                console.log('👑 VIP из URL:', urlVip);
+            }
             
             return {
                 post: postId,
