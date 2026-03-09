@@ -578,7 +578,9 @@
             userId: null,
             touchStartX: 0,
             preloadedImages: new Set(),
-            retryCount: 0
+            retryCount: 0,
+            vipCheckAttempts: 0,
+            maxVipCheckAttempts: 5
         };
 
         // --- ИНИЦИАЛИЗАЦИЯ TELEGRAM ---
@@ -610,7 +612,7 @@
             const params = new URLSearchParams(window.location.search);
             let postId = null;
             
-            // 1️⃣ САМОЕ ВАЖНОЕ: получаем start_param из Telegram (приходит из кнопки)
+            // 1️⃣ Получаем start_param из Telegram (приходит из кнопки)
             if (window.Telegram?.WebApp?.initDataUnsafe?.start_param) {
                 postId = window.Telegram.WebApp.initDataUnsafe.start_param;
                 console.log('📦 start_param из Telegram:', postId);
@@ -666,19 +668,66 @@
             }
         }
 
-        // --- ПРОВЕРКА VIP СТАТУСА ---
+        // --- ПРОВЕРКА VIP СТАТУСА ЧЕРЕЗ БОТА ---
         async function checkVipStatus(userId) {
-            // Получаем параметры
+            // Сначала проверяем, может быть уже есть в URL (если бот передал)
             const params = getUrlParams();
-            
-            // Если есть прямой параметр VIP из бота, используем его
             if (params.vip) {
                 console.log('👑 VIP статус из параметров URL:', params.vip);
                 return true;
             }
             
-            console.log('❌ VIP статус не получен, параметр vip отсутствует или false');
+            // Если нет в URL — запрашиваем у бота
+            try {
+                console.log('🔄 Запрашиваю VIP статус у бота для пользователя', userId);
+                
+                // Отправляем запрос боту через WebApp
+                if (window.Telegram?.WebApp) {
+                    window.Telegram.WebApp.sendData(JSON.stringify({
+                        action: 'check_vip',
+                        user_id: userId,
+                        post_id: state.postId
+                    }));
+                    
+                    console.log('📤 Запрос на проверку VIP отправлен боту');
+                    
+                    // Ждём ответ (асинхронно, обрабатывается в handleWebAppData)
+                    // Пока возвращаем false, но запускаем повторную проверку через интервал
+                    setTimeout(() => {
+                        if (!state.isVip && state.vipCheckAttempts < state.maxVipCheckAttempts) {
+                            console.log(`🔄 Повторная проверка VIP (попытка ${state.vipCheckAttempts + 1})`);
+                            state.vipCheckAttempts++;
+                            checkVipStatus(userId);
+                        }
+                    }, 2000);
+                    
+                    return false;
+                }
+            } catch (e) {
+                console.error('❌ Ошибка запроса VIP статуса:', e);
+            }
+            
             return false;
+        }
+
+        // --- ОБРАБОТКА ОТВЕТА ОТ БОТА ---
+        function handleVipResponse(response) {
+            console.log('📩 Получен ответ от бота:', response);
+            
+            if (response.vip === true) {
+                state.isVip = true;
+                console.log('👑 VIP статус подтверждён ботом!');
+                
+                // Обновляем интерфейс
+                document.getElementById('vip-badge').style.display = 'block';
+                document.getElementById('save-button').classList.remove('vip-only');
+                
+                // Перезагружаем галерею с правильным статусом
+                loadGallery();
+            } else {
+                console.log('❌ VIP статус не подтверждён ботом');
+                state.isVip = false;
+            }
         }
 
         // --- ЗАГРУЗКА ГАЛЕРЕИ ---
@@ -692,7 +741,11 @@
             
             // Очищаем ID от лишних символов
             state.postId = params.post.replace(/[^a-zA-Z0-9_\-]/g, '');
-            state.isVip = await checkVipStatus(state.userId);
+            
+            // Если VIP статус ещё не установлен, проверяем
+            if (!state.isVip) {
+                state.isVip = await checkVipStatus(state.userId);
+            }
             
             console.log('📁 Пост:', state.postId);
             console.log('👑 VIP статус (итоговый):', state.isVip);
@@ -938,6 +991,8 @@
 
         window.addEventListener('load', init);
         
+        // Экспортируем функции для обработки ответов от бота
+        window.handleVipResponse = handleVipResponse;
         window.nextImage = nextImage;
         window.prevImage = prevImage;
         window.closeGallery = closeGallery;
