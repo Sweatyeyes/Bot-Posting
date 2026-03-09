@@ -766,52 +766,51 @@
         }
 
         // ==================== ПРОВЕРКА VIP СТАТУСА ЧЕРЕЗ БОТА ====================
-// ==================== ПРОВЕРКА VIP СТАТУСА ЧЕРЕЗ БОТА ====================
-async function checkVipStatus(userId) {
-    debugLog(`🔍 Проверка VIP статуса для пользователя ${userId}...`);
-    
-    // Сначала проверяем, может быть уже есть в URL
-    const params = getUrlParams();
-    if (params.vip) {
-        debugLog(`👑 VIP статус из параметров URL: true`);
-        return true;
-    }
-    
-    // Запрашиваем у бота через WebApp
-    return new Promise((resolve) => {
-        try {
-            if (!window.Telegram?.WebApp) {
-                debugLog('❌ Telegram.WebApp не доступен', 'error');
-                resolve(false);
-                return;
+        async function checkVipStatus(userId) {
+            debugLog(`🔍 Проверка VIP статуса для пользователя ${userId}...`);
+            
+            // Сначала проверяем, может быть уже есть в URL
+            const params = getUrlParams();
+            if (params.vip) {
+                debugLog(`👑 VIP статус из параметров URL: true`);
+                return true;
             }
             
-            state.vipPromiseResolve = resolve;
-            
-            const requestData = {
-                action: 'check_vip',
-                user_id: userId,
-                post_id: state.postId
-            };
-            
-            debugLog(`📤 Отправка запроса боту: ${JSON.stringify(requestData)}`);
-            window.Telegram.WebApp.sendData(JSON.stringify(requestData));
-            
-            // Таймаут на случай, если бот не ответит
-            setTimeout(() => {
-                if (state.vipPromiseResolve) {
-                    debugLog('⚠️ Таймаут ожидания ответа от бота', 'warn');
-                    state.vipPromiseResolve(false);
-                    state.vipPromiseResolve = null;
+            // Запрашиваем у бота через WebApp
+            return new Promise((resolve) => {
+                try {
+                    if (!window.Telegram?.WebApp) {
+                        debugLog('❌ Telegram.WebApp не доступен', 'error');
+                        resolve(false);
+                        return;
+                    }
+                    
+                    state.vipPromiseResolve = resolve;
+                    
+                    const requestData = {
+                        action: 'check_vip',
+                        user_id: userId,
+                        post_id: state.postId
+                    };
+                    
+                    debugLog(`📤 Отправка запроса боту: ${JSON.stringify(requestData)}`);
+                    window.Telegram.WebApp.sendData(JSON.stringify(requestData));
+                    
+                    // Таймаут на случай, если бот не ответит
+                    setTimeout(() => {
+                        if (state.vipPromiseResolve) {
+                            debugLog('⚠️ Таймаут ожидания ответа от бота', 'warn');
+                            state.vipPromiseResolve(false);
+                            state.vipPromiseResolve = null;
+                        }
+                    }, 5000);
+                    
+                } catch (e) {
+                    debugLog(`❌ Ошибка отправки запроса: ${e.message}`, 'error');
+                    resolve(false);
                 }
-            }, 5000);
-            
-        } catch (e) {
-            debugLog(`❌ Ошибка отправки запроса: ${e.message}`, 'error');
-            resolve(false);
+            });
         }
-    });
-}
 
         // ==================== ОБРАБОТКА ОТВЕТОВ ОТ БОТА ====================
         window.handleVipResponse = function(responseText) {
