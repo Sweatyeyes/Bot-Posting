@@ -610,17 +610,21 @@
             const params = new URLSearchParams(window.location.search);
             let postId = null;
             
+            // Получаем из start_param (приоритет)
             if (window.Telegram?.WebApp?.initDataUnsafe?.start_param) {
                 postId = window.Telegram.WebApp.initDataUnsafe.start_param;
                 console.log('📦 start_param:', postId);
             }
             
+            // Или из URL
             if (!postId) {
                 postId = params.get('startapp') || params.get('post');
                 console.log('📦 URL param:', postId);
             }
             
+            // Получаем VIP статус из URL параметра
             const urlVip = params.get('vip') === 'true';
+            console.log('👑 VIP из URL:', urlVip);
             
             return {
                 post: postId,
@@ -662,11 +666,16 @@
 
         // --- ПРОВЕРКА VIP СТАТУСА ---
         async function checkVipStatus(userId) {
+            // Получаем параметры
             const params = getUrlParams();
+            
+            // Если есть прямой параметр VIP из бота, используем его
             if (params.vip) {
-                console.log('👑 VIP статус из параметров');
+                console.log('👑 VIP статус из параметров URL:', params.vip);
                 return true;
             }
+            
+            console.log('❌ VIP статус не получен, параметр vip отсутствует или false');
             return false;
         }
 
@@ -679,11 +688,12 @@
                 return;
             }
             
+            // Очищаем ID от лишних символов
             state.postId = params.post.replace(/[^a-zA-Z0-9_\-]/g, '');
             state.isVip = await checkVipStatus(state.userId);
             
             console.log('📁 Пост:', state.postId);
-            console.log('👑 VIP:', state.isVip);
+            console.log('👑 VIP статус (итоговый):', state.isVip);
             
             updateLoadingProgress(30, 'Загрузка изображений...');
             
@@ -694,12 +704,16 @@
             
             let files = [];
             
+            // Добавляем общие фото
             files.push(...generalFiles.map(f => ({...f, type: 'general'})));
             
+            // Добавляем VIP фото в зависимости от статуса
             if (state.isVip) {
+                // Для VIP - оригиналы
                 files.push(...vipFiles.map(f => ({...f, type: 'vip'})));
-                console.log(`👑 Загружено ${vipFiles.length} VIP фото`);
+                console.log(`👑 Загружено ${vipFiles.length} оригинальных VIP фото`);
             } else {
+                // Для обычных - размытые версии
                 vipFiles.forEach(file => {
                     files.push({
                         ...file,
@@ -718,12 +732,14 @@
                 return;
             }
             
+            // Сортируем по имени
             files.sort((a, b) => a.name.localeCompare(b.name));
             
             state.files = files;
             
             updateLoadingProgress(100, `Готово! ${files.length} фото`);
             
+            // Показываем VIP бейдж если нужно
             if (state.isVip) {
                 document.getElementById('vip-badge').style.display = 'block';
                 document.getElementById('save-button').classList.remove('vip-only');
@@ -731,6 +747,7 @@
                 document.getElementById('save-button').classList.add('vip-only');
             }
             
+            // Запускаем галерею
             setTimeout(() => {
                 document.getElementById('loading-screen').style.opacity = '0';
                 setTimeout(() => {
@@ -764,14 +781,17 @@
             
             counter.textContent = `${index + 1} / ${state.files.length}`;
             
+            // Показываем VIP бейдж только для VIP фото
             if (file.type === 'vip') {
                 document.getElementById('vip-badge').style.display = 'block';
             } else {
                 document.getElementById('vip-badge').style.display = 'none';
             }
             
+            console.log(`🖼 Показываем: ${file.name}, тип: ${file.type}`);
             img.src = file.url;
             
+            // Предзагрузка следующего
             const nextIndex = (index + 1) % state.files.length;
             const nextFile = state.files[nextIndex];
             if (nextFile && !state.preloadedImages.has(nextFile.url)) {
@@ -847,6 +867,7 @@
             document.getElementById('gallery-image').classList.add('loaded');
             document.getElementById('image-loader').classList.remove('active');
             state.retryCount = 0;
+            console.log('✅ Изображение загружено');
         }
 
         function onImageError() {
@@ -854,6 +875,7 @@
             const loader = document.getElementById('image-loader');
             
             loader.classList.remove('active');
+            console.error('❌ Ошибка загрузки изображения:', img.src);
             
             if (state.retryCount < CONFIG.MAX_RETRIES) {
                 state.retryCount++;
@@ -894,6 +916,7 @@
         }
 
         function showError(message) {
+            console.error('❌ Ошибка:', message);
             document.getElementById('loading-screen').style.display = 'none';
             document.getElementById('gallery-screen').style.display = 'none';
             document.getElementById('error-screen').style.display = 'flex';
