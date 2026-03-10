@@ -765,77 +765,45 @@
             }
         }
 
-        // ==================== ПРОВЕРКА VIP СТАТУСА ЧЕРЕЗ БОТА ====================
-// ==================== ТЕСТОВАЯ ПРОВЕРКА VIP СТАТУСА ====================
-async function checkVipStatus(userId) {
-    debugLog(`🔍 ТЕСТОВАЯ проверка VIP статуса для пользователя ${userId}...`);
-    
-    // Сначала проверяем, может быть уже есть в URL
-    const params = getUrlParams();
-    if (params.vip) {
-        debugLog(`👑 VIP статус из параметров URL: true`);
-        return true;
-    }
-    
-    // Отправляем тестовое сообщение боту
-    try {
-        if (window.Telegram?.WebApp) {
-            const testMessage = JSON.stringify({action: "test", user_id: userId, message: "Привет от WebApp!"});
-            debugLog(`📤 Отправка ТЕСТОВОГО сообщения боту: ${testMessage}`);
-            window.Telegram.WebApp.sendData(testMessage);
+        // ==================== ПРОВЕРКА VIP СТАТУСА ====================
+        async function checkVipStatus(userId) {
+            debugLog(`🔍 Проверка VIP статуса для пользователя ${userId}...`);
             
-            // Временно даём VIP, чтобы галерея работала
-            debugLog(`👑 ВРЕМЕННО: VIP статус true для теста`);
-            return true;
-        }
-    } catch (e) {
-        debugLog(`❌ Ошибка отправки: ${e.message}`, 'error');
-    }
-    
-    return true; // Временно всегда VIP
-}
-        // ==================== ОБРАБОТКА ОТВЕТОВ ОТ БОТА ====================
-        window.handleVipResponse = function(responseText) {
-            debugLog(`📩 Получен ответ от бота: ${responseText}`);
-            
-            try {
-                // Парсим ответ (формат: VIP_RESPONSE:{"vip":true,"user_id":123})
-                if (responseText.startsWith('VIP_RESPONSE:')) {
-                    const jsonStr = responseText.substring(13);
-                    const data = JSON.parse(jsonStr);
-                    
-                    debugLog(`📊 Данные ответа: ${JSON.stringify(data)}`);
-                    
-                    if (data.vip === true) {
-                        debugLog(`👑 VIP статус ПОДТВЕРЖДЁН ботом!`);
-                        state.isVip = true;
-                        
-                        // Обновляем интерфейс
-                        document.getElementById('vip-badge').style.display = 'block';
-                        document.getElementById('save-button').classList.remove('vip-only');
-                        
-                        // Если есть ожидающий Promise, разрешаем его
-                        if (state.vipPromiseResolve) {
-                            state.vipPromiseResolve(true);
-                            state.vipPromiseResolve = null;
-                        }
-                        
-                        // Перезагружаем галерею для показа оригиналов
-                        location.reload();
-                    } else {
-                        debugLog(`❌ VIP статус НЕ ПОДТВЕРЖДЁН`);
-                        state.isVip = false;
-                        
-                        if (state.vipPromiseResolve) {
-                            state.vipPromiseResolve(false);
-                            state.vipPromiseResolve = null;
-                        }
-                    }
-                }
-            } catch (e) {
-                debugLog(`❌ Ошибка обработки ответа: ${e.message}`, 'error');
+            // Сначала проверяем, может быть уже есть в URL
+            const params = getUrlParams();
+            if (params.vip) {
+                debugLog(`👑 VIP статус из параметров URL: true`);
+                return true;
             }
-        };
+            
+            // ВРЕМЕННО: даём VIP статус по ID администратора
+            if (userId === 337383733) {
+                debugLog(`👑 ВРЕМЕННО: VIP статус по ID администратора`);
+                return true;
+            }
+            
+            return false;
+        }
+
+        // ==================== ОТПРАВКА СТАТИСТИКИ В БОТА ====================
+        function sendStats(action, details = {}) {
+            if (!window.Telegram?.WebApp) {
+                debugLog('❌ Telegram.WebApp не доступен, статистика не отправлена', 'warn');
+                return;
+            }
+            
+            const statsData = {
+                action: action,
+                user_id: state.userId,
+                post_id: state.postId,
+                is_vip: state.isVip,
+                timestamp: Date.now(),
+                ...details
+            };
+            
+            debugLog(`📊 Отправка статистики: ${JSON.stringify(statsData)}`);
+            window.Telegram.WebApp.sendData(JSON.stringify(statsData));
+        }
 
         // ==================== ЗАГРУЗКА ГАЛЕРЕИ ====================
         async function loadGallery() {
@@ -909,6 +877,13 @@ async function checkVipStatus(userId) {
                 document.getElementById('save-button').classList.add('vip-only');
             }
             
+            // Отправляем статистику открытия
+            sendStats('gallery_open', {
+                files_count: files.length,
+                general_count: generalFiles.length,
+                vip_count: vipFiles.length
+            });
+            
             // Запускаем галерею
             setTimeout(() => {
                 document.getElementById('loading-screen').style.opacity = '0';
@@ -952,6 +927,13 @@ async function checkVipStatus(userId) {
             debugLog(`🖼 Показываем ${index + 1}: ${file.name}`);
             img.src = file.url;
             
+            // Отправляем статистику просмотра (можно закомментировать, если слишком часто)
+            // sendStats('view_image', {
+            //     image_index: index,
+            //     image_name: file.name,
+            //     image_type: file.type
+            // });
+            
             // Предзагрузка следующего
             const nextIndex = (index + 1) % state.files.length;
             const nextFile = state.files[nextIndex];
@@ -971,6 +953,7 @@ async function checkVipStatus(userId) {
         }
 
         function closeGallery() {
+            debugLog('🚪 Закрытие галереи');
             if (tg) tg.close();
             else window.close();
         }
@@ -979,6 +962,8 @@ async function checkVipStatus(userId) {
         let notificationTimeout = null;
 
         function showNotification(text, duration = 2000) {
+            debugLog(`🔔 Уведомление: ${text}`);
+            
             const notification = document.getElementById('notification');
             const notificationText = document.getElementById('notification-text');
             
@@ -997,8 +982,11 @@ async function checkVipStatus(userId) {
 
         // ==================== ОБРАБОТКА СОХРАНЕНИЯ ====================
         function handleSave() {
+            debugLog(`💾 Попытка сохранения (VIP статус: ${state.isVip})`);
+            
             if (!state.isVip) {
                 showNotification('🍓 Подпишись на канал чтобы сохранять фото', 1500);
+                sendStats('save_click', {success: false, reason: 'not_vip'});
                 return;
             }
             
@@ -1011,9 +999,18 @@ async function checkVipStatus(userId) {
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
+                
                 showNotification('✅ Фото сохраняется...', 1000);
+                debugLog(`✅ Сохранение: ${currentFile.name}`);
+                sendStats('save_click', {
+                    success: true,
+                    file_name: currentFile.name,
+                    file_type: currentFile.type
+                });
             } else {
                 showNotification('❌ Нельзя сохранить размытое фото', 1500);
+                debugLog(`❌ Попытка сохранить размытое фото`, 'warn');
+                sendStats('save_click', {success: false, reason: 'blurred'});
             }
         }
 
@@ -1022,6 +1019,7 @@ async function checkVipStatus(userId) {
             document.getElementById('gallery-image').classList.add('loaded');
             document.getElementById('image-loader').classList.remove('active');
             state.retryCount = 0;
+            debugLog('✅ Изображение загружено');
         }
 
         function onImageError() {
@@ -1029,14 +1027,17 @@ async function checkVipStatus(userId) {
             const loader = document.getElementById('image-loader');
             
             loader.classList.remove('active');
+            debugLog(`❌ Ошибка загрузки: ${img.src}`, 'error');
             
             if (state.retryCount < CONFIG.MAX_RETRIES) {
                 state.retryCount++;
+                debugLog(`🔄 Повторная попытка ${state.retryCount}/${CONFIG.MAX_RETRIES}...`);
                 setTimeout(() => {
                     img.src = img.src.split('?')[0] + '?retry=' + Date.now();
                 }, 1000);
             } else {
                 img.classList.add('loaded');
+                debugLog(`❌ Превышено количество попыток`, 'error');
             }
         }
 
@@ -1051,48 +1052,4 @@ async function checkVipStatus(userId) {
             const touchEndX = e.changedTouches[0].clientX;
             const diffX = touchEndX - state.touchStartX;
             
-            if (Math.abs(diffX) > 50) {
-                if (diffX > 0) prevImage();
-                else nextImage();
-            }
-            
-            state.touchStartX = 0;
-        }
-
-        // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
-        function updateLoadingProgress(percent, text) {
-            document.getElementById('progress-bar').style.width = percent + '%';
-            document.getElementById('loading-text').textContent = text;
-        }
-
-        function showError(message) {
-            debugLog(`❌ ОШИБКА: ${message}`, 'error');
-            document.getElementById('loading-screen').style.display = 'none';
-            document.getElementById('gallery-screen').style.display = 'none';
-            document.getElementById('error-screen').style.display = 'flex';
-            document.getElementById('error-message').textContent = message;
-        }
-
-        // ==================== ИНИЦИАЛИЗАЦИЯ ====================
-        async function init() {
-            debugLog('🚀 ИНИЦИАЛИЗАЦИЯ ГАЛЕРЕИ');
-            
-            initTelegram();
-            await loadGallery();
-            
-            document.addEventListener('touchstart', handleTouchStart, { passive: true });
-            document.addEventListener('touchend', handleTouchEnd);
-        }
-
-        window.addEventListener('load', init);
-        
-        // Экспортируем функции
-        window.nextImage = nextImage;
-        window.prevImage = prevImage;
-        window.closeGallery = closeGallery;
-        window.handleSave = handleSave;
-        window.onImageLoad = onImageLoad;
-        window.onImageError = onImageError;
-    </script>
-</body>
-</html>
+            if (Math.abs(diffX) > 50
