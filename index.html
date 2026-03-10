@@ -765,27 +765,97 @@
             }
         }
 
-        // ==================== ПРОВЕРКА VIP СТАТУСА ====================
+        // ==================== ПРОВЕРКА VIP СТАТУСА ЧЕРЕЗ БОТА ====================
         async function checkVipStatus(userId) {
             debugLog(`🔍 Проверка VIP статуса для пользователя ${userId}...`);
             
-            // Сначала проверяем, может быть уже есть в URL
+            // Сначала проверяем, может быть уже есть в URL (если бот передал)
             const params = getUrlParams();
             if (params.vip) {
                 debugLog(`👑 VIP статус из параметров URL: true`);
                 return true;
             }
             
-            // ВРЕМЕННО: даём VIP статус по ID администратора
-            if (userId === 337383733) {
-                debugLog(`👑 ВРЕМЕННО: VIP статус по ID администратора`);
-                return true;
-            }
-            
-            return false;
+            // Запрашиваем у бота через WebApp
+            return new Promise((resolve) => {
+                try {
+                    if (!window.Telegram?.WebApp) {
+                        debugLog('❌ Telegram.WebApp не доступен', 'error');
+                        resolve(false);
+                        return;
+                    }
+                    
+                    state.vipPromiseResolve = resolve;
+                    
+                    const requestData = {
+                        action: 'check_vip',
+                        user_id: userId,
+                        post_id: state.postId
+                    };
+                    
+                    debugLog(`📤 Отправка запроса боту: ${JSON.stringify(requestData)}`);
+                    window.Telegram.WebApp.sendData(JSON.stringify(requestData));
+                    
+                    // Таймаут на случай, если бот не ответит
+                    setTimeout(() => {
+                        if (state.vipPromiseResolve) {
+                            debugLog('⚠️ Таймаут ожидания ответа от бота', 'warn');
+                            state.vipPromiseResolve(false);
+                            state.vipPromiseResolve = null;
+                        }
+                    }, 5000);
+                    
+                } catch (e) {
+                    debugLog(`❌ Ошибка отправки запроса: ${e.message}`, 'error');
+                    resolve(false);
+                }
+            });
         }
 
-        // ==================== ОТПРАВКА СТАТИСТИКИ В БОТА (ИСПРАВЛЕНО) ====================
+        // ==================== ОБРАБОТКА ОТВЕТОВ ОТ БОТА ====================
+        window.handleVipResponse = function(responseText) {
+            debugLog(`📩 Получен ответ от бота: ${responseText}`);
+            
+            try {
+                // Парсим ответ (формат: VIP_RESPONSE:{"vip":true,"user_id":123})
+                if (responseText.startsWith('VIP_RESPONSE:')) {
+                    const jsonStr = responseText.substring(13);
+                    const data = JSON.parse(jsonStr);
+                    
+                    debugLog(`📊 Данные ответа: ${JSON.stringify(data)}`);
+                    
+                    if (data.vip === true) {
+                        debugLog(`👑 VIP статус ПОДТВЕРЖДЁН ботом!`);
+                        state.isVip = true;
+                        
+                        // Обновляем интерфейс
+                        document.getElementById('vip-badge').style.display = 'block';
+                        document.getElementById('save-button').classList.remove('vip-only');
+                        
+                        // Если есть ожидающий Promise, разрешаем его
+                        if (state.vipPromiseResolve) {
+                            state.vipPromiseResolve(true);
+                            state.vipPromiseResolve = null;
+                        }
+                        
+                        // Перезагружаем галерею для показа оригиналов
+                        location.reload();
+                    } else {
+                        debugLog(`❌ VIP статус НЕ ПОДТВЕРЖДЁН`);
+                        state.isVip = false;
+                        
+                        if (state.vipPromiseResolve) {
+                            state.vipPromiseResolve(false);
+                            state.vipPromiseResolve = null;
+                        }
+                    }
+                }
+            } catch (e) {
+                debugLog(`❌ Ошибка обработки ответа: ${e.message}`, 'error');
+            }
+        };
+
+        // ==================== ОТПРАВКА СТАТИСТИКИ В БОТА ====================
         function sendStats(action, details = {}) {
             if (!window.Telegram?.WebApp) {
                 debugLog('❌ Telegram.WebApp не доступен, статистика не отправлена', 'warn');
