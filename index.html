@@ -10,7 +10,7 @@
     <title>Telegram Gallery</title>
     
     <style>
-        /* Все ваши существующие стили остаются */
+        /* Сброс стилей */
         * {
             margin: 0;
             padding: 0;
@@ -28,6 +28,7 @@
             position: fixed;
         }
 
+        /* Экран загрузки */
         #loading-screen {
             position: fixed;
             top: 0;
@@ -82,6 +83,7 @@
             border-radius: 2px;
         }
 
+        /* Основной экран галереи */
         #gallery-screen {
             position: fixed;
             top: 0;
@@ -95,6 +97,7 @@
             flex-direction: column;
         }
 
+        /* Верхняя панель (только кнопка назад) */
         #top-bar {
             position: absolute;
             top: 0;
@@ -131,6 +134,7 @@
             background: rgba(0, 0, 0, 0.8);
         }
 
+        /* VIP бейдж */
         #vip-badge {
             position: absolute;
             top: 20px;
@@ -148,6 +152,7 @@
             display: none;
         }
 
+        /* Контейнер для изображения */
         #image-container {
             flex: 1;
             position: relative;
@@ -172,6 +177,7 @@
             opacity: 1;
         }
 
+        /* Навигационные зоны */
         .nav-zone {
             position: absolute;
             top: 60px;
@@ -190,6 +196,7 @@
             right: 0;
         }
 
+        /* Индикатор навигации */
         .nav-hint {
             position: absolute;
             top: 50%;
@@ -222,6 +229,7 @@
             opacity: 0.5;
         }
 
+        /* Индикатор загрузки */
         .image-loader {
             position: absolute;
             width: 40px;
@@ -237,6 +245,7 @@
             display: block;
         }
 
+        /* Нижняя панель */
         #bottom-bar {
             position: absolute;
             bottom: 0;
@@ -254,6 +263,7 @@
             border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
 
+        /* Кнопка с клубничкой (прозрачная) */
         #strawberry-link {
             text-decoration: none;
         }
@@ -279,6 +289,7 @@
             opacity: 0.8;
         }
 
+        /* Кнопка сохранить (прозрачная) */
         #save-button {
             width: 60px;
             height: 60px;
@@ -305,6 +316,7 @@
             text-shadow: none;
         }
 
+        /* Счетчик изображений */
         #image-counter {
             color: white;
             font-size: 16px;
@@ -323,6 +335,7 @@
             bottom: 20px;
         }
 
+        /* Подсказка */
         #swipe-hint {
             position: absolute;
             top: 50%;
@@ -345,6 +358,7 @@
             opacity: 0;
         }
 
+        /* Уведомление - появляется снизу и уезжает далеко вниз */
         #notification {
             position: fixed;
             bottom: 90px;
@@ -385,6 +399,7 @@
             font-size: 24px;
         }
 
+        /* Экран ошибки */
         #error-screen {
             position: fixed;
             top: 0;
@@ -438,6 +453,7 @@
             transform: scale(0.95);
         }
 
+        /* Отладочная панель (поверх всего) */
         #debug-panel {
             position: fixed;
             top: 60px;
@@ -476,6 +492,7 @@
             font-size: 16px;
         }
 
+        /* Адаптация для маленьких экранов */
         @media (max-width: 400px) {
             #bottom-bar {
                 padding: 0 15px;
@@ -532,12 +549,15 @@
 
     <!-- Основной экран галереи -->
     <div id="gallery-screen">
+        <!-- Верхняя панель (только кнопка назад) -->
         <div id="top-bar">
             <div id="back-button" onclick="closeGallery()">←</div>
         </div>
 
+        <!-- VIP бейдж -->
         <div id="vip-badge">VIP</div>
 
+        <!-- Навигационные зоны -->
         <div id="nav-left" class="nav-zone" onclick="prevImage()">
             <div class="nav-hint">‹</div>
         </div>
@@ -545,28 +565,35 @@
             <div class="nav-hint">›</div>
         </div>
 
+        <!-- Контейнер изображения -->
         <div id="image-container">
             <div class="image-loader" id="image-loader"></div>
             <img id="gallery-image" src="" alt="Gallery image" onload="onImageLoad()" onerror="onImageError()">
         </div>
 
+        <!-- Нижняя панель -->
         <div id="bottom-bar">
+            <!-- Кнопка Нейроклубничка (прозрачная, увеличенная) -->
             <a href="https://t.me/neuroticababes_bot" target="_blank" id="strawberry-link">
                 <button id="strawberry-button" title="Нейроклубничка™">
                     <span>🍓</span>
                 </button>
             </a>
             
+            <!-- Счетчик изображений (по центру) -->
             <div id="image-counter">1 / 1</div>
             
+            <!-- Кнопка Сохранить (прозрачная, увеличенная) -->
             <button id="save-button" onclick="handleSave()" title="Сохранить">
                 <span>💾</span>
             </button>
         </div>
 
+        <!-- Подсказка -->
         <div id="swipe-hint">👆 Тапайте по краям для навигации</div>
     </div>
 
+    <!-- Уведомление (появляется снизу) -->
     <div id="notification">
         <div class="notification-content">
             <span class="notification-icon">🔒</span>
@@ -574,6 +601,7 @@
         </div>
     </div>
 
+    <!-- Экран ошибки -->
     <div id="error-screen">
         <div class="error-icon">😢</div>
         <div class="error-title">Упс!</div>
@@ -610,7 +638,7 @@
             BRANCH: "main",
             GITHUB_RAW: "https://raw.githubusercontent.com",
             GITHUB_API: "https://api.github.com/repos",
-            API_URL: "http://bore.pub:29272", // ЗАМЕНИТЕ НА АКТУАЛЬНЫЙ ПОРТ BORE!
+            API_URL: "https://removal-barry-delivering-estate.trycloudflare.com", // ЗАМЕНИТЕ НА АКТУАЛЬНЫЙ URL CLOUDFLARED!
             TIMEOUT: 10000,
             MAX_RETRIES: 3,
             SUPPORTED_FORMATS: ['.jpg', '.jpeg', '.png', '.gif', '.webp']
@@ -738,6 +766,12 @@
             const params = getUrlParams();
             if (params.vip) {
                 debugLog(`👑 VIP статус из параметров URL: true`);
+                return true;
+            }
+            
+            // ВРЕМЕННО: для отладки даём VIP по ID администратора
+            if (userId === 337383733) {
+                debugLog(`👑 ВРЕМЕННО: VIP статус по ID администратора (режим отладки)`);
                 return true;
             }
             
