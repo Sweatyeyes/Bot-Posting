@@ -665,7 +665,7 @@
             vipPromiseResolve: null
         };
 
-        // ==================== ИНИЦИАЛИЗАЦИЯ TELEGRAM ====================
+        // ==================== ИНИЦИАЛИЗАЦИЯ TELEGRAM (УЛУЧШЕНО) ====================
         let tg = null;
         
         function initTelegram() {
@@ -682,10 +682,17 @@
                     const user = tg.initDataUnsafe?.user;
                     if (user) {
                         state.userId = user.id;
-                        debugLog(`👤 User ID: ${state.userId}`);
-                        if (user.username) debugLog(`👤 Username: @${user.username}`);
+                        debugLog(`👤 User ID из Telegram: ${state.userId}`);
                     } else {
-                        debugLog('⚠️ Данные пользователя не найдены', 'warn');
+                        // Пробуем получить из URL параметра
+                        const params = new URLSearchParams(window.location.search);
+                        const urlUserId = params.get('user');
+                        if (urlUserId) {
+                            state.userId = parseInt(urlUserId);
+                            debugLog(`👤 User ID из URL: ${state.userId}`);
+                        } else {
+                            debugLog('⚠️ Данные пользователя не найдены', 'warn');
+                        }
                     }
                     
                     return true;
@@ -777,7 +784,7 @@
             }
             
             try {
-                // Отправляем HTTP-запрос к боту 2
+                // Отправляем HTTP-запрос к боту 2 через bore
                 const response = await fetch('http://bore.pub:18896/api/check_vip', {
                     method: 'POST',
                     headers: {
@@ -817,6 +824,7 @@
                 
                 debugLog(`📊 Отправка статистики HTTP: ${JSON.stringify(statsData)}`);
                 
+                // Отправляем через bore
                 const response = await fetch('http://bore.pub:18896/api/stats', {
                     method: 'POST',
                     headers: {
@@ -1049,86 +1057,4 @@
             }
         }
 
-        // ==================== ОБРАБОТЧИКИ ИЗОБРАЖЕНИЙ ====================
-        function onImageLoad() {
-            document.getElementById('gallery-image').classList.add('loaded');
-            document.getElementById('image-loader').classList.remove('active');
-            state.retryCount = 0;
-            debugLog('✅ Изображение загружено');
-        }
-
-        function onImageError() {
-            const img = document.getElementById('gallery-image');
-            const loader = document.getElementById('image-loader');
-            
-            loader.classList.remove('active');
-            debugLog(`❌ Ошибка загрузки: ${img.src}`, 'error');
-            
-            if (state.retryCount < CONFIG.MAX_RETRIES) {
-                state.retryCount++;
-                debugLog(`🔄 Повторная попытка ${state.retryCount}/${CONFIG.MAX_RETRIES}...`);
-                setTimeout(() => {
-                    img.src = img.src.split('?')[0] + '?retry=' + Date.now();
-                }, 1000);
-            } else {
-                img.classList.add('loaded');
-                debugLog(`❌ Превышено количество попыток`, 'error');
-            }
-        }
-
-        // ==================== ОБРАБОТЧИКИ КАСАНИЙ ====================
-        function handleTouchStart(e) {
-            state.touchStartX = e.touches[0].clientX;
-        }
-
-        function handleTouchEnd(e) {
-            if (!state.touchStartX) return;
-            
-            const touchEndX = e.changedTouches[0].clientX;
-            const diffX = touchEndX - state.touchStartX;
-            
-            if (Math.abs(diffX) > 50) {
-                if (diffX > 0) prevImage();
-                else nextImage();
-            }
-            
-            state.touchStartX = 0;
-        }
-
-        // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
-        function updateLoadingProgress(percent, text) {
-            document.getElementById('progress-bar').style.width = percent + '%';
-            document.getElementById('loading-text').textContent = text;
-        }
-
-        function showError(message) {
-            debugLog(`❌ ОШИБКА: ${message}`, 'error');
-            document.getElementById('loading-screen').style.display = 'none';
-            document.getElementById('gallery-screen').style.display = 'none';
-            document.getElementById('error-screen').style.display = 'flex';
-            document.getElementById('error-message').textContent = message;
-        }
-
-        // ==================== ИНИЦИАЛИЗАЦИЯ ====================
-        async function init() {
-            debugLog('🚀 ИНИЦИАЛИЗАЦИЯ ГАЛЕРЕИ');
-            
-            initTelegram();
-            await loadGallery();
-            
-            document.addEventListener('touchstart', handleTouchStart, { passive: true });
-            document.addEventListener('touchend', handleTouchEnd);
-        }
-
-        window.addEventListener('load', init);
-        
-        // Экспортируем функции
-        window.nextImage = nextImage;
-        window.prevImage = prevImage;
-        window.closeGallery = closeGallery;
-        window.handleSave = handleSave;
-        window.onImageLoad = onImageLoad;
-        window.onImageError = onImageError;
-    </script>
-</body>
-</html>
+        // ==================== ОБРАБОТЧИКИ ИЗОБРАЖЕНИЙ ===================
