@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>🔍 ТЕСТ ПОЛУЧЕНИЯ ДАННЫХ</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            padding: 20px;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            max-width: 500px;
+            width: 100%;
+            background: #2d2d2d;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid #404040;
+        }
+        h1 {
+            color: #ffd700;
+            margin-top: 0;
+            text-align: center;
+            font-size: 24px;
+        }
+        .data-box {
+            background: #1a1a1a;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            border-left: 4px solid #2ea6ff;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .label {
+            color: #888;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+        .value {
+            color: #2ea6ff;
+            font-weight: bold;
+        }
+        button {
+            background: #2ea6ff;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            width: 100%;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #1a8cff;
+            transform: scale(1.02);
+        }
+        button:active {
+            transform: scale(0.98);
+        }
+        .success {
+            background: #00c851;
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            margin-top: 15px;
+            display: none;
+        }
+        .error {
+            background: #ff4444;
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            margin-top: 15px;
+            display: none;
+        }
+        .debug {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 ТЕСТ ПОЛУЧЕНИЯ ДАННЫХ ПОЛЬЗОВАТЕЛЯ</h1>
+        
+        <div class="data-box">
+            <div class="label">📦 Данные из Telegram WebApp:</div>
+            <div id="telegram-data" class="value">Загрузка...</div>
+        </div>
+
+        <div class="data-box">
+            <div class="label">📋 Параметры из URL:</div>
+            <div id="url-params" class="value">Загрузка...</div>
+        </div>
+
+        <div class="data-box">
+            <div class="label">👤 Информация о пользователе:</div>
+            <div id="user-data" class="value">Загрузка...</div>
+        </div>
+
+        <button onclick="sendTestData()">
+            📤 ОТПРАВИТЬ ТЕСТОВЫЕ ДАННЫЕ БОТУ
+        </button>
+
+        <div id="success-message" class="success">
+            ✅ Данные успешно отправлены!
+        </div>
+        <div id="error-message" class="error">
+            ❌ Ошибка отправки данных
+        </div>
+
+        <div class="debug" id="debug-log"></div>
+    </div>
+
+    <script>
+        let tg = null;
+        const debugLog = document.getElementById('debug-log');
+        
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logLine = `[${timestamp}] ${message}`;
+            debugLog.innerHTML += `<div>${logLine}</div>`;
+            debugLog.scrollTop = debugLog.scrollHeight;
+            console.log(logLine);
+        }
+
+        // Инициализация Telegram WebApp
+        try {
+            if (window.Telegram?.WebApp) {
+                tg = window.Telegram.WebApp;
+                tg.ready();
+                tg.expand();
+                log('✅ Telegram WebApp инициализирован');
+            } else {
+                log('❌ Telegram WebApp не найден');
+            }
+        } catch (e) {
+            log(`❌ Ошибка инициализации: ${e.message}`);
+        }
+
+        // Получаем все параметры из URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const params = {};
+        for (const [key, value] of urlParams.entries()) {
+            params[key] = value;
+        }
+
+        // Получаем данные из Telegram
+        const telegramData = {
+            start_param: tg?.initDataUnsafe?.start_param || 'не передан',
+            user: tg?.initDataUnsafe?.user || null,
+            query_id: tg?.initDataUnsafe?.query_id || 'не передан',
+            auth_date: tg?.initDataUnsafe?.auth_date || 'не передан',
+            hash: tg?.initDataUnsafe?.hash || 'не передан'
+        };
+
+        // Информация о пользователе
+        const userInfo = {
+            id: tg?.initDataUnsafe?.user?.id || 'не получен',
+            first_name: tg?.initDataUnsafe?.user?.first_name || 'не получен',
+            last_name: tg?.initDataUnsafe?.user?.last_name || 'не получен',
+            username: tg?.initDataUnsafe?.user?.username || 'не получен',
+            language_code: tg?.initDataUnsafe?.user?.language_code || 'не получен',
+            is_premium: tg?.initDataUnsafe?.user?.is_premium || false
+        };
+
+        // Отображаем данные
+        document.getElementById('telegram-data').innerHTML = 
+            JSON.stringify(telegramData, null, 2).replace(/\n/g, '<br>');
+        
+        document.getElementById('url-params').innerHTML = 
+            Object.keys(params).length > 0 
+                ? JSON.stringify(params, null, 2).replace(/\n/g, '<br>')
+                : 'нет параметров';
+        
+        document.getElementById('user-data').innerHTML = 
+            JSON.stringify(userInfo, null, 2).replace(/\n/g, '<br>');
+
+        log(`📦 Параметры URL: ${JSON.stringify(params)}`);
+        log(`🎯 start_param: ${telegramData.start_param}`);
+        log(`👤 User ID: ${userInfo.id}`);
+
+        // Функция отправки данных боту
+        function sendTestData() {
+            const dataToSend = {
+                type: 'test_data',
+                timestamp: Date.now(),
+                telegram: telegramData,
+                url_params: params,
+                user: userInfo,
+                page_url: window.location.href
+            };
+
+            log(`📤 Отправка данных: ${JSON.stringify(dataToSend)}`);
+
+            try {
+                if (tg) {
+                    // Отправляем через Telegram WebApp
+                    tg.sendData(JSON.stringify(dataToSend));
+                    log('✅ Данные отправлены через tg.sendData()');
+                    document.getElementById('success-message').style.display = 'block';
+                    setTimeout(() => {
+                        document.getElementById('success-message').style.display = 'none';
+                    }, 3000);
+                } else {
+                    // Если нет Telegram, пробуем через fetch (для отладки в браузере)
+                    log('⚠️ Telegram не доступен, пробуем fetch...');
+                    
+                    fetch('https://api.telegram.org/bot' + 'YOUR_BOT_TOKEN' + '/sendMessage', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            chat_id: userInfo.id || 337383733,
+                            text: `📊 Тестовые данные:\n\`\`\`json\n${JSON.stringify(dataToSend, null, 2)}\n\`\`\``,
+                            parse_mode: 'Markdown'
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        log(`✅ Fetch успешен: ${JSON.stringify(data)}`);
+                        document.getElementById('success-message').style.display = 'block';
+                    })
+                    .catch(error => {
+                        log(`❌ Fetch ошибка: ${error.message}`);
+                        document.getElementById('error-message').style.display = 'block';
+                    });
+                }
+            } catch (e) {
+                log(`❌ Ошибка отправки: ${e.message}`);
+                document.getElementById('error-message').style.display = 'block';
+            }
+        }
+
+        // Автоматическая отправка при загрузке (для теста)
+        setTimeout(() => {
+            if (confirm('Отправить тестовые данные?')) {
+                sendTestData();
+            }
+        }, 2000);
+    </script>
+</body>
+</html>
