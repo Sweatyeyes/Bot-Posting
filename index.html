@@ -531,7 +531,7 @@
 <body>
     <!-- Отладочная панель -->
     <div id="debug-panel">
-        <div class="title">🔍 ОТЛАДКА (БЕЗ HTTP)</div>
+        <div class="title">🔍 ОТЛАДКА (СБОР ДАННЫХ)</div>
         <div class="close-btn" onclick="this.parentElement.style.display='none'">✖</div>
         <div id="debug-content">Загрузка...</div>
     </div>
@@ -647,7 +647,8 @@
             preloadedImages: new Set(),
             retryCount: 0,
             generalCount: 0,
-            vipCount: 0
+            vipCount: 0,
+            viewedImages: new Set() // Для отслеживания просмотренных фото
         };
 
         // ==================== TELEGRAM INIT ====================
@@ -664,22 +665,13 @@
                     
                     debugLog('✅ Telegram WebApp найден!');
                     
-                    // Подробная отладка всех данных от Telegram
-                    debugLog('📦 initDataUnsafe: ' + JSON.stringify(tg.initDataUnsafe, null, 2));
-                    
                     if (tg.initDataUnsafe?.user) {
                         state.userId = tg.initDataUnsafe.user.id;
                         debugLog(`👤 User ID из Telegram: ${state.userId}`);
-                        debugLog(`👤 User data: ${JSON.stringify(tg.initDataUnsafe.user)}`);
                     }
                     
                     if (tg.initDataUnsafe?.start_param) {
                         debugLog(`🎯 start_param: ${tg.initDataUnsafe.start_param}`);
-                    }
-                    
-                    // Пробуем получить данные из разных мест
-                    if (tg.initDataUnsafe?.query_id) {
-                        debugLog(`📎 query_id: ${tg.initDataUnsafe.query_id}`);
                     }
                     
                     return true;
@@ -693,7 +685,37 @@
             }
         }
 
-        // ==================== ПОЛУЧЕНИЕ ПАРАМЕТРОВ ИЗ URL И TELEGRAM ====================
+        // ==================== ОТПРАВКА ДАННЫХ БОТУ ====================
+        function sendUserData(action, details = {}) {
+            try {
+                if (!tg) {
+                    debugLog('⚠️ Telegram WebApp не инициализирован', 'warn');
+                    return;
+                }
+                
+                const data = {
+                    action: action,
+                    user_id: state.userId,
+                    post_id: state.postId,
+                    is_vip: state.isVip,
+                    timestamp: Date.now(),
+                    current_index: state.currentIndex,
+                    total_files: state.files.length,
+                    ...details
+                };
+                
+                const dataStr = JSON.stringify(data);
+                debugLog(`📤 Отправка данных боту: ${action} (${dataStr.length} байт)`, 'info');
+                
+                // Отправляем данные через Telegram Bot API
+                tg.sendData(dataStr);
+                
+            } catch (e) {
+                debugLog(`❌ Ошибка отправки данных: ${e.message}`, 'error');
+            }
+        }
+
+        // ==================== ПОЛУЧЕНИЕ ПАРАМЕТРОВ ====================
         function getUrlParams() {
             debugLog('🔍 Получение параметров из URL и Telegram...');
             
@@ -704,50 +726,43 @@
             let vipCount = 0;
             let timestamp = null;
             
-            // 1. Сначала пробуем получить из Telegram WebApp (самый надежный способ)
+            // 1. Из Telegram WebApp
             if (window.Telegram?.WebApp?.initDataUnsafe?.start_param) {
                 const startParam = window.Telegram.WebApp.initDataUnsafe.start_param;
                 debugLog(`📦 start_param из Telegram: "${startParam}"`);
                 
-                // start_param может быть просто ID поста или gallery_ID
                 if (startParam.startsWith('gallery_')) {
                     postId = startParam.replace('gallery_', '');
                 } else {
                     postId = startParam;
                 }
                 
-                // Если есть start_param, считаем что пользователь авторизован
-                // и ID пользователя можно получить из Telegram
                 if (window.Telegram.WebApp.initDataUnsafe?.user?.id) {
                     userId = window.Telegram.WebApp.initDataUnsafe.user.id;
                 }
             }
             
-            // 2. Потом пробуем получить из URL параметров (как запасной вариант)
+            // 2. Из URL параметров
             const params = new URLSearchParams(window.location.search);
             
-            // ID поста: сначала из URL, если нет - оставляем из Telegram
             const urlPost = params.get('post') || params.get('startapp');
             if (urlPost) {
                 debugLog(`📦 post из URL: "${urlPost}"`);
                 postId = urlPost;
             }
             
-            // VIP статус
             const urlVip = params.get('vip');
             if (urlVip) {
                 vip = urlVip === 'true';
                 debugLog(`📦 vip из URL: ${vip}`);
             }
             
-            // User ID из URL
             const urlUser = params.get('user');
             if (urlUser) {
                 userId = parseInt(urlUser);
                 debugLog(`📦 user из URL: ${userId}`);
             }
             
-            // Остальные параметры
             const urlGeneral = params.get('general');
             if (urlGeneral) {
                 generalCount = parseInt(urlGeneral) || 0;
@@ -762,26 +777,10 @@
             
             timestamp = params.get('t');
             
-            // 3. Пробуем получить из hash (иногда Telegram так передаёт)
-            if (!postId && window.location.hash) {
-                const hash = window.location.hash.substring(1); // убираем #
-                if (hash) {
-                    debugLog(`📦 Параметр из hash: "${hash}"`);
-                    postId = hash;
-                }
-            }
-            
-            // 4. Если всё ещё нет postId, пробуем получить из полного URL
-            if (!postId) {
-                const fullUrl = window.location.href;
-                debugLog(`📦 Полный URL: ${fullUrl}`);
-                
-                // Пробуем извлечь ID из пути (например, .../index.html/10-03_19-35)
-                const matches = fullUrl.match(/index\.html\/([^?#]+)/);
-                if (matches && matches[1]) {
-                    postId = matches[1];
-                    debugLog(`📦 Извлечено из пути: ${postId}`);
-                }
+            // 3. Принудительный VIP для админа
+            if (userId === 337383733) {
+                debugLog(`👑 Принудительный VIP для админа ${userId}`);
+                vip = true;
             }
             
             debugLog(`📦 Итоговые параметры:
@@ -806,7 +805,7 @@
         // ==================== GITHUB ФУНКЦИИ ====================
         async function loadFilesFromFolder(postId, folder) {
             const url = `${CONFIG.GITHUB_API}/${CONFIG.REPO}/contents/posts/${postId}/${folder}`;
-            debugLog(`📂 Запрос к GitHub: ${folder} (${url})`);
+            debugLog(`📂 Запрос к GitHub: ${folder}`);
             
             try {
                 const controller = new AbortController();
@@ -821,16 +820,15 @@
                 
                 if (!response.ok) {
                     if (response.status === 404) {
-                        debugLog(`📁 Папка ${folder} не найдена (404)`);
+                        debugLog(`📁 Папка ${folder} не найдена`);
                     } else {
-                        debugLog(`❌ GitHub ответил кодом ${response.status} для ${folder}`, 'error');
+                        debugLog(`❌ GitHub ответил кодом ${response.status}`, 'error');
                     }
                     return [];
                 }
                 
                 const data = await response.json();
                 
-                // Фильтруем только изображения
                 const files = data
                     .filter(item => {
                         const ext = item.name.toLowerCase().slice(item.name.lastIndexOf('.'));
@@ -844,9 +842,6 @@
                     }));
                 
                 debugLog(`📸 Найдено в ${folder}: ${files.length} фото`);
-                if (files.length > 0) {
-                    files.forEach(f => debugLog(`   - ${f.name} (${f.type})`));
-                }
                 return files;
                 
             } catch (e) {
@@ -862,7 +857,7 @@
         // ==================== ЗАГРУЗКА ГАЛЕРЕИ ====================
         async function loadGallery() {
             clearDebug();
-            debugLog('🚀 ЗАГРУЗКА ГАЛЕРЕИ (БЕЗ HTTP)...');
+            debugLog('🚀 ЗАГРУЗКА ГАЛЕРЕИ (СБОР ДАННЫХ)...');
             
             const params = getUrlParams();
             
@@ -871,7 +866,6 @@
                 return;
             }
             
-            // Очищаем ID поста от недопустимых символов
             state.postId = params.post.replace(/[^a-zA-Z0-9_\-]/g, '');
             state.isVip = params.vip;
             state.userId = params.user;
@@ -879,18 +873,13 @@
             state.vipCount = params.vip_count;
             
             debugLog(`📁 Пост: ${state.postId}`);
-            debugLog(`👑 VIP статус из URL: ${state.isVip}`);
+            debugLog(`👑 VIP статус: ${state.isVip}`);
             debugLog(`👤 User ID: ${state.userId}`);
-            if (state.generalCount) debugLog(`📊 Ожидается общих фото: ${state.generalCount}`);
-            if (state.vipCount) debugLog(`📊 Ожидается VIP фото: ${state.vipCount}`);
             
             updateLoadingProgress(20, 'Проверка доступа...');
-            await new Promise(r => setTimeout(r, 500));
             
             updateLoadingProgress(40, 'Загрузка изображений...');
             
-            // Загружаем фото с GitHub
-            debugLog(`📂 Загрузка из папки posts/${state.postId}/`);
             const [generalFiles, vipFiles] = await Promise.all([
                 loadFilesFromFolder(state.postId, 'general'),
                 loadFilesFromFolder(state.postId, 'vip')
@@ -898,23 +887,18 @@
             
             let files = [];
             
-            // Добавляем общие фото
             files.push(...generalFiles.map(f => ({...f, type: 'general'})));
             
-            // Обрабатываем VIP фото в зависимости от статуса
             if (state.isVip) {
-                // VIP видят оригиналы
                 const originalVip = vipFiles.filter(f => !f.isBlurred);
                 files.push(...originalVip.map(f => ({...f, type: 'vip'})));
                 debugLog(`👑 Добавлено ${originalVip.length} оригинальных VIP фото`);
             } else {
-                // Обычные видят размытые
                 const blurredVip = vipFiles.filter(f => f.isBlurred);
                 if (blurredVip.length > 0) {
                     files.push(...blurredVip.map(f => ({...f, type: 'vip-blurred'})));
                     debugLog(`🔒 Добавлено ${blurredVip.length} размытых VIP фото`);
                 } else {
-                    // Создаём ссылки на размытые версии
                     vipFiles.filter(f => !f.isBlurred).forEach(file => {
                         files.push({
                             ...file,
@@ -934,13 +918,11 @@
             
             debugLog(`✅ Всего загружено: ${files.length} фото`);
             
-            // Сортируем по имени
             files.sort((a, b) => a.name.localeCompare(b.name));
             state.files = files;
             
             updateLoadingProgress(90, `Загружено ${files.length} фото...`);
             
-            // Обновляем UI
             if (state.isVip) {
                 document.getElementById('vip-badge').style.display = 'block';
                 document.getElementById('save-button').classList.remove('vip-only');
@@ -948,7 +930,13 @@
                 document.getElementById('save-button').classList.add('vip-only');
             }
 
-            // Показываем галерею
+            // Отправляем событие открытия галереи
+            sendUserData('gallery_open', {
+                general_count: generalFiles.length,
+                vip_count: vipFiles.length,
+                total_files: files.length
+            });
+
             setTimeout(() => {
                 updateLoadingProgress(100, 'Готово!');
                 setTimeout(() => {
@@ -990,30 +978,52 @@
                 document.getElementById('vip-badge').style.display = 'none';
             }
             
-            debugLog(`🖼 Показываем ${index + 1}/${state.files.length}: ${file.name} (${file.type})`);
+            debugLog(`🖼 Показываем ${index + 1}/${state.files.length}: ${file.name}`);
             img.src = file.url;
             
-            // Предзагружаем следующее
+            // Отправляем просмотр (только если фото ещё не было просмотрено)
+            if (!state.viewedImages.has(file.url)) {
+                state.viewedImages.add(file.url);
+                sendUserData('view_image', {
+                    file_name: file.name,
+                    file_type: file.type,
+                    index: index,
+                    is_blurred: file.isBlurred || false
+                });
+            }
+            
             const nextIndex = (index + 1) % state.files.length;
             const nextFile = state.files[nextIndex];
             if (nextFile && !state.preloadedImages.has(nextFile.url)) {
                 const preloadImg = new Image();
                 preloadImg.src = nextFile.url;
                 state.preloadedImages.add(nextFile.url);
-                debugLog(`⏳ Предзагрузка: ${nextFile.name}`);
             }
         }
 
         function nextImage() {
             showImage(state.currentIndex + 1);
+            sendUserData('navigate_next', { 
+                from_index: state.currentIndex - 1, 
+                to_index: state.currentIndex 
+            });
         }
 
         function prevImage() {
             showImage(state.currentIndex - 1);
+            sendUserData('navigate_prev', { 
+                from_index: state.currentIndex + 1, 
+                to_index: state.currentIndex 
+            });
         }
 
         function closeGallery() {
             debugLog('🚪 Закрытие галереи');
+            sendUserData('gallery_close', { 
+                last_index: state.currentIndex,
+                total_viewed: state.viewedImages.size,
+                time_spent: Date.now() - (window.startTime || Date.now())
+            });
             if (tg) tg.close();
             else window.close();
         }
@@ -1046,6 +1056,7 @@
             
             if (!state.isVip) {
                 showNotification('🍓 Подпишись на канал чтобы сохранять фото', 2000, '🍓');
+                sendUserData('save_attempt', {success: false, reason: 'not_vip'});
                 return;
             }
             
@@ -1053,6 +1064,7 @@
             
             if (currentFile.isBlurred || currentFile.type === 'vip-blurred') {
                 showNotification('❌ Нельзя сохранить размытое фото', 1500, '❌');
+                sendUserData('save_attempt', {success: false, reason: 'blurred'});
                 return;
             }
             
@@ -1072,9 +1084,17 @@
                 showNotification('✅ Фото сохраняется...', 1000, '✅');
                 debugLog(`✅ Сохранение: ${currentFile.name}`);
                 
+                sendUserData('save_success', {
+                    file_name: currentFile.name,
+                    file_type: currentFile.type,
+                    file_size: blob.size,
+                    index: state.currentIndex
+                });
+                
             } catch (e) {
                 debugLog(`❌ Ошибка сохранения: ${e.message}`, 'error');
                 showNotification('❌ Ошибка при сохранении', 1500, '❌');
+                sendUserData('save_error', {error: e.message});
             }
         }
 
@@ -1083,7 +1103,6 @@
             document.getElementById('gallery-image').classList.add('loaded');
             document.getElementById('image-loader').classList.remove('active');
             state.retryCount = 0;
-            debugLog('✅ Изображение загружено');
         }
 
         function onImageError() {
@@ -1141,7 +1160,9 @@
 
         // ==================== ИНИЦИАЛИЗАЦИЯ ====================
         async function init() {
-            debugLog('🚀 ИНИЦИАЛИЗАЦИЯ ГАЛЕРЕИ (РЕЖИМ БЕЗ HTTP)');
+            debugLog('🚀 ИНИЦИАЛИЗАЦИЯ ГАЛЕРЕИ (СБОР ДАННЫХ)');
+            
+            window.startTime = Date.now();
             
             initTelegram();
             await loadGallery();
