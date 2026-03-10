@@ -765,103 +765,46 @@
             }
         }
 
-        // ==================== ПРОВЕРКА VIP СТАТУСА ЧЕРЕЗ БОТА ====================
+        // ==================== ПРОВЕРКА VIP СТАТУСА ЧЕРЕЗ HTTP ====================
         async function checkVipStatus(userId) {
             debugLog(`🔍 Проверка VIP статуса для пользователя ${userId}...`);
             
-            // Сначала проверяем, может быть уже есть в URL (если бот передал)
+            // Сначала проверяем, может быть уже есть в URL
             const params = getUrlParams();
             if (params.vip) {
                 debugLog(`👑 VIP статус из параметров URL: true`);
                 return true;
             }
             
-            // Запрашиваем у бота через WebApp
-            return new Promise((resolve) => {
-                try {
-                    if (!window.Telegram?.WebApp) {
-                        debugLog('❌ Telegram.WebApp не доступен', 'error');
-                        resolve(false);
-                        return;
-                    }
-                    
-                    state.vipPromiseResolve = resolve;
-                    
-                    const requestData = {
-                        action: 'check_vip',
+            try {
+                // Отправляем HTTP-запрос к боту 2
+                const response = await fetch('http://localhost:8080/api/check_vip', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
                         user_id: userId,
                         post_id: state.postId
-                    };
-                    
-                    debugLog(`📤 Отправка запроса боту: ${JSON.stringify(requestData)}`);
-                    window.Telegram.WebApp.sendData(JSON.stringify(requestData));
-                    
-                    // Таймаут на случай, если бот не ответит
-                    setTimeout(() => {
-                        if (state.vipPromiseResolve) {
-                            debugLog('⚠️ Таймаут ожидания ответа от бота', 'warn');
-                            state.vipPromiseResolve(false);
-                            state.vipPromiseResolve = null;
-                        }
-                    }, 5000);
-                    
-                } catch (e) {
-                    debugLog(`❌ Ошибка отправки запроса: ${e.message}`, 'error');
-                    resolve(false);
-                }
-            });
-        }
-
-        // ==================== ОБРАБОТКА ОТВЕТОВ ОТ БОТА ====================
-        window.handleVipResponse = function(responseText) {
-            debugLog(`📩 Получен ответ от бота: ${responseText}`);
-            
-            try {
-                // Парсим ответ (формат: VIP_RESPONSE:{"vip":true,"user_id":123})
-                if (responseText.startsWith('VIP_RESPONSE:')) {
-                    const jsonStr = responseText.substring(13);
-                    const data = JSON.parse(jsonStr);
-                    
-                    debugLog(`📊 Данные ответа: ${JSON.stringify(data)}`);
-                    
-                    if (data.vip === true) {
-                        debugLog(`👑 VIP статус ПОДТВЕРЖДЁН ботом!`);
-                        state.isVip = true;
-                        
-                        // Обновляем интерфейс
-                        document.getElementById('vip-badge').style.display = 'block';
-                        document.getElementById('save-button').classList.remove('vip-only');
-                        
-                        // Если есть ожидающий Promise, разрешаем его
-                        if (state.vipPromiseResolve) {
-                            state.vipPromiseResolve(true);
-                            state.vipPromiseResolve = null;
-                        }
-                        
-                        // Перезагружаем галерею для показа оригиналов
-                        location.reload();
-                    } else {
-                        debugLog(`❌ VIP статус НЕ ПОДТВЕРЖДЁН`);
-                        state.isVip = false;
-                        
-                        if (state.vipPromiseResolve) {
-                            state.vipPromiseResolve(false);
-                            state.vipPromiseResolve = null;
-                        }
-                    }
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    debugLog(`📩 Ответ от сервера: VIP=${data.vip}`);
+                    return data.vip === true;
+                } else {
+                    debugLog(`❌ Ошибка HTTP: ${response.status}`, 'error');
+                    return false;
                 }
             } catch (e) {
-                debugLog(`❌ Ошибка обработки ответа: ${e.message}`, 'error');
+                debugLog(`❌ Ошибка запроса: ${e.message}`, 'error');
+                return false;
             }
-        };
+        }
 
-        // ==================== ОТПРАВКА СТАТИСТИКИ В БОТА ====================
-        function sendStats(action, details = {}) {
-            if (!window.Telegram?.WebApp) {
-                debugLog('❌ Telegram.WebApp не доступен, статистика не отправлена', 'warn');
-                return;
-            }
-            
+        // ==================== ОТПРАВКА СТАТИСТИКИ ЧЕРЕЗ HTTP ====================
+        async function sendStats(action, details = {}) {
             try {
                 const statsData = {
                     action: action,
@@ -872,8 +815,19 @@
                     ...details
                 };
                 
-                debugLog(`📊 Отправка статистики: ${JSON.stringify(statsData)}`);
-                window.Telegram.WebApp.sendData(JSON.stringify(statsData));
+                debugLog(`📊 Отправка статистики HTTP: ${JSON.stringify(statsData)}`);
+                
+                const response = await fetch('http://localhost:8080/api/stats', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(statsData)
+                });
+                
+                if (!response.ok) {
+                    debugLog(`❌ Ошибка HTTP: ${response.status}`, 'error');
+                }
             } catch (e) {
                 debugLog(`❌ Ошибка отправки статистики: ${e.message}`, 'error');
             }
@@ -952,7 +906,7 @@
             }
             
             // Отправляем статистику открытия
-            sendStats('gallery_open', {
+            await sendStats('gallery_open', {
                 files_count: files.length,
                 general_count: generalFiles.length,
                 vip_count: vipFiles.length
@@ -1062,12 +1016,12 @@
         }
 
         // ==================== ОБРАБОТКА СОХРАНЕНИЯ ====================
-        function handleSave() {
+        async function handleSave() {
             debugLog(`💾 Попытка сохранения (VIP статус: ${state.isVip})`);
             
             if (!state.isVip) {
                 showNotification('🍓 Подпишись на канал чтобы сохранять фото', 1500);
-                sendStats('save_click', {success: false, reason: 'not_vip'});
+                await sendStats('save_click', {success: false, reason: 'not_vip'});
                 return;
             }
             
@@ -1083,7 +1037,7 @@
                 
                 showNotification('✅ Фото сохраняется...', 1000);
                 debugLog(`✅ Сохранение: ${currentFile.name}`);
-                sendStats('save_click', {
+                await sendStats('save_click', {
                     success: true,
                     file_name: currentFile.name,
                     file_type: currentFile.type
@@ -1091,7 +1045,7 @@
             } else {
                 showNotification('❌ Нельзя сохранить размытое фото', 1500);
                 debugLog(`❌ Попытка сохранить размытое фото`, 'warn');
-                sendStats('save_click', {success: false, reason: 'blurred'});
+                await sendStats('save_click', {success: false, reason: 'blurred'});
             }
         }
 
