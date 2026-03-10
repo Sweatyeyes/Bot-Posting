@@ -10,7 +10,7 @@
     <title>Telegram Gallery</title>
     
     <style>
-        /* Сброс стилей */
+        /* Все стили без изменений - оставляем как в предыдущей версии */
         * {
             margin: 0;
             padding: 0;
@@ -93,11 +93,9 @@
             background: #000;
             display: none;
             z-index: 1000;
-            display: flex;
             flex-direction: column;
         }
 
-        /* Верхняя панель (только кнопка назад) */
         #top-bar {
             position: absolute;
             top: 0;
@@ -134,7 +132,6 @@
             background: rgba(0, 0, 0, 0.8);
         }
 
-        /* VIP бейдж */
         #vip-badge {
             position: absolute;
             top: 20px;
@@ -152,7 +149,6 @@
             display: none;
         }
 
-        /* Контейнер для изображения */
         #image-container {
             flex: 1;
             position: relative;
@@ -177,7 +173,6 @@
             opacity: 1;
         }
 
-        /* Навигационные зоны */
         .nav-zone {
             position: absolute;
             top: 60px;
@@ -196,7 +191,6 @@
             right: 0;
         }
 
-        /* Индикатор навигации */
         .nav-hint {
             position: absolute;
             top: 50%;
@@ -229,7 +223,6 @@
             opacity: 0.5;
         }
 
-        /* Индикатор загрузки */
         .image-loader {
             position: absolute;
             width: 40px;
@@ -245,7 +238,6 @@
             display: block;
         }
 
-        /* Нижняя панель */
         #bottom-bar {
             position: absolute;
             bottom: 0;
@@ -263,7 +255,6 @@
             border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        /* Кнопка с клубничкой (прозрачная) */
         #strawberry-link {
             text-decoration: none;
         }
@@ -289,7 +280,6 @@
             opacity: 0.8;
         }
 
-        /* Кнопка сохранить (прозрачная) */
         #save-button {
             width: 60px;
             height: 60px;
@@ -316,7 +306,6 @@
             text-shadow: none;
         }
 
-        /* Счетчик изображений */
         #image-counter {
             color: white;
             font-size: 16px;
@@ -335,7 +324,6 @@
             bottom: 20px;
         }
 
-        /* Подсказка */
         #swipe-hint {
             position: absolute;
             top: 50%;
@@ -358,7 +346,6 @@
             opacity: 0;
         }
 
-        /* Уведомление - появляется снизу и уезжает далеко вниз */
         #notification {
             position: fixed;
             bottom: 90px;
@@ -399,7 +386,6 @@
             font-size: 24px;
         }
 
-        /* Экран ошибки */
         #error-screen {
             position: fixed;
             top: 0;
@@ -453,7 +439,7 @@
             transform: scale(0.95);
         }
 
-        /* Отладочная панель (поверх всего) */
+        /* Отладочная панель (можно отключить в продакшене) */
         #debug-panel {
             position: fixed;
             top: 60px;
@@ -492,7 +478,6 @@
             font-size: 16px;
         }
 
-        /* Адаптация для маленьких экранов */
         @media (max-width: 400px) {
             #bottom-bar {
                 padding: 0 15px;
@@ -533,7 +518,7 @@
 <body>
     <!-- Отладочная панель -->
     <div id="debug-panel">
-        <div class="title">🔍 ОТЛАДКА</div>
+        <div class="title">🔍 ОТЛАДКА (БЕЗ HTTP)</div>
         <div class="close-btn" onclick="this.parentElement.style.display='none'">✖</div>
         <div id="debug-content">Загрузка...</div>
     </div>
@@ -549,15 +534,12 @@
 
     <!-- Основной экран галереи -->
     <div id="gallery-screen">
-        <!-- Верхняя панель (только кнопка назад) -->
         <div id="top-bar">
             <div id="back-button" onclick="closeGallery()">←</div>
         </div>
 
-        <!-- VIP бейдж -->
         <div id="vip-badge">VIP</div>
 
-        <!-- Навигационные зоны -->
         <div id="nav-left" class="nav-zone" onclick="prevImage()">
             <div class="nav-hint">‹</div>
         </div>
@@ -565,35 +547,29 @@
             <div class="nav-hint">›</div>
         </div>
 
-        <!-- Контейнер изображения -->
         <div id="image-container">
             <div class="image-loader" id="image-loader"></div>
             <img id="gallery-image" src="" alt="Gallery image" onload="onImageLoad()" onerror="onImageError()">
         </div>
 
-        <!-- Нижняя панель -->
         <div id="bottom-bar">
-            <!-- Кнопка Нейроклубничка (прозрачная, увеличенная) -->
             <a href="https://t.me/neuroticababes_bot" target="_blank" id="strawberry-link">
                 <button id="strawberry-button" title="Нейроклубничка™">
                     <span>🍓</span>
                 </button>
             </a>
             
-            <!-- Счетчик изображений (по центру) -->
             <div id="image-counter">1 / 1</div>
             
-            <!-- Кнопка Сохранить (прозрачная, увеличенная) -->
             <button id="save-button" onclick="handleSave()" title="Сохранить">
                 <span>💾</span>
             </button>
         </div>
 
-        <!-- Подсказка -->
         <div id="swipe-hint">👆 Тапайте по краям для навигации</div>
     </div>
 
-    <!-- Уведомление (появляется снизу) -->
+    <!-- Уведомление -->
     <div id="notification">
         <div class="notification-content">
             <span class="notification-icon">🔒</span>
@@ -611,7 +587,11 @@
 
     <script>
         // ==================== ОТЛАДКА ====================
+        const DEBUG_MODE = true;
+
         function debugLog(message, type = 'info') {
+            if (!DEBUG_MODE) return;
+            
             const timestamp = new Date().toLocaleTimeString();
             const logMessage = `[${timestamp}] ${message}`;
             
@@ -638,7 +618,6 @@
             BRANCH: "main",
             GITHUB_RAW: "https://raw.githubusercontent.com",
             GITHUB_API: "https://api.github.com/repos",
-            API_URL: "https://removal-barry-delivering-estate.trycloudflare.com", // ЗАМЕНИТЕ НА АКТУАЛЬНЫЙ URL CLOUDFLARED!
             TIMEOUT: 10000,
             MAX_RETRIES: 3,
             SUPPORTED_FORMATS: ['.jpg', '.jpeg', '.png', '.gif', '.webp']
@@ -653,7 +632,9 @@
             userId: null,
             touchStartX: 0,
             preloadedImages: new Set(),
-            retryCount: 0
+            retryCount: 0,
+            generalCount: 0,
+            vipCount: 0
         };
 
         // ==================== TELEGRAM INIT ====================
@@ -670,20 +651,13 @@
                     
                     debugLog('✅ Telegram WebApp найден!');
                     
-                    const user = tg.initDataUnsafe?.user;
-                    if (user) {
-                        state.userId = user.id;
-                        debugLog(`👤 User ID из Telegram: ${state.userId}`);
-                    } else {
-                        // Пробуем получить из URL параметра
-                        const params = new URLSearchParams(window.location.search);
-                        const urlUserId = params.get('user');
-                        if (urlUserId) {
-                            state.userId = parseInt(urlUserId);
-                            debugLog(`👤 User ID из URL: ${state.userId}`);
-                        } else {
-                            debugLog('⚠️ Данные пользователя не найдены', 'warn');
-                        }
+                    // Получаем данные из URL (HTTP не используется!)
+                    const params = new URLSearchParams(window.location.search);
+                    const urlUserId = params.get('user');
+                    
+                    if (urlUserId) {
+                        state.userId = parseInt(urlUserId);
+                        debugLog(`👤 User ID из URL: ${state.userId}`);
                     }
                     
                     return true;
@@ -697,30 +671,36 @@
             }
         }
 
-        // ==================== ПОЛУЧЕНИЕ ПАРАМЕТРОВ ====================
+        // ==================== ПОЛУЧЕНИЕ ПАРАМЕТРОВ ИЗ URL ====================
         function getUrlParams() {
             debugLog('🔍 Получение параметров из URL...');
             
             const params = new URLSearchParams(window.location.search);
-            let postId = null;
             
-            if (window.Telegram?.WebApp?.initDataUnsafe?.start_param) {
-                postId = window.Telegram.WebApp.initDataUnsafe.start_param;
-                debugLog(`📦 start_param из Telegram: "${postId}"`);
-            }
+            // Все данные приходят в URL - HTTP не нужен!
+            const postId = params.get('post') || params.get('startapp');
+            const vip = params.get('vip') === 'true';
+            const userId = params.get('user');
+            const generalCount = parseInt(params.get('general')) || 0;
+            const vipCount = parseInt(params.get('vip_count')) || 0;
+            const timestamp = params.get('t');
             
-            if (!postId) {
-                postId = params.get('startapp') || params.get('post');
-                if (postId) debugLog(`📦 URL параметр: "${postId}"`);
-            }
-            
-            const urlVip = params.get('vip') === 'true';
-            if (urlVip) debugLog(`👑 VIP из URL: true`);
+            debugLog(`📦 Параметры из URL:
+                post: ${postId}
+                vip: ${vip}
+                user: ${userId}
+                general: ${generalCount}
+                vip_count: ${vipCount}
+                t: ${timestamp}
+            `);
             
             return {
                 post: postId,
-                vip: urlVip,
-                user: params.get('user')
+                vip: vip,
+                user: userId,
+                general: generalCount,
+                vip_count: vipCount,
+                timestamp: timestamp
             };
         }
 
@@ -730,121 +710,57 @@
             debugLog(`📂 Запрос к GitHub: ${folder}`);
             
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUT);
+                
                 const response = await fetch(url, {
-                    headers: { 'Accept': 'application/vnd.github.v3+json' }
+                    headers: { 'Accept': 'application/vnd.github.v3+json' },
+                    signal: controller.signal
                 });
                 
+                clearTimeout(timeoutId);
+                
                 if (!response.ok) {
-                    if (response.status === 404) debugLog(`📁 Папка ${folder} не найдена`);
+                    if (response.status === 404) {
+                        debugLog(`📁 Папка ${folder} не найдена`);
+                    } else {
+                        debugLog(`❌ GitHub ответил кодом ${response.status}`, 'error');
+                    }
                     return [];
                 }
                 
                 const data = await response.json();
-                debugLog(`✅ Получено ${data.length} элементов из ${folder}`);
                 
-                return data
+                // Фильтруем только изображения
+                const files = data
                     .filter(item => {
                         const ext = item.name.toLowerCase().slice(item.name.lastIndexOf('.'));
-                        return CONFIG.SUPPORTED_FORMATS.includes(ext) && !item.name.startsWith('blur_');
+                        return CONFIG.SUPPORTED_FORMATS.includes(ext);
                     })
                     .map(item => ({
                         name: item.name,
                         url: `${CONFIG.GITHUB_RAW}/${CONFIG.REPO}/${CONFIG.BRANCH}/posts/${postId}/${folder}/${item.name}`,
-                        type: folder
+                        type: folder,
+                        isBlurred: item.name.startsWith('blur_')
                     }));
                 
+                debugLog(`📸 Найдено в ${folder}: ${files.length} фото`);
+                return files;
+                
             } catch (e) {
-                debugLog(`❌ Ошибка загрузки ${folder}: ${e.message}`, 'error');
+                if (e.name === 'AbortError') {
+                    debugLog(`⏱️ Таймаут при загрузке ${folder}`, 'error');
+                } else {
+                    debugLog(`❌ Ошибка загрузки ${folder}: ${e.message}`, 'error');
+                }
                 return [];
-            }
-        }
-
-        // ==================== ПРОВЕРКА VIP СТАТУСА ЧЕРЕЗ HTTP ====================
-        async function checkVipStatus(userId) {
-            debugLog(`🔍 Проверка VIP статуса для пользователя ${userId}...`);
-            
-            const params = getUrlParams();
-            if (params.vip) {
-                debugLog(`👑 VIP статус из параметров URL: true`);
-                return true;
-            }
-            
-            // ВРЕМЕННО: для отладки даём VIP по ID администратора
-            if (userId === 337383733) {
-                debugLog(`👑 ВРЕМЕННО: VIP статус по ID администратора (режим отладки)`);
-                return true;
-            }
-            
-            if (!userId) {
-                debugLog('❌ Нет user_id для проверки VIP', 'error');
-                return false;
-            }
-            
-            try {
-                debugLog(`📤 HTTP-запрос к ${CONFIG.API_URL}/api/check_vip`);
-                
-                const response = await fetch(`${CONFIG.API_URL}/api/check_vip`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        user_id: userId,
-                        post_id: state.postId,
-                        timestamp: Date.now()
-                    })
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    debugLog(`📩 Ответ от сервера: ${JSON.stringify(data)}`);
-                    return data.vip === true;
-                } else {
-                    debugLog(`❌ Ошибка HTTP: ${response.status} ${response.statusText}`, 'error');
-                    return false;
-                }
-            } catch (e) {
-                debugLog(`❌ Ошибка запроса: ${e.message}`, 'error');
-                return false;
-            }
-        }
-
-        // ==================== ОТПРАВКА СТАТИСТИКИ ЧЕРЕЗ HTTP ====================
-        async function sendStats(action, details = {}) {
-            try {
-                const statsData = {
-                    action: action,
-                    user_id: state.userId,
-                    post_id: state.postId,
-                    is_vip: state.isVip,
-                    timestamp: Date.now(),
-                    ...details
-                };
-                
-                debugLog(`📊 Отправка статистики HTTP: ${JSON.stringify(statsData)}`);
-                
-                const response = await fetch(`${CONFIG.API_URL}/api/stats`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(statsData)
-                });
-                
-                if (!response.ok) {
-                    debugLog(`❌ Ошибка HTTP: ${response.status}`, 'error');
-                } else {
-                    debugLog(`✅ Статистика отправлена`);
-                }
-            } catch (e) {
-                debugLog(`❌ Ошибка отправки статистики: ${e.message}`, 'error');
             }
         }
 
         // ==================== ЗАГРУЗКА ГАЛЕРЕИ ====================
         async function loadGallery() {
             clearDebug();
-            debugLog('🚀 ЗАГРУЗКА ГАЛЕРЕИ...');
+            debugLog('🚀 ЗАГРУЗКА ГАЛЕРЕИ (БЕЗ HTTP)...');
             
             const params = getUrlParams();
             
@@ -853,40 +769,54 @@
                 return;
             }
             
+            // Загружаем ВСЕ данные из URL - HTTP не нужен!
             state.postId = params.post.replace(/[^a-zA-Z0-9_\-]/g, '');
-            debugLog(`📁 Пост: ${state.postId}`);
+            state.isVip = params.vip;  // VIP статус уже в URL!
+            state.userId = params.user ? parseInt(params.user) : null;
+            state.generalCount = params.general;
+            state.vipCount = params.vip_count;
             
-            debugLog('🔍 Определение VIP статуса...');
-            state.isVip = await checkVipStatus(state.userId);
-            debugLog(`👑 Итоговый VIP статус: ${state.isVip}`);
+            debugLog(`📁 Пост: ${state.postId}`);
+            debugLog(`👑 VIP статус из URL: ${state.isVip}`);
+            if (state.generalCount) debugLog(`📊 Ожидается общих фото: ${state.generalCount}`);
+            if (state.vipCount) debugLog(`📊 Ожидается VIP фото: ${state.vipCount}`);
             
             updateLoadingProgress(30, 'Загрузка изображений...');
             
+            // Загружаем фото с GitHub
             const [generalFiles, vipFiles] = await Promise.all([
                 loadFilesFromFolder(state.postId, 'general'),
                 loadFilesFromFolder(state.postId, 'vip')
             ]);
             
-            debugLog(`📸 Общих фото: ${generalFiles.length}`);
-            debugLog(`🔒 VIP фото: ${vipFiles.length}`);
-            
             let files = [];
+            
+            // Добавляем общие фото
             files.push(...generalFiles.map(f => ({...f, type: 'general'})));
             
+            // Обрабатываем VIP фото в зависимости от статуса
             if (state.isVip) {
-                files.push(...vipFiles.map(f => ({...f, type: 'vip'})));
-                debugLog(`👑 Загружено ${vipFiles.length} оригинальных VIP фото`);
+                // VIP видят оригиналы
+                const originalVip = vipFiles.filter(f => !f.isBlurred);
+                files.push(...originalVip.map(f => ({...f, type: 'vip'})));
+                debugLog(`👑 Добавлено ${originalVip.length} оригинальных VIP фото`);
             } else {
-                vipFiles.forEach(file => {
-                    files.push({
-                        ...file,
-                        url: file.url.replace('/vip/', '/vip/blur_'),
-                        type: 'vip-blurred',
-                        isBlurred: true
+                // Обычные видят размытые
+                const blurredVip = vipFiles.filter(f => f.isBlurred);
+                if (blurredVip.length > 0) {
+                    files.push(...blurredVip.map(f => ({...f, type: 'vip-blurred'})));
+                    debugLog(`🔒 Добавлено ${blurredVip.length} размытых VIP фото`);
+                } else {
+                    // Создаём ссылки на размытые версии
+                    vipFiles.filter(f => !f.isBlurred).forEach(file => {
+                        files.push({
+                            ...file,
+                            url: file.url.replace('/vip/', '/vip/blur_'),
+                            type: 'vip-blurred',
+                            isBlurred: true
+                        });
                     });
-                });
-                if (vipFiles.length > 0) {
-                    debugLog(`🔒 Загружено ${vipFiles.length} размытых VIP фото`);
+                    debugLog(`🔒 Создано ссылок на размытые версии: ${vipFiles.length}`);
                 }
             }
             
@@ -895,50 +825,38 @@
                 return;
             }
             
-            debugLog(`✅ Всего загружено файлов: ${files.length}`);
+            debugLog(`✅ Всего загружено: ${files.length} фото`);
+            
+            // Сортируем по имени
             files.sort((a, b) => a.name.localeCompare(b.name));
             state.files = files;
             
-            updateLoadingProgress(100, `Готово! ${files.length} фото`);
+            updateLoadingProgress(90, `Загружено ${files.length} фото...`);
             
+            // Обновляем UI
             if (state.isVip) {
                 document.getElementById('vip-badge').style.display = 'block';
                 document.getElementById('save-button').classList.remove('vip-only');
             } else {
                 document.getElementById('save-button').classList.add('vip-only');
             }
-            
-            await sendStats('gallery_open', {
-                files_count: files.length,
-                general_count: generalFiles.length,
-                vip_count: vipFiles.length
-            });
 
-            fetch(`https://api.github.com/repos/${CONFIG.REPO}/contents/posts/${state.postId}`)
-                .then(response => response.json())
-                .then(githubData => {
-                    debugLog(`📊 Получена информация с GitHub: ${githubData.length} элементов`);
-                    sendStats('github_post_info', {
-                        files_count: githubData.length,
-                        post_id: state.postId
-                    });
-                })
-                .catch(error => {
-                    debugLog(`❌ Ошибка получения инфо с GitHub: ${error.message}`, 'error');
-                });
-            
+            // Показываем галерею
             setTimeout(() => {
-                document.getElementById('loading-screen').style.opacity = '0';
+                updateLoadingProgress(100, 'Готово!');
                 setTimeout(() => {
-                    document.getElementById('loading-screen').style.display = 'none';
-                    document.getElementById('gallery-screen').style.display = 'flex';
-                    showImage(0);
-                    
+                    document.getElementById('loading-screen').style.opacity = '0';
                     setTimeout(() => {
-                        document.getElementById('swipe-hint').classList.add('fade-out');
-                    }, 3000);
-                }, 300);
-            }, 500);
+                        document.getElementById('loading-screen').style.display = 'none';
+                        document.getElementById('gallery-screen').style.display = 'flex';
+                        showImage(0);
+                        
+                        setTimeout(() => {
+                            document.getElementById('swipe-hint').classList.add('fade-out');
+                        }, 3000);
+                    }, 300);
+                }, 200);
+            }, 300);
         }
 
         // ==================== НАВИГАЦИЯ ====================
@@ -965,9 +883,10 @@
                 document.getElementById('vip-badge').style.display = 'none';
             }
             
-            debugLog(`🖼 Показываем ${index + 1}: ${file.name}`);
+            debugLog(`🖼 Показываем ${index + 1}/${state.files.length}: ${file.name}`);
             img.src = file.url;
             
+            // Предзагружаем следующее
             const nextIndex = (index + 1) % state.files.length;
             const nextFile = state.files[nextIndex];
             if (nextFile && !state.preloadedImages.has(nextFile.url)) {
@@ -994,16 +913,16 @@
         // ==================== УВЕДОМЛЕНИЯ ====================
         let notificationTimeout = null;
 
-        function showNotification(text, duration = 2000) {
-            debugLog(`🔔 Уведомление: ${text}`);
-            
+        function showNotification(text, duration = 2000, icon = '🔒') {
             const notification = document.getElementById('notification');
             const notificationText = document.getElementById('notification-text');
+            const notificationIcon = document.querySelector('.notification-icon');
             
             if (notificationTimeout) clearTimeout(notificationTimeout);
             
             notification.classList.remove('hide');
             notificationText.textContent = text;
+            if (notificationIcon) notificationIcon.textContent = icon;
             notification.classList.add('show');
             
             notificationTimeout = setTimeout(() => {
@@ -1013,37 +932,41 @@
             }, duration);
         }
 
-        // ==================== ОБРАБОТКА СОХРАНЕНИЯ ====================
+        // ==================== СОХРАНЕНИЕ ====================
         async function handleSave() {
             debugLog(`💾 Попытка сохранения (VIP статус: ${state.isVip})`);
             
             if (!state.isVip) {
-                showNotification('🍓 Подпишись на канал чтобы сохранять фото', 1500);
-                await sendStats('save_click', {success: false, reason: 'not_vip'});
+                showNotification('🍓 Подпишись на канал чтобы сохранять фото', 2000, '🍓');
                 return;
             }
             
             const currentFile = state.files[state.currentIndex];
             
-            if (currentFile.type === 'vip' || currentFile.type === 'general') {
+            if (currentFile.isBlurred || currentFile.type === 'vip-blurred') {
+                showNotification('❌ Нельзя сохранить размытое фото', 1500, '❌');
+                return;
+            }
+            
+            try {
+                const response = await fetch(currentFile.url);
+                const blob = await response.blob();
+                
                 const link = document.createElement('a');
-                link.href = currentFile.url;
+                link.href = URL.createObjectURL(blob);
                 link.download = currentFile.name;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
                 
-                showNotification('✅ Фото сохраняется...', 1000);
+                setTimeout(() => URL.revokeObjectURL(link.href), 100);
+                
+                showNotification('✅ Фото сохраняется...', 1000, '✅');
                 debugLog(`✅ Сохранение: ${currentFile.name}`);
-                await sendStats('save_click', {
-                    success: true,
-                    file_name: currentFile.name,
-                    file_type: currentFile.type
-                });
-            } else {
-                showNotification('❌ Нельзя сохранить размытое фото', 1500);
-                debugLog(`❌ Попытка сохранить размытое фото`, 'warn');
-                await sendStats('save_click', {success: false, reason: 'blurred'});
+                
+            } catch (e) {
+                debugLog(`❌ Ошибка сохранения: ${e.message}`, 'error');
+                showNotification('❌ Ошибка при сохранении', 1500, '❌');
             }
         }
 
@@ -1052,7 +975,6 @@
             document.getElementById('gallery-image').classList.add('loaded');
             document.getElementById('image-loader').classList.remove('active');
             state.retryCount = 0;
-            debugLog('✅ Изображение загружено');
         }
 
         function onImageError() {
@@ -1060,17 +982,17 @@
             const loader = document.getElementById('image-loader');
             
             loader.classList.remove('active');
-            debugLog(`❌ Ошибка загрузки: ${img.src}`, 'error');
             
             if (state.retryCount < CONFIG.MAX_RETRIES) {
                 state.retryCount++;
                 debugLog(`🔄 Повторная попытка ${state.retryCount}/${CONFIG.MAX_RETRIES}...`);
                 setTimeout(() => {
                     img.src = img.src.split('?')[0] + '?retry=' + Date.now();
-                }, 1000);
+                }, 1000 * state.retryCount);
             } else {
                 img.classList.add('loaded');
-                debugLog(`❌ Превышено количество попыток`, 'error');
+                img.alt = 'Ошибка загрузки';
+                showNotification('❌ Не удалось загрузить фото', 2000, '❌');
             }
         }
 
@@ -1109,13 +1031,19 @@
 
         // ==================== ИНИЦИАЛИЗАЦИЯ ====================
         async function init() {
-            debugLog('🚀 ИНИЦИАЛИЗАЦИЯ ГАЛЕРЕИ');
+            debugLog('🚀 ИНИЦИАЛИЗАЦИЯ ГАЛЕРЕИ (РЕЖИМ БЕЗ HTTP)');
             
             initTelegram();
             await loadGallery();
             
             document.addEventListener('touchstart', handleTouchStart, { passive: true });
             document.addEventListener('touchend', handleTouchEnd);
+            
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowLeft') prevImage();
+                else if (e.key === 'ArrowRight') nextImage();
+                else if (e.key === 'Escape') closeGallery();
+            });
         }
 
         window.addEventListener('load', init);
