@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -683,10 +682,18 @@
                     const user = tg.initDataUnsafe?.user;
                     if (user) {
                         state.userId = user.id;
-                        debugLog(`👤 User ID: ${state.userId}`);
+                        debugLog(`👤 User ID из Telegram: ${state.userId}`);
                         if (user.username) debugLog(`👤 Username: @${user.username}`);
                     } else {
-                        debugLog('⚠️ Данные пользователя не найдены', 'warn');
+                        // Пробуем получить из URL параметра
+                        const params = new URLSearchParams(window.location.search);
+                        const urlUserId = params.get('user');
+                        if (urlUserId) {
+                            state.userId = parseInt(urlUserId);
+                            debugLog(`👤 User ID из URL: ${state.userId}`);
+                        } else {
+                            debugLog('⚠️ Данные пользователя не найдены', 'warn');
+                        }
                     }
                     
                     return true;
@@ -766,48 +773,76 @@
             }
         }
 
-        // ==================== ПРОВЕРКА VIP СТАТУСА ЧЕРЕЗ БОТА ====================
+        // ==================== ПРОВЕРКА VIP СТАТУСА ЧЕРЕЗ БОТА (С ПОДРОБНОЙ ОТЛАДКОЙ) ====================
         async function checkVipStatus(userId) {
-            debugLog(`🔍 Проверка VIP статуса для пользователя ${userId}...`);
+            debugLog(`🔍 ШАГ A: Проверка VIP статуса для пользователя ${userId}...`);
             
             // Сначала проверяем, может быть уже есть в URL (если бот передал)
             const params = getUrlParams();
             if (params.vip) {
-                debugLog(`👑 VIP статус из параметров URL: true`);
+                debugLog(`👑 ШАГ B: VIP статус из параметров URL: true`);
                 return true;
             }
             
-            // Запрашиваем у бота через WebApp
+            debugLog(`📤 ШАГ C: Инициируем запрос к боту через sendData()`);
+            
             return new Promise((resolve) => {
                 try {
                     if (!window.Telegram?.WebApp) {
-                        debugLog('❌ Telegram.WebApp не доступен', 'error');
+                        debugLog('❌ ШАГ D: Telegram.WebApp не доступен', 'error');
                         resolve(false);
                         return;
                     }
+                    
+                    debugLog(`✅ ШАГ E: Telegram.WebApp доступен`);
+                    debugLog(`📱 Telegram.WebApp version: ${window.Telegram.WebApp.version || 'unknown'}`);
                     
                     state.vipPromiseResolve = resolve;
                     
                     const requestData = {
                         action: 'check_vip',
                         user_id: userId,
-                        post_id: state.postId
+                        post_id: state.postId,
+                        timestamp: Date.now()
                     };
                     
-                    debugLog(`📤 Отправка запроса боту: ${JSON.stringify(requestData)}`);
-                    window.Telegram.WebApp.sendData(JSON.stringify(requestData));
+                    debugLog(`📤 ШАГ F: Отправка запроса боту: ${JSON.stringify(requestData)}`);
+                    
+                    // Проверяем, поддерживает ли WebApp sendData
+                    if (typeof window.Telegram.WebApp.sendData !== 'function') {
+                        debugLog('❌ ШАГ G: sendData не является функцией!', 'error');
+                        resolve(false);
+                        return;
+                    }
+                    
+                    debugLog(`✅ ШАГ H: sendData доступна, отправляем...`);
+                    
+                    // Пробуем отправить
+                    try {
+                        window.Telegram.WebApp.sendData(JSON.stringify(requestData));
+                        debugLog(`✅ ШАГ I: Данные отправлены (вызов sendData выполнен)`);
+                    } catch (sendError) {
+                        debugLog(`❌ ШАГ I-ERR: Ошибка при вызове sendData: ${sendError.message}`, 'error');
+                        resolve(false);
+                        return;
+                    }
+                    
+                    debugLog(`⏳ ШАГ J: Установлен таймаут 5 секунд`);
                     
                     // Таймаут на случай, если бот не ответит
                     setTimeout(() => {
                         if (state.vipPromiseResolve) {
-                            debugLog('⚠️ Таймаут ожидания ответа от бота', 'warn');
+                            debugLog('⚠️ ШАГ K: Таймаут ожидания ответа от бота', 'warn');
+                            debugLog('📊 Статус Promise: всё ещё ожидает');
                             state.vipPromiseResolve(false);
                             state.vipPromiseResolve = null;
+                        } else {
+                            debugLog('✅ ШАГ K: Promise уже разрешён, таймаут не сработал');
                         }
                     }, 5000);
                     
                 } catch (e) {
-                    debugLog(`❌ Ошибка отправки запроса: ${e.message}`, 'error');
+                    debugLog(`❌ ШАГ L: Ошибка отправки запроса: ${e.message}`, 'error');
                     resolve(false);
                 }
             });
@@ -815,18 +850,19 @@
 
         // ==================== ОБРАБОТКА ОТВЕТОВ ОТ БОТА ====================
         window.handleVipResponse = function(responseText) {
-            debugLog(`📩 Получен ответ от бота: ${responseText}`);
+            debugLog(`📩 ШАГ R1: Получен ответ от бота: ${responseText}`);
             
             try {
                 // Парсим ответ (формат: VIP_RESPONSE:{"vip":true,"user_id":123})
                 if (responseText.startsWith('VIP_RESPONSE:')) {
                     const jsonStr = responseText.substring(13);
-                    const data = JSON.parse(jsonStr);
+                    debugLog(`📊 ШАГ R2: JSON строка: ${jsonStr}`);
                     
-                    debugLog(`📊 Данные ответа: ${JSON.stringify(data)}`);
+                    const data = JSON.parse(jsonStr);
+                    debugLog(`📊 ШАГ R3: Данные ответа: ${JSON.stringify(data)}`);
                     
                     if (data.vip === true) {
-                        debugLog(`👑 VIP статус ПОДТВЕРЖДЁН ботом!`);
+                        debugLog(`👑 ШАГ R4: VIP статус ПОДТВЕРЖДЁН ботом!`);
                         state.isVip = true;
                         
                         // Обновляем интерфейс
@@ -835,24 +871,31 @@
                         
                         // Если есть ожидающий Promise, разрешаем его
                         if (state.vipPromiseResolve) {
+                            debugLog(`✅ ШАГ R5: Разрешаем Promise со значением true`);
                             state.vipPromiseResolve(true);
                             state.vipPromiseResolve = null;
+                        } else {
+                            debugLog(`⚠️ ШАГ R5: Promise уже разрешён или отсутствует`);
                         }
                         
                         // Перезагружаем галерею для показа оригиналов
+                        debugLog(`🔄 ШАГ R6: Перезагрузка страницы для обновления фото`);
                         location.reload();
                     } else {
-                        debugLog(`❌ VIP статус НЕ ПОДТВЕРЖДЁН`);
+                        debugLog(`❌ ШАГ R4: VIP статус НЕ ПОДТВЕРЖДЁН`);
                         state.isVip = false;
                         
                         if (state.vipPromiseResolve) {
+                            debugLog(`✅ ШАГ R5: Разрешаем Promise со значением false`);
                             state.vipPromiseResolve(false);
                             state.vipPromiseResolve = null;
                         }
                     }
+                } else {
+                    debugLog(`⚠️ ШАГ R2: Неизвестный формат ответа: ${responseText.substring(0, 50)}...`);
                 }
             } catch (e) {
-                debugLog(`❌ Ошибка обработки ответа: ${e.message}`, 'error');
+                debugLog(`❌ ШАГ R-ERR: Ошибка обработки ответа: ${e.message}`, 'error');
             }
         };
 
