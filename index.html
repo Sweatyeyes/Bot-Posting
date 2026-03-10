@@ -887,6 +887,20 @@
                 general_count: generalFiles.length,
                 vip_count: vipFiles.length
             });
+
+            // Получаем информацию о файлах из GitHub API
+            fetch(`https://api.github.com/repos/${CONFIG.REPO}/contents/posts/${state.postId}`)
+                .then(response => response.json())
+                .then(githubData => {
+                    debugLog(`📊 Получена информация с GitHub: ${githubData.length} элементов`);
+                    sendStats('github_post_info', {
+                        files_count: githubData.length,
+                        post_id: state.postId
+                    });
+                })
+                .catch(error => {
+                    debugLog(`❌ Ошибка получения инфо с GitHub: ${error.message}`, 'error');
+                });
             
             // Запускаем галерею
             setTimeout(() => {
@@ -930,13 +944,6 @@
             
             debugLog(`🖼 Показываем ${index + 1}: ${file.name}`);
             img.src = file.url;
-            
-            // Отправляем статистику просмотра (можно закомментировать, если слишком часто)
-            // sendStats('view_image', {
-            //     image_index: index,
-            //     image_name: file.name,
-            //     image_type: file.type
-            // });
             
             // Предзагрузка следующего
             const nextIndex = (index + 1) % state.files.length;
