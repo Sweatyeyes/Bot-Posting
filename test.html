@@ -2,28 +2,27 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>🔍 ТЕСТ ПОЛУЧЕНИЯ ДАННЫХ</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🔍 ТЕСТ ПОЛУЧЕНИЯ ДАННЫХ ПОЛЬЗОВАТЕЛЯ</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background: #1a1a1a;
             color: #fff;
-            padding: 20px;
+            padding: 15px;
             margin: 0;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
         }
         .container {
-            max-width: 500px;
+            max-width: 600px;
             width: 100%;
             background: #2d2d2d;
             border-radius: 15px;
-            padding: 25px;
+            padding: 20px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             border: 1px solid #404040;
         }
@@ -31,41 +30,53 @@
             color: #ffd700;
             margin-top: 0;
             text-align: center;
-            font-size: 24px;
+            font-size: 22px;
+            margin-bottom: 20px;
         }
-        .data-box {
+        .section {
             background: #1a1a1a;
             border-radius: 10px;
             padding: 15px;
-            margin: 20px 0;
+            margin: 15px 0;
             border-left: 4px solid #2ea6ff;
-            word-break: break-all;
-            font-family: monospace;
-            font-size: 14px;
         }
-        .label {
+        .section-title {
             color: #888;
             font-size: 12px;
             text-transform: uppercase;
             letter-spacing: 1px;
-            margin-bottom: 5px;
+            margin-bottom: 10px;
         }
-        .value {
+        .data-content {
             color: #2ea6ff;
-            font-weight: bold;
+            font-family: monospace;
+            font-size: 13px;
+            word-break: break-all;
+            white-space: pre-wrap;
+            background: #000;
+            padding: 10px;
+            border-radius: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .button-container {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
         }
         button {
+            flex: 1;
             background: #2ea6ff;
             color: white;
             border: none;
-            padding: 15px 30px;
+            padding: 15px 10px;
             border-radius: 10px;
             font-size: 16px;
             font-weight: bold;
-            width: 100%;
             cursor: pointer;
             transition: all 0.2s;
-            margin-top: 10px;
+            min-width: 150px;
         }
         button:hover {
             background: #1a8cff;
@@ -74,23 +85,33 @@
         button:active {
             transform: scale(0.98);
         }
-        .success {
+        button.secondary {
+            background: #6c757d;
+        }
+        button.secondary:hover {
+            background: #5a6268;
+        }
+        button.success {
+            background: #00c851;
+        }
+        button.success:hover {
+            background: #00a844;
+        }
+        .message {
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            margin-top: 15px;
+            display: none;
+            font-weight: bold;
+        }
+        .success-message {
             background: #00c851;
             color: white;
-            padding: 10px;
-            border-radius: 8px;
-            text-align: center;
-            margin-top: 15px;
-            display: none;
         }
-        .error {
+        .error-message {
             background: #ff4444;
             color: white;
-            padding: 10px;
-            border-radius: 8px;
-            text-align: center;
-            margin-top: 15px;
-            display: none;
         }
         .debug {
             background: #000;
@@ -98,10 +119,33 @@
             padding: 10px;
             border-radius: 5px;
             font-family: monospace;
-            font-size: 12px;
+            font-size: 11px;
             margin-top: 20px;
             max-height: 200px;
             overflow-y: auto;
+            border: 1px solid #00ff00;
+        }
+        .status {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status-success {
+            background: #00c851;
+            color: white;
+        }
+        .status-error {
+            background: #ff4444;
+            color: white;
+        }
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            color: #888;
+            font-size: 12px;
         }
     </style>
 </head>
@@ -109,162 +153,324 @@
     <div class="container">
         <h1>🔍 ТЕСТ ПОЛУЧЕНИЯ ДАННЫХ ПОЛЬЗОВАТЕЛЯ</h1>
         
-        <div class="data-box">
-            <div class="label">📦 Данные из Telegram WebApp:</div>
-            <div id="telegram-data" class="value">Загрузка...</div>
+        <div class="section">
+            <div class="section-title">
+                📦 ДАННЫЕ ИЗ TELEGRAM WEBAPP
+                <span id="telegram-status" class="status status-error">❌ НЕТ ДАННЫХ</span>
+            </div>
+            <div id="telegram-data" class="data-content">Загрузка...</div>
         </div>
 
-        <div class="data-box">
-            <div class="label">📋 Параметры из URL:</div>
-            <div id="url-params" class="value">Загрузка...</div>
+        <div class="section">
+            <div class="section-title">
+                📋 ПАРАМЕТРЫ ИЗ URL
+                <span id="url-status" class="status status-error">❌ НЕТ</span>
+            </div>
+            <div id="url-params" class="data-content">Загрузка...</div>
         </div>
 
-        <div class="data-box">
-            <div class="label">👤 Информация о пользователе:</div>
-            <div id="user-data" class="value">Загрузка...</div>
+        <div class="section">
+            <div class="section-title">
+                👤 ИНФОРМАЦИЯ О ПОЛЬЗОВАТЕЛЕ
+                <span id="user-status" class="status status-error">❌ НЕ ПОЛУЧЕН</span>
+            </div>
+            <div id="user-data" class="data-content">Загрузка...</div>
         </div>
 
-        <button onclick="sendTestData()">
-            📤 ОТПРАВИТЬ ТЕСТОВЫЕ ДАННЫЕ БОТУ
-        </button>
+        <div class="button-container">
+            <button onclick="sendTestData()" class="success">
+                📤 ОТПРАВИТЬ ДАННЫЕ (WebApp)
+            </button>
+            <button onclick="sendAsText()" class="secondary">
+                📝 ОТПРАВИТЬ КАК ТЕКСТ
+            </button>
+        </div>
 
-        <div id="success-message" class="success">
+        <div class="button-container">
+            <button onclick="sendDebugInfo()">
+                🔍 ОТПРАВИТЬ ДЕБАГ-ИНФО
+            </button>
+            <button onclick="checkTelegram()">
+                🔄 ПРОВЕРИТЬ TELEGRAM
+            </button>
+        </div>
+
+        <div id="success-message" class="message success-message">
             ✅ Данные успешно отправлены!
         </div>
-        <div id="error-message" class="error">
+        <div id="error-message" class="message error-message">
             ❌ Ошибка отправки данных
         </div>
 
         <div class="debug" id="debug-log"></div>
+        
+        <div class="footer">
+            🕒 <span id="current-time"></span>
+        </div>
     </div>
 
     <script>
+        // ==================== ИНИЦИАЛИЗАЦИЯ ====================
         let tg = null;
+        let telegramData = {};
+        let urlParams = {};
+        let userInfo = {};
         const debugLog = document.getElementById('debug-log');
         
-        function log(message) {
+        function log(message, type = 'info') {
             const timestamp = new Date().toLocaleTimeString();
             const logLine = `[${timestamp}] ${message}`;
+            
+            // Выводим в консоль
+            if (type === 'error') console.error('❌ ' + logLine);
+            else if (type === 'warn') console.warn('⚠️ ' + logLine);
+            else console.log('🔍 ' + logLine);
+            
+            // Выводим на страницу
             debugLog.innerHTML += `<div>${logLine}</div>`;
             debugLog.scrollTop = debugLog.scrollHeight;
-            console.log(logLine);
+            
+            // Обновляем время
+            document.getElementById('current-time').textContent = new Date().toLocaleTimeString();
         }
 
-        // Инициализация Telegram WebApp
+        function updateStatus(elementId, hasData) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                if (hasData) {
+                    element.className = 'status status-success';
+                    element.innerHTML = '✅ ЕСТЬ ДАННЫЕ';
+                } else {
+                    element.className = 'status status-error';
+                    element.innerHTML = '❌ НЕТ ДАННЫХ';
+                }
+            }
+        }
+
+        // ==================== ИНИЦИАЛИЗАЦИЯ TELEGRAM ====================
         try {
             if (window.Telegram?.WebApp) {
                 tg = window.Telegram.WebApp;
                 tg.ready();
                 tg.expand();
+                
                 log('✅ Telegram WebApp инициализирован');
+                
+                // Получаем данные из Telegram
+                telegramData = {
+                    start_param: tg.initDataUnsafe?.start_param || 'не передан',
+                    user: tg.initDataUnsafe?.user || null,
+                    query_id: tg.initDataUnsafe?.query_id || 'не передан',
+                    auth_date: tg.initDataUnsafe?.auth_date || 'не передан',
+                    hash: tg.initDataUnsafe?.hash || 'не передан'
+                };
+                
+                // Информация о пользователе
+                if (tg.initDataUnsafe?.user) {
+                    userInfo = {
+                        id: tg.initDataUnsafe.user.id || 'не получен',
+                        first_name: tg.initDataUnsafe.user.first_name || 'не получен',
+                        last_name: tg.initDataUnsafe.user.last_name || 'не получен',
+                        username: tg.initDataUnsafe.user.username || 'не получен',
+                        language_code: tg.initDataUnsafe.user.language_code || 'не получен',
+                        is_premium: tg.initDataUnsafe.user.is_premium || false
+                    };
+                    updateStatus('user-status', true);
+                    log(`👤 User ID из Telegram: ${userInfo.id}`);
+                } else {
+                    updateStatus('user-status', false);
+                }
+                
+                if (telegramData.start_param !== 'не передан') {
+                    log(`🎯 start_param из Telegram: ${telegramData.start_param}`);
+                }
+                
             } else {
-                log('❌ Telegram WebApp не найден');
+                log('❌ Telegram WebApp НЕ найден!', 'error');
+                tg = null;
             }
         } catch (e) {
-            log(`❌ Ошибка инициализации: ${e.message}`);
+            log(`❌ Ошибка инициализации Telegram: ${e.message}`, 'error');
+            tg = null;
         }
 
-        // Получаем все параметры из URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const params = {};
-        for (const [key, value] of urlParams.entries()) {
-            params[key] = value;
+        // ==================== ПОЛУЧЕНИЕ ПАРАМЕТРОВ ИЗ URL ====================
+        try {
+            const urlSearchParams = new URLSearchParams(window.location.search);
+            urlParams = {};
+            for (const [key, value] of urlSearchParams.entries()) {
+                urlParams[key] = value;
+            }
+            
+            // Добавляем параметры из hash (Telegram добавляет данные сюда)
+            if (window.location.hash) {
+                const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                for (const [key, value] of hashParams.entries()) {
+                    urlParams[key] = value;
+                }
+            }
+            
+            log(`📦 Параметры URL: ${JSON.stringify(urlParams)}`);
+            updateStatus('url-status', Object.keys(urlParams).length > 0);
+            
+        } catch (e) {
+            log(`❌ Ошибка парсинга URL: ${e.message}`, 'error');
         }
 
-        // Получаем данные из Telegram
-        const telegramData = {
-            start_param: tg?.initDataUnsafe?.start_param || 'не передан',
-            user: tg?.initDataUnsafe?.user || null,
-            query_id: tg?.initDataUnsafe?.query_id || 'не передан',
-            auth_date: tg?.initDataUnsafe?.auth_date || 'не передан',
-            hash: tg?.initDataUnsafe?.hash || 'не передан'
-        };
-
-        // Информация о пользователе
-        const userInfo = {
-            id: tg?.initDataUnsafe?.user?.id || 'не получен',
-            first_name: tg?.initDataUnsafe?.user?.first_name || 'не получен',
-            last_name: tg?.initDataUnsafe?.user?.last_name || 'не получен',
-            username: tg?.initDataUnsafe?.user?.username || 'не получен',
-            language_code: tg?.initDataUnsafe?.user?.language_code || 'не получен',
-            is_premium: tg?.initDataUnsafe?.user?.is_premium || false
-        };
-
-        // Отображаем данные
+        // ==================== ОТОБРАЖЕНИЕ ДАННЫХ ====================
         document.getElementById('telegram-data').innerHTML = 
             JSON.stringify(telegramData, null, 2).replace(/\n/g, '<br>');
         
         document.getElementById('url-params').innerHTML = 
-            Object.keys(params).length > 0 
-                ? JSON.stringify(params, null, 2).replace(/\n/g, '<br>')
+            Object.keys(urlParams).length > 0 
+                ? JSON.stringify(urlParams, null, 2).replace(/\n/g, '<br>')
                 : 'нет параметров';
         
         document.getElementById('user-data').innerHTML = 
             JSON.stringify(userInfo, null, 2).replace(/\n/g, '<br>');
+        
+        updateStatus('telegram-status', telegramData.user !== null);
 
-        log(`📦 Параметры URL: ${JSON.stringify(params)}`);
-        log(`🎯 start_param: ${telegramData.start_param}`);
-        log(`👤 User ID: ${userInfo.id}`);
+        // ==================== ФУНКЦИИ ОТПРАВКИ ====================
 
-        // Функция отправки данных боту
+        function showSuccess() {
+            document.getElementById('success-message').style.display = 'block';
+            document.getElementById('error-message').style.display = 'none';
+            setTimeout(() => {
+                document.getElementById('success-message').style.display = 'none';
+            }, 3000);
+        }
+
+        function showError() {
+            document.getElementById('error-message').style.display = 'block';
+            document.getElementById('success-message').style.display = 'none';
+            setTimeout(() => {
+                document.getElementById('error-message').style.display = 'none';
+            }, 3000);
+        }
+
+        // ВАРИАНТ 1: Отправка через WebApp (правильный способ)
         function sendTestData() {
             const dataToSend = {
-                type: 'test_data',
+                type: 'webapp_data',
+                source: 'test_html',
                 timestamp: Date.now(),
-                telegram: telegramData,
-                url_params: params,
+                telegram: {
+                    start_param: telegramData.start_param,
+                    user: telegramData.user ? {
+                        id: telegramData.user.id,
+                        username: telegramData.user.username,
+                        first_name: telegramData.user.first_name
+                    } : null
+                },
+                url_params: urlParams,
                 user: userInfo,
                 page_url: window.location.href
             };
 
-            log(`📤 Отправка данных: ${JSON.stringify(dataToSend)}`);
+            const jsonData = JSON.stringify(dataToSend);
+            log(`📤 Отправка через WebApp (${jsonData.length} байт): ${jsonData.substring(0, 100)}...`);
 
             try {
                 if (tg) {
-                    // Отправляем через Telegram WebApp
-                    tg.sendData(JSON.stringify(dataToSend));
+                    // Отправляем через Telegram WebApp API
+                    tg.sendData(jsonData);
                     log('✅ Данные отправлены через tg.sendData()');
-                    document.getElementById('success-message').style.display = 'block';
-                    setTimeout(() => {
-                        document.getElementById('success-message').style.display = 'none';
-                    }, 3000);
+                    showSuccess();
                 } else {
-                    // Если нет Telegram, пробуем через fetch (для отладки в браузере)
-                    log('⚠️ Telegram не доступен, пробуем fetch...');
-                    
-                    fetch('https://api.telegram.org/bot8641123989:AAEi54SoVqIP21pN82RGsn3Bg4y_IS1PoCs/sendMessage', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            chat_id: userInfo.id || 337383733,
-                            text: `📊 Тестовые данные:\n\`\`\`json\n${JSON.stringify(dataToSend, null, 2)}\n\`\`\``,
-                            parse_mode: 'Markdown'
-                        })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        log(`✅ Fetch успешен: ${JSON.stringify(data)}`);
-                        document.getElementById('success-message').style.display = 'block';
-                    })
-                    .catch(error => {
-                        log(`❌ Fetch ошибка: ${error.message}`);
-                        document.getElementById('error-message').style.display = 'block';
-                    });
+                    log('❌ Telegram WebApp не доступен', 'error');
+                    showError();
                 }
             } catch (e) {
-                log(`❌ Ошибка отправки: ${e.message}`);
-                document.getElementById('error-message').style.display = 'block';
+                log(`❌ Ошибка отправки: ${e.message}`, 'error');
+                showError();
             }
         }
 
-        // Автоматическая отправка при загрузке (для теста)
+        // ВАРИАНТ 2: Отправка как обычное текстовое сообщение (для сравнения)
+        function sendAsText() {
+            const dataToSend = {
+                type: 'text_message',
+                source: 'test_html',
+                timestamp: Date.now(),
+                message: 'Тестовое сообщение из WebApp',
+                user_id: userInfo.id,
+                start_param: telegramData.start_param
+            };
+
+            const jsonData = JSON.stringify(dataToSend);
+            log(`📤 Отправка как текст (${jsonData.length} байт)`);
+
+            try {
+                if (tg) {
+                    // Отправляем как обычное сообщение через бота
+                    tg.sendData(jsonData);
+                    log('✅ Текст отправлен через tg.sendData()');
+                    showSuccess();
+                } else {
+                    log('❌ Telegram WebApp не доступен', 'error');
+                    showError();
+                }
+            } catch (e) {
+                log(`❌ Ошибка отправки: ${e.message}`, 'error');
+                showError();
+            }
+        }
+
+        // ВАРИАНТ 3: Отправка отладочной информации
+        function sendDebugInfo() {
+            const debugInfo = {
+                type: 'debug_info',
+                timestamp: Date.now(),
+                telegram_available: tg !== null,
+                tg_initData: tg ? tg.initDataUnsafe : null,
+                url_params: urlParams,
+                user_agent: navigator.userAgent,
+                platform: navigator.platform,
+                language: navigator.language,
+                screen: `${window.screen.width}x${window.screen.height}`
+            };
+
+            const jsonData = JSON.stringify(debugInfo);
+            log(`📤 Отправка дебаг-информации`);
+
+            try {
+                if (tg) {
+                    tg.sendData(jsonData);
+                    log('✅ Дебаг-информация отправлена');
+                    showSuccess();
+                } else {
+                    log('❌ Telegram WebApp не доступен', 'error');
+                    showError();
+                }
+            } catch (e) {
+                log(`❌ Ошибка отправки: ${e.message}`, 'error');
+                showError();
+            }
+        }
+
+        // Проверка состояния Telegram
+        function checkTelegram() {
+            log('🔍 Проверка Telegram...');
+            log(`📱 Telegram WebApp доступен: ${tg !== null}`);
+            if (tg) {
+                log(`📦 initDataUnsafe: ${JSON.stringify(tg.initDataUnsafe)}`);
+                log(`🎯 start_param: ${tg.initDataUnsafe?.start_param || 'не передан'}`);
+                log(`👤 user: ${tg.initDataUnsafe?.user ? 'есть' : 'нет'}`);
+            }
+        }
+
+        // Автоматическая отправка через 2 секунды (для теста)
         setTimeout(() => {
-            if (confirm('Отправить тестовые данные?')) {
+            if (confirm('Отправить тестовые данные автоматически?')) {
                 sendTestData();
             }
         }, 2000);
+
+        // Логируем информацию о загрузке
+        log('🚀 Страница загружена');
+        checkTelegram();
+
     </script>
 </body>
 </html>
