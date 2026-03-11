@@ -46,6 +46,9 @@
             text-transform: uppercase;
             letter-spacing: 1px;
             margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
         .data-content {
             color: #2ea6ff;
@@ -88,6 +91,13 @@
         button.success {
             background: #00c851;
         }
+        button.secondary {
+            background: #6c757d;
+        }
+        button.warning {
+            background: #ffbb33;
+            color: #000;
+        }
         .message {
             padding: 10px;
             border-radius: 8px;
@@ -102,6 +112,10 @@
         }
         .error-message {
             background: #ff4444;
+            color: white;
+        }
+        .info-message {
+            background: #2ea6ff;
             color: white;
         }
         .debug {
@@ -122,7 +136,6 @@
             border-radius: 12px;
             font-size: 12px;
             font-weight: bold;
-            margin-left: 10px;
         }
         .status-success {
             background: #00c851;
@@ -172,6 +185,18 @@
             <button onclick="sendToDatabase()" class="success">
                 📤 ОТПРАВИТЬ В БАЗУ ДАННЫХ
             </button>
+            <button onclick="sendTestData()" class="warning">
+                📤 ОТПРАВИТЬ ЧЕРЕЗ WEBAPP
+            </button>
+        </div>
+
+        <div class="button-container">
+            <button onclick="checkTelegram()" class="secondary">
+                🔄 ПРОВЕРИТЬ TELEGRAM
+            </button>
+            <button onclick="clearLogs()" class="secondary">
+                🗑 ОЧИСТИТЬ ЛОГ
+            </button>
         </div>
 
         <div id="success-message" class="message success-message">
@@ -179,6 +204,9 @@
         </div>
         <div id="error-message" class="message error-message">
             ❌ Ошибка отправки данных
+        </div>
+        <div id="info-message" class="message info-message">
+            ℹ️ Лог очищен
         </div>
 
         <div class="debug" id="debug-log"></div>
@@ -189,16 +217,16 @@
     </div>
 
     <script>
+        // ==================== НАСТРОЙКИ ====================
+        // ВАЖНО: Укажите правильный IP вашего компьютера в локальной сети!
+        const API_URL = 'http://192.168.0.103:8080';  // Ваш IP из ifconfig
+        
         // ==================== ИНИЦИАЛИЗАЦИЯ ====================
         let tg = null;
         let telegramData = {};
         let urlParams = {};
         let userInfo = {};
         const debugLog = document.getElementById('debug-log');
-        
-        // URL вашего локального сервера (где работает Бот 2)
-        // !!! ВАЖНО: Замените на ваш актуальный адрес
-        const API_URL = 'http://localhost:8080';  // Стандартный порт для локального сервера
         
         function log(message, type = 'info') {
             const timestamp = new Date().toLocaleTimeString();
@@ -214,6 +242,11 @@
             document.getElementById('current-time').textContent = new Date().toLocaleTimeString();
         }
 
+        function clearLogs() {
+            debugLog.innerHTML = '';
+            showMessage('info', 'Лог очищен');
+        }
+
         function updateStatus(elementId, hasData) {
             const element = document.getElementById(elementId);
             if (element) {
@@ -225,6 +258,30 @@
                     element.innerHTML = '❌ НЕТ ДАННЫХ';
                 }
             }
+        }
+
+        function showMessage(type, text) {
+            const successMsg = document.getElementById('success-message');
+            const errorMsg = document.getElementById('error-message');
+            const infoMsg = document.getElementById('info-message');
+            
+            successMsg.style.display = 'none';
+            errorMsg.style.display = 'none';
+            infoMsg.style.display = 'none';
+            
+            if (type === 'success') {
+                successMsg.style.display = 'block';
+            } else if (type === 'error') {
+                errorMsg.style.display = 'block';
+            } else if (type === 'info') {
+                infoMsg.style.display = 'block';
+            }
+            
+            setTimeout(() => {
+                successMsg.style.display = 'none';
+                errorMsg.style.display = 'none';
+                infoMsg.style.display = 'none';
+            }, 3000);
         }
 
         // ==================== ИНИЦИАЛИЗАЦИЯ TELEGRAM ====================
@@ -257,6 +314,8 @@
                     };
                     updateStatus('user-status', true);
                     log(`👤 User ID из Telegram: ${userInfo.id}`);
+                } else {
+                    updateStatus('user-status', false);
                 }
                 
                 if (telegramData.start_param !== 'не передан') {
@@ -306,7 +365,8 @@
         document.getElementById('user-data').innerHTML = 
             JSON.stringify(userInfo, null, 2).replace(/\n/g, '<br>');
 
-        // ==================== ОТПРАВКА В БАЗУ ДАННЫХ ====================
+        // ==================== ФУНКЦИИ ОТПРАВКИ ====================
+
         async function sendToDatabase() {
             // Формируем данные для отправки
             const dataToSend = {
@@ -326,76 +386,119 @@
                 platform: navigator.platform
             };
 
-            log(`📤 Отправка данных в базу...`);
+            log(`📤 Отправка данных на ${API_URL}/api/webapp-data...`);
             log(`📦 Данные: ${JSON.stringify(dataToSend, null, 2)}`);
 
             try {
-                // Пытаемся отправить на локальный сервер
                 const response = await fetch(`${API_URL}/api/webapp-data`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(dataToSend),
-                    mode: 'no-cors'  // Важно для локальной разработки
+                    body: JSON.stringify(dataToSend)
                 });
 
-                log(`✅ Данные отправлены на сервер`);
-                
-                // Дополнительно сохраняем в localStorage как резервную копию
-                const savedData = JSON.parse(localStorage.getItem('webapp_data') || '[]');
-                savedData.push({
-                    ...dataToSend,
-                    saved_at: new Date().toISOString()
-                });
-                localStorage.setItem('webapp_data', JSON.stringify(savedData.slice(-10))); // Храним последние 10
-                
-                showMessage('success');
-                
+                if (response.ok) {
+                    const result = await response.json();
+                    log(`✅ Успех: ${JSON.stringify(result)}`);
+                    showMessage('success', 'Данные отправлены');
+                    
+                    // Сохраняем в localStorage как резервную копию
+                    const savedData = JSON.parse(localStorage.getItem('webapp_data') || '[]');
+                    savedData.push({
+                        ...dataToSend,
+                        status: 'sent',
+                        sent_at: new Date().toISOString()
+                    });
+                    localStorage.setItem('webapp_data', JSON.stringify(savedData.slice(-10)));
+                    
+                } else {
+                    const error = await response.text();
+                    log(`❌ Ошибка HTTP ${response.status}: ${error}`, 'error');
+                    showMessage('error', `Ошибка ${response.status}`);
+                    
+                    // Сохраняем ошибку
+                    const savedData = JSON.parse(localStorage.getItem('webapp_data') || '[]');
+                    savedData.push({
+                        ...dataToSend,
+                        error: `HTTP ${response.status}`,
+                        failed_at: new Date().toISOString()
+                    });
+                    localStorage.setItem('webapp_data', JSON.stringify(savedData.slice(-10)));
+                }
             } catch (error) {
-                log(`❌ Ошибка отправки: ${error.message}`, 'error');
+                log(`❌ Ошибка сети: ${error.message}`, 'error');
+                showMessage('error', 'Ошибка сети');
                 
-                // При ошибке сохраняем локально
+                // Сохраняем ошибку
                 const savedData = JSON.parse(localStorage.getItem('webapp_data') || '[]');
                 savedData.push({
                     ...dataToSend,
                     error: error.message,
-                    saved_at: new Date().toISOString()
+                    failed_at: new Date().toISOString()
                 });
                 localStorage.setItem('webapp_data', JSON.stringify(savedData.slice(-10)));
-                
-                showMessage('error');
             }
         }
 
-        function showMessage(type) {
-            const successMsg = document.getElementById('success-message');
-            const errorMsg = document.getElementById('error-message');
-            
-            if (type === 'success') {
-                successMsg.style.display = 'block';
-                errorMsg.style.display = 'none';
-            } else {
-                successMsg.style.display = 'none';
-                errorMsg.style.display = 'block';
+        function sendTestData() {
+            const dataToSend = {
+                type: 'webapp_data_legacy',
+                source: 'test_html',
+                timestamp: Date.now(),
+                telegram: telegramData,
+                url_params: urlParams,
+                user: userInfo,
+                page_url: window.location.href
+            };
+
+            log(`📤 Отправка через tg.sendData()`);
+
+            try {
+                if (tg) {
+                    tg.sendData(JSON.stringify(dataToSend));
+                    log('✅ Данные отправлены через tg.sendData()');
+                    showMessage('success', 'Отправлено через WebApp');
+                } else {
+                    log('❌ Telegram WebApp не доступен', 'error');
+                    showMessage('error', 'WebApp не доступен');
+                }
+            } catch (e) {
+                log(`❌ Ошибка: ${e.message}`, 'error');
+                showMessage('error', e.message);
             }
-            
-            setTimeout(() => {
-                successMsg.style.display = 'none';
-                errorMsg.style.display = 'none';
-            }, 3000);
         }
 
-        // ==================== ПРОВЕРКА ====================
+        function checkTelegram() {
+            log('🔍 Проверка Telegram...');
+            log(`📱 Telegram WebApp доступен: ${tg !== null}`);
+            if (tg) {
+                log(`📦 initDataUnsafe: ${JSON.stringify(tg.initDataUnsafe)}`);
+                log(`🎯 start_param: ${tg.initDataUnsafe?.start_param || 'не передан'}`);
+                log(`👤 user: ${tg.initDataUnsafe?.user ? 'есть' : 'нет'}`);
+                log(`💬 chat_instance: ${tg.initDataUnsafe?.chat_instance || 'нет'}`);
+                log(`📊 chat_type: ${tg.initDataUnsafe?.chat_type || 'нет'}`);
+            }
+        }
+
+        // ==================== ПРОВЕРКА СОХРАНЕННЫХ ДАННЫХ ====================
         function checkStoredData() {
             const savedData = localStorage.getItem('webapp_data');
             if (savedData) {
-                log(`📦 Локально сохраненные данные: ${savedData}`);
+                const data = JSON.parse(savedData);
+                log(`📦 Локально сохранено ${data.length} записей`);
+                if (data.length > 0) {
+                    log(`📋 Последняя: ${JSON.stringify(data[data.length-1])}`);
+                }
+            } else {
+                log('📭 Нет сохраненных данных');
             }
         }
 
         // Логируем информацию о загрузке
         log('🚀 Страница загружена');
+        log(`🌐 API_URL: ${API_URL}`);
+        checkTelegram();
         checkStoredData();
 
     </script>
