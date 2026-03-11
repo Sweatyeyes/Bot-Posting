@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🔍 ТЕСТ ПОЛУЧЕНИЯ ДАННЫХ ПОЛЬЗОВАТЕЛЯ</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            padding: 15px;
+            margin: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #2d2d2d;
+            border-radius: 15px;
+            padding: 20px;
+        }
+        h1 {
+            color: #ffd700;
+            text-align: center;
+        }
+        .data-box {
+            background: #1a1a1a;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #2ea6ff;
+        }
+        .status {
+            color: #00ff00;
+            font-weight: bold;
+        }
+        .debug {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 АВТОМАТИЧЕСКАЯ ОТПРАВКА ДАННЫХ</h1>
+        
+        <div class="data-box">
+            <div>📦 Статус: <span id="status" class="status">Инициализация...</span></div>
+            <div>👤 User ID: <span id="user-id">загрузка...</span></div>
+            <div>🎯 Start Param: <span id="start-param">загрузка...</span></div>
+        </div>
+
+        <div class="debug" id="debug-log"></div>
+    </div>
+
+    <script>
+        // ==================== НАСТРОЙКИ ====================
+        const BOT_USERNAME = 't3st_back_bot';  // ваш бот-отладчик
+        
+        // ==================== ЛОГИРОВАНИЕ ====================
+        const debugLog = document.getElementById('debug-log');
+        const statusEl = document.getElementById('status');
+        const userIdEl = document.getElementById('user-id');
+        const startParamEl = document.getElementById('start-param');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logLine = `[${timestamp}] ${message}`;
+            debugLog.innerHTML += `<div>${logLine}</div>`;
+            debugLog.scrollTop = debugLog.scrollHeight;
+            console.log(logLine);
+        }
+
+        // ==================== АВТОМАТИЧЕСКАЯ ОТПРАВКА ====================
+        async function autoSendData() {
+            try {
+                // Получаем данные из Telegram WebApp
+                const tg = window.Telegram?.WebApp;
+                
+                if (!tg) {
+                    log('❌ Telegram WebApp не доступен');
+                    statusEl.textContent = '❌ WebApp не доступен';
+                    return;
+                }
+
+                tg.ready();
+                
+                // Получаем данные пользователя
+                const user = tg.initDataUnsafe?.user;
+                const startParam = tg.initDataUnsafe?.start_param || 'не передан';
+                const chatInstance = tg.initDataUnsafe?.chat_instance;
+                const chatType = tg.initDataUnsafe?.chat_type;
+                
+                // Обновляем отображение
+                userIdEl.textContent = user?.id || 'не получен';
+                startParamEl.textContent = startParam;
+                
+                // Формируем данные для отправки
+                const dataToSend = {
+                    type: 'auto_webapp_data',
+                    source: 'test_html_auto',
+                    timestamp: Date.now(),
+                    user: {
+                        id: user?.id,
+                        first_name: user?.first_name,
+                        last_name: user?.last_name,
+                        username: user?.username,
+                        language_code: user?.language_code
+                    },
+                    start_param: startParam,
+                    chat_instance: chatInstance,
+                    chat_type: chatType,
+                    page_url: window.location.href,
+                    user_agent: navigator.userAgent
+                };
+
+                log(`📦 Данные готовы: ${JSON.stringify(dataToSend)}`);
+                statusEl.textContent = '📤 Отправка...';
+
+                // ОТПРАВКА ЧЕРЕЗ TELEGRAM API (автоматически!)
+                tg.sendData(JSON.stringify(dataToSend));
+                
+                log('✅ Данные автоматически отправлены через tg.sendData()');
+                statusEl.textContent = '✅ Данные отправлены!';
+                
+                // Дополнительно сохраняем в localStorage для резерва
+                const savedData = JSON.parse(localStorage.getItem('auto_sent_data') || '[]');
+                savedData.push({
+                    ...dataToSend,
+                    sent_at: new Date().toISOString()
+                });
+                localStorage.setItem('auto_sent_data', JSON.stringify(savedData.slice(-5)));
+                
+            } catch (error) {
+                log(`❌ Ошибка: ${error.message}`);
+                statusEl.textContent = '❌ Ошибка отправки';
+            }
+        }
+
+        // ==================== ЗАПУСК АВТОМАТИЧЕСКОЙ ОТПРАВКИ ====================
+        window.addEventListener('load', () => {
+            log('🚀 Страница загружена, запуск автоматической отправки...');
+            
+            // Небольшая задержка для гарантии инициализации
+            setTimeout(autoSendData, 1000);
+        });
+
+        // Дополнительно: отправка при видимости страницы
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                log('👁 Страница снова видима');
+                // Можно повторно отправить данные, если нужно
+            }
+        });
+
+    </script>
+</body>
+</html>
