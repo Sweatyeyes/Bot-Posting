@@ -46,9 +46,6 @@
             text-transform: uppercase;
             letter-spacing: 1px;
             margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
         }
         .data-content {
             color: #2ea6ff;
@@ -88,24 +85,8 @@
         button:active {
             transform: scale(0.98);
         }
-        button.secondary {
-            background: #6c757d;
-        }
-        button.secondary:hover {
-            background: #5a6268;
-        }
         button.success {
             background: #00c851;
-        }
-        button.success:hover {
-            background: #00a844;
-        }
-        button.warning {
-            background: #ffbb33;
-            color: #000;
-        }
-        button.warning:hover {
-            background: #ffaa00;
         }
         .message {
             padding: 10px;
@@ -121,10 +102,6 @@
         }
         .error-message {
             background: #ff4444;
-            color: white;
-        }
-        .info-message {
-            background: #2ea6ff;
             color: white;
         }
         .debug {
@@ -145,6 +122,7 @@
             border-radius: 12px;
             font-size: 12px;
             font-weight: bold;
+            margin-left: 10px;
         }
         .status-success {
             background: #00c851;
@@ -154,33 +132,11 @@
             background: #ff4444;
             color: white;
         }
-        .bot-link {
-            display: inline-block;
-            background: #0088cc;
-            color: white;
-            text-decoration: none;
-            padding: 10px 20px;
-            border-radius: 20px;
-            margin: 10px 0;
-            font-weight: bold;
-        }
-        .bot-link:hover {
-            background: #006699;
-        }
         .footer {
             margin-top: 20px;
             text-align: center;
             color: #888;
             font-size: 12px;
-        }
-        .encoded-data {
-            background: #2d2d2d;
-            padding: 10px;
-            border-radius: 5px;
-            font-size: 11px;
-            word-break: break-all;
-            margin: 10px 0;
-            border: 1px solid #404040;
         }
     </style>
 </head>
@@ -212,46 +168,17 @@
             <div id="user-data" class="data-content">Загрузка...</div>
         </div>
 
-        <div class="section">
-            <div class="section-title">
-                🤖 ОТПРАВКА В БОТА
-            </div>
-            <div style="text-align: center; margin: 10px 0;">
-                <a href="https://t.me/t3st_back_bot" target="_blank" class="bot-link">
-                    📱 ОТКРЫТЬ ЧАТ С БОТОМ
-                </a>
-            </div>
-            <div class="encoded-data" id="encoded-data">
-                Данные для отправки появятся здесь
-            </div>
-        </div>
-
         <div class="button-container">
-            <button onclick="sendToBotDirectly()" class="success">
-                📤 ОТПРАВИТЬ В БОТА (ЧЕРЕЗ START)
-            </button>
-            <button onclick="copyToClipboard()" class="secondary">
-                📋 КОПИРОВАТЬ ДАННЫЕ
-            </button>
-        </div>
-
-        <div class="button-container">
-            <button onclick="sendTestData()" class="warning">
-                📤 ОТПРАВИТЬ ЧЕРЕЗ WEBAPP
-            </button>
-            <button onclick="checkTelegram()">
-                🔄 ПРОВЕРИТЬ TELEGRAM
+            <button onclick="sendToDatabase()" class="success">
+                📤 ОТПРАВИТЬ В БАЗУ ДАННЫХ
             </button>
         </div>
 
         <div id="success-message" class="message success-message">
-            ✅ Данные успешно отправлены!
+            ✅ Данные успешно отправлены в базу данных!
         </div>
         <div id="error-message" class="message error-message">
             ❌ Ошибка отправки данных
-        </div>
-        <div id="info-message" class="message info-message">
-            ℹ️ Данные скопированы в буфер обмена
         </div>
 
         <div class="debug" id="debug-log"></div>
@@ -267,27 +194,23 @@
         let telegramData = {};
         let urlParams = {};
         let userInfo = {};
-        let currentEncodedData = '';
         const debugLog = document.getElementById('debug-log');
         
-        // Константы
-        const BOT_USERNAME = 't3st_back_bot';
-        const ADMIN_ID = 337383733;
+        // URL вашего локального сервера (где работает Бот 2)
+        // !!! ВАЖНО: Замените на ваш актуальный адрес
+        const API_URL = 'http://localhost:8080';  // Стандартный порт для локального сервера
         
         function log(message, type = 'info') {
             const timestamp = new Date().toLocaleTimeString();
             const logLine = `[${timestamp}] ${message}`;
             
-            // Выводим в консоль
             if (type === 'error') console.error('❌ ' + logLine);
             else if (type === 'warn') console.warn('⚠️ ' + logLine);
             else console.log('🔍 ' + logLine);
             
-            // Выводим на страницу
             debugLog.innerHTML += `<div>${logLine}</div>`;
             debugLog.scrollTop = debugLog.scrollHeight;
             
-            // Обновляем время
             document.getElementById('current-time').textContent = new Date().toLocaleTimeString();
         }
 
@@ -304,30 +227,6 @@
             }
         }
 
-        function showMessage(type, text) {
-            const successMsg = document.getElementById('success-message');
-            const errorMsg = document.getElementById('error-message');
-            const infoMsg = document.getElementById('info-message');
-            
-            successMsg.style.display = 'none';
-            errorMsg.style.display = 'none';
-            infoMsg.style.display = 'none';
-            
-            if (type === 'success') {
-                successMsg.style.display = 'block';
-            } else if (type === 'error') {
-                errorMsg.style.display = 'block';
-            } else if (type === 'info') {
-                infoMsg.style.display = 'block';
-            }
-            
-            setTimeout(() => {
-                successMsg.style.display = 'none';
-                errorMsg.style.display = 'none';
-                infoMsg.style.display = 'none';
-            }, 3000);
-        }
-
         // ==================== ИНИЦИАЛИЗАЦИЯ TELEGRAM ====================
         try {
             if (window.Telegram?.WebApp) {
@@ -337,7 +236,6 @@
                 
                 log('✅ Telegram WebApp инициализирован');
                 
-                // Получаем данные из Telegram
                 telegramData = {
                     start_param: tg.initDataUnsafe?.start_param || 'не передан',
                     user: tg.initDataUnsafe?.user || null,
@@ -348,7 +246,6 @@
                     chat_type: tg.initDataUnsafe?.chat_type || 'не передан'
                 };
                 
-                // Информация о пользователе
                 if (tg.initDataUnsafe?.user) {
                     userInfo = {
                         id: tg.initDataUnsafe.user.id || 'не получен',
@@ -360,8 +257,6 @@
                     };
                     updateStatus('user-status', true);
                     log(`👤 User ID из Telegram: ${userInfo.id}`);
-                } else {
-                    updateStatus('user-status', false);
                 }
                 
                 if (telegramData.start_param !== 'не передан') {
@@ -372,11 +267,9 @@
                 
             } else {
                 log('❌ Telegram WebApp НЕ найден!', 'error');
-                tg = null;
             }
         } catch (e) {
-            log(`❌ Ошибка инициализации Telegram: ${e.message}`, 'error');
-            tg = null;
+            log(`❌ Ошибка инициализации: ${e.message}`, 'error');
         }
 
         // ==================== ПОЛУЧЕНИЕ ПАРАМЕТРОВ ИЗ URL ====================
@@ -387,7 +280,6 @@
                 urlParams[key] = value;
             }
             
-            // Добавляем параметры из hash (Telegram добавляет данные сюда)
             if (window.location.hash) {
                 const hashParams = new URLSearchParams(window.location.hash.substring(1));
                 for (const [key, value] of hashParams.entries()) {
@@ -414,125 +306,97 @@
         document.getElementById('user-data').innerHTML = 
             JSON.stringify(userInfo, null, 2).replace(/\n/g, '<br>');
 
-        // ==================== ФУНКЦИЯ ФОРМИРОВАНИЯ ДАННЫХ ====================
-        function prepareData() {
-            return {
+        // ==================== ОТПРАВКА В БАЗУ ДАННЫХ ====================
+        async function sendToDatabase() {
+            // Формируем данные для отправки
+            const dataToSend = {
                 type: 'webapp_data',
                 source: 'test_html',
                 timestamp: Date.now(),
-                telegram: {
-                    start_param: telegramData.start_param,
-                    user_id: userInfo.id,
-                    username: userInfo.username,
-                    chat_instance: telegramData.chat_instance,
-                    chat_type: telegramData.chat_type
-                },
+                user_id: userInfo.id,
+                username: userInfo.username,
+                first_name: userInfo.first_name,
+                last_name: userInfo.last_name,
+                start_param: telegramData.start_param,
+                chat_instance: telegramData.chat_instance,
+                chat_type: telegramData.chat_type,
                 url_params: urlParams,
-                user: userInfo,
-                page_url: window.location.href
+                page_url: window.location.href,
+                user_agent: navigator.userAgent,
+                platform: navigator.platform
             };
-        }
 
-        // ==================== ВАРИАНТ 2: Отправка через start параметр ====================
-        function sendToBotDirectly() {
-            const data = prepareData();
-            const jsonData = JSON.stringify(data);
-            
-            // Кодируем данные для передачи в URL
-            const encodedData = encodeURIComponent(jsonData);
-            currentEncodedData = encodedData;
-            
-            // Показываем закодированные данные
-            document.getElementById('encoded-data').innerHTML = 
-                `<b>Закодированные данные:</b><br>${encodedData.substring(0, 100)}...`;
-            
-            log(`📤 Подготовлены данные для отправки (${jsonData.length} байт)`);
-            
-            // Формируем ссылку для открытия диалога с ботом
-            const botLink = `https://t.me/${BOT_USERNAME}?start=${encodedData}`;
-            
-            log(`🔗 Ссылка для бота: ${botLink.substring(0, 100)}...`);
-            
-            // Открываем диалог с ботом
-            window.location.href = botLink;
-            
-            showMessage('success', '✅ Открываем чат с ботом...');
-        }
-
-        // ==================== Копирование в буфер обмена ====================
-        function copyToClipboard() {
-            const data = prepareData();
-            const jsonData = JSON.stringify(data, null, 2);
-            
-            navigator.clipboard.writeText(jsonData).then(() => {
-                log('📋 Данные скопированы в буфер обмена');
-                showMessage('info', '✅ Данные скопированы!');
-            }).catch(err => {
-                log(`❌ Ошибка копирования: ${err}`, 'error');
-                showMessage('error', '❌ Ошибка копирования');
-            });
-        }
-
-        // ==================== ВАРИАНТ 1: Отправка через WebApp (для сравнения) ====================
-        function sendTestData() {
-            const data = prepareData();
-            const jsonData = JSON.stringify(data);
-
-            log(`📤 Отправка через WebApp (${jsonData.length} байт)`);
+            log(`📤 Отправка данных в базу...`);
+            log(`📦 Данные: ${JSON.stringify(dataToSend, null, 2)}`);
 
             try {
-                if (tg) {
-                    tg.sendData(jsonData);
-                    log('✅ Данные отправлены через tg.sendData()');
-                    showMessage('success', '✅ Данные отправлены через WebApp');
-                } else {
-                    log('❌ Telegram WebApp не доступен', 'error');
-                    showMessage('error', '❌ WebApp не доступен');
-                }
-            } catch (e) {
-                log(`❌ Ошибка отправки: ${e.message}`, 'error');
-                showMessage('error', '❌ Ошибка отправки');
+                // Пытаемся отправить на локальный сервер
+                const response = await fetch(`${API_URL}/api/webapp-data`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(dataToSend),
+                    mode: 'no-cors'  // Важно для локальной разработки
+                });
+
+                log(`✅ Данные отправлены на сервер`);
+                
+                // Дополнительно сохраняем в localStorage как резервную копию
+                const savedData = JSON.parse(localStorage.getItem('webapp_data') || '[]');
+                savedData.push({
+                    ...dataToSend,
+                    saved_at: new Date().toISOString()
+                });
+                localStorage.setItem('webapp_data', JSON.stringify(savedData.slice(-10))); // Храним последние 10
+                
+                showMessage('success');
+                
+            } catch (error) {
+                log(`❌ Ошибка отправки: ${error.message}`, 'error');
+                
+                // При ошибке сохраняем локально
+                const savedData = JSON.parse(localStorage.getItem('webapp_data') || '[]');
+                savedData.push({
+                    ...dataToSend,
+                    error: error.message,
+                    saved_at: new Date().toISOString()
+                });
+                localStorage.setItem('webapp_data', JSON.stringify(savedData.slice(-10)));
+                
+                showMessage('error');
             }
         }
 
-        // ==================== Проверка Telegram ====================
-        function checkTelegram() {
-            log('🔍 Проверка Telegram...');
-            log(`📱 Telegram WebApp доступен: ${tg !== null}`);
-            if (tg) {
-                log(`📦 initDataUnsafe: ${JSON.stringify(tg.initDataUnsafe)}`);
-                log(`🎯 start_param: ${tg.initDataUnsafe?.start_param || 'не передан'}`);
-                log(`👤 user: ${tg.initDataUnsafe?.user ? 'есть' : 'нет'}`);
-                log(`💬 chat_instance: ${tg.initDataUnsafe?.chat_instance || 'нет'}`);
-                log(`📊 chat_type: ${tg.initDataUnsafe?.chat_type || 'нет'}`);
+        function showMessage(type) {
+            const successMsg = document.getElementById('success-message');
+            const errorMsg = document.getElementById('error-message');
+            
+            if (type === 'success') {
+                successMsg.style.display = 'block';
+                errorMsg.style.display = 'none';
+            } else {
+                successMsg.style.display = 'none';
+                errorMsg.style.display = 'block';
             }
+            
+            setTimeout(() => {
+                successMsg.style.display = 'none';
+                errorMsg.style.display = 'none';
+            }, 3000);
         }
 
-        // ==================== Автоматическое обновление ====================
-        function updateEncodedData() {
-            const data = prepareData();
-            const jsonData = JSON.stringify(data);
-            const encodedData = encodeURIComponent(jsonData);
-            document.getElementById('encoded-data').innerHTML = 
-                `<b>Данные готовы к отправке</b><br>
-                <small>Размер: ${jsonData.length} байт</small><br>
-                <small>User ID: ${userInfo.id}</small><br>
-                <small>start_param: ${telegramData.start_param}</small>`;
-        }
-
-        // Обновляем отображение
-        updateEncodedData();
-
-        // Автоматическая отправка через 2 секунды (для теста)
-        setTimeout(() => {
-            if (confirm('Отправить тестовые данные через start параметр?')) {
-                sendToBotDirectly();
+        // ==================== ПРОВЕРКА ====================
+        function checkStoredData() {
+            const savedData = localStorage.getItem('webapp_data');
+            if (savedData) {
+                log(`📦 Локально сохраненные данные: ${savedData}`);
             }
-        }, 2000);
+        }
 
         // Логируем информацию о загрузке
         log('🚀 Страница загружена');
-        checkTelegram();
+        checkStoredData();
 
     </script>
 </body>
