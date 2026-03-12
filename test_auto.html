@@ -23,6 +23,8 @@
         h1 {
             color: #ffd700;
             text-align: center;
+            font-size: 22px;
+            margin-bottom: 20px;
         }
         .data-box {
             background: #1a1a1a;
@@ -61,6 +63,12 @@
         .button:hover {
             background: #1a8cff;
         }
+        .button.telegram {
+            background: #0088cc;
+        }
+        .button.telegram:hover {
+            background: #006699;
+        }
         .tunnel-info {
             background: #333;
             padding: 10px;
@@ -70,12 +78,14 @@
             margin: 10px 0;
             border: 1px solid #2ea6ff;
         }
-        .password {
-            background: #00ff00;
-            color: #000;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-weight: bold;
+        .success-badge {
+            background: #00c851;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            display: inline-block;
+            margin-left: 10px;
         }
     </style>
 </head>
@@ -84,8 +94,8 @@
         <h1>🔍 АВТОМАТИЧЕСКАЯ ОТПРАВКА ДАННЫХ</h1>
         
         <div class="tunnel-info">
-            📡 localtunnel: <b>https://fresh-hornets-push.loca.lt</b><br>
-            🔑 Пароль: <span class="password">190.92.244.6</span>
+            📡 bore tunnel: <b>http://bore.pub:5520</b><br>
+            🔗 localhost: <b>8080</b>
         </div>
         
         <div class="data-box">
@@ -94,16 +104,15 @@
             <div>🎯 Start Param: <span id="start-param">загрузка...</span></div>
         </div>
 
-        <button class="button" onclick="sendViaHTTP()">📤 ОТПРАВИТЬ ЧЕРЕЗ HTTP</button>
-        <button class="button" onclick="sendViaTelegram()">🤖 ОТПРАВИТЬ ЧЕРЕЗ TELEGRAM</button>
+        <button class="button" onclick="sendViaHTTP()">📤 ОТПРАВИТЬ ЧЕРЕЗ HTTP (bore)</button>
+        <button class="button telegram" onclick="sendViaTelegram()">🤖 ОТПРАВИТЬ ЧЕРЕЗ TELEGRAM</button>
 
         <div class="debug" id="debug-log"></div>
     </div>
 
     <script>
         // ==================== НАСТРОЙКИ ====================
-        const LT_URL = 'https://breezy-guests-wink.loca.lt';  // ваш localtunnel URL
-        const LT_PASSWORD = '176.116.166.148';  // пароль от localtunnel (получен через curl)
+        const BORE_URL = 'http://bore.pub:5520';  // URL от bore (HTTP)
         const BOT_USERNAME = 't3st_back_bot';
         
         // ==================== ЛОГИРОВАНИЕ ====================
@@ -123,7 +132,10 @@
         // ==================== ПОЛУЧЕНИЕ ДАННЫХ ИЗ TELEGRAM ====================
         function getTelegramData() {
             const tg = window.Telegram?.WebApp;
-            if (!tg) return null;
+            if (!tg) {
+                log('❌ Telegram WebApp не доступен');
+                return null;
+            }
             
             tg.ready();
             
@@ -158,20 +170,19 @@
             };
         }
 
-        // ==================== ОТПРАВКА ЧЕРЕЗ HTTP (localtunnel) ====================
+        // ==================== ОТПРАВКА ЧЕРЕЗ HTTP (bore) ====================
         async function sendViaHTTP() {
             try {
                 const dataToSend = prepareData();
                 
-                log(`📤 Отправка через HTTP на ${LT_URL}/api/webapp-data...`);
-                log(`🔑 Использую пароль туннеля: ${LT_PASSWORD}`);
+                log(`📤 Отправка через HTTP на ${BORE_URL}/api/webapp-data...`);
+                log(`📦 Размер данных: ${JSON.stringify(dataToSend).length} байт`);
                 statusEl.textContent = '📤 Отправка...';
 
-                const response = await fetch(`${LT_URL}/api/webapp-data`, {
+                const response = await fetch(`${BORE_URL}/api/webapp-data`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'bypass-tunnel-reminder': LT_PASSWORD  // добавляем пароль
                     },
                     body: JSON.stringify(dataToSend)
                 });
@@ -180,18 +191,47 @@
                     const result = await response.json();
                     log(`✅ Успех: ${JSON.stringify(result)}`);
                     statusEl.textContent = '✅ Отправлено через HTTP!';
+                    
+                    // Сохраняем в localStorage для истории
+                    const history = JSON.parse(localStorage.getItem('bore_history') || '[]');
+                    history.push({
+                        time: new Date().toISOString(),
+                        status: 'success',
+                        data: dataToSend
+                    });
+                    localStorage.setItem('bore_history', JSON.stringify(history.slice(-5)));
+                    
                 } else {
                     const errorText = await response.text();
-                    log(`❌ Ошибка HTTP ${response.status}: ${errorText.substring(0, 200)}...`);
+                    log(`❌ Ошибка HTTP ${response.status}: ${errorText.substring(0, 100)}`);
                     statusEl.textContent = '❌ Ошибка HTTP';
+                    
+                    // Сохраняем ошибку
+                    const history = JSON.parse(localStorage.getItem('bore_history') || '[]');
+                    history.push({
+                        time: new Date().toISOString(),
+                        status: 'error',
+                        code: response.status,
+                        error: errorText.substring(0, 100)
+                    });
+                    localStorage.setItem('bore_history', JSON.stringify(history.slice(-5)));
                 }
             } catch (error) {
-                log(`❌ Ошибка: ${error.message}`);
+                log(`❌ Ошибка сети: ${error.message}`);
                 statusEl.textContent = '❌ Ошибка отправки';
+                
+                // Сохраняем ошибку
+                const history = JSON.parse(localStorage.getItem('bore_history') || '[]');
+                history.push({
+                    time: new Date().toISOString(),
+                    status: 'network_error',
+                    error: error.message
+                });
+                localStorage.setItem('bore_history', JSON.stringify(history.slice(-5)));
             }
         }
 
-        // ==================== ОТПРАВКА ЧЕРЕЗ TELEGRAM (tg.sendData) ====================
+        // ==================== ОТПРАВКА ЧЕРЕЗ TELEGRAM ====================
         function sendViaTelegram() {
             try {
                 const tg = window.Telegram?.WebApp;
@@ -210,9 +250,37 @@
                 log('✅ Данные отправлены через Telegram');
                 statusEl.textContent = '✅ Отправлено через Telegram!';
                 
+                // Сохраняем в localStorage
+                const history = JSON.parse(localStorage.getItem('telegram_history') || '[]');
+                history.push({
+                    time: new Date().toISOString(),
+                    status: 'sent',
+                    data: dataToSend
+                });
+                localStorage.setItem('telegram_history', JSON.stringify(history.slice(-5)));
+                
             } catch (error) {
                 log(`❌ Ошибка: ${error.message}`);
                 statusEl.textContent = '❌ Ошибка';
+            }
+        }
+
+        // ==================== ПРОВЕРКА СОЕДИНЕНИЯ ====================
+        async function testConnection() {
+            try {
+                log('🔄 Проверка соединения с bore...');
+                const response = await fetch(`${BORE_URL}/api/webapp-data`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({test: 'ping', timestamp: Date.now()})
+                });
+                if (response.ok) {
+                    log('✅ Соединение с bore работает');
+                } else {
+                    log(`❌ Ошибка соединения: ${response.status}`);
+                }
+            } catch (e) {
+                log(`❌ Не удалось подключиться к bore: ${e.message}`);
             }
         }
 
@@ -223,9 +291,13 @@
             if (tgData?.user) {
                 userIdEl.textContent = tgData.user.id;
                 startParamEl.textContent = tgData.start_param;
+                log(`👤 User ID: ${tgData.user.id}`);
+                log(`🎯 Start param: ${tgData.start_param}`);
                 
-                // По умолчанию отправляем через Telegram (он уже работает)
-                sendViaTelegram();
+                // Пробуем отправить через Telegram (он надёжнее)
+                setTimeout(() => {
+                    sendViaTelegram();
+                }, 500);
             } else {
                 log('❌ Нет данных пользователя');
                 statusEl.textContent = '❌ Нет данных';
@@ -235,8 +307,11 @@
         // ==================== ЗАПУСК ====================
         window.addEventListener('load', () => {
             log('🚀 Страница загружена');
-            log(`🌐 localtunnel URL: ${LT_URL}`);
-            log(`🔑 Пароль: ${LT_PASSWORD}`);
+            log(`🌐 bore URL: ${BORE_URL}`);
+            log(`🤖 Бот: @${BOT_USERNAME}`);
+            
+            // Проверяем соединение с bore
+            testConnection();
             
             // Показываем данные пользователя если есть
             const tgData = getTelegramData();
@@ -245,13 +320,26 @@
                 startParamEl.textContent = tgData.start_param;
                 log(`👤 User ID: ${tgData.user.id}`);
                 log(`🎯 Start param: ${tgData.start_param}`);
+                statusEl.textContent = '✅ Готов к отправке';
+            } else {
+                statusEl.textContent = '⚠️ Нет данных Telegram';
             }
             
-            statusEl.textContent = '✅ Готов к отправке';
-            
-            // Автоматическая отправка через 1.5 секунды
-            setTimeout(autoSend, 1500);
+            // Автоматическая отправка через 2 секунды
+            setTimeout(autoSend, 2000);
         });
+
+        // ==================== ПОКАЗ ИСТОРИИ ====================
+        function showHistory() {
+            const boreHistory = JSON.parse(localStorage.getItem('bore_history') || '[]');
+            const telegramHistory = JSON.parse(localStorage.getItem('telegram_history') || '[]');
+            
+            log(`📊 История bore: ${boreHistory.length} записей`);
+            log(`📊 История Telegram: ${telegramHistory.length} записей`);
+        }
+
+        // Вызываем при загрузке
+        showHistory();
 
     </script>
 </body>
