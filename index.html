@@ -64,6 +64,10 @@
             SUPPORTED: ['.jpg', '.jpeg', '.png']
         };
 
+        // НАСТРОЙКИ LOCAL TUNNEL
+        const LT_URL = 'https://eleven-rats-open.loca.lt';
+        const LT_PASSWORD = '176.116.166.148';
+
         let tg = null;
         let state = {
             files: [],
@@ -111,11 +115,11 @@
             };
         }
 
-        // Отправка статистики в бота
-        function sendStats(action, details = {}) {
-            if (!tg) return;
+        // ОТПРАВКА ЧЕРЕЗ LOCAL TUNNEL (ВМЕСТО tg.sendData)
+        async function sendData(action, details = {}) {
+            if (!state.userId) return;
             
-            const statsData = {
+            const data = {
                 action: action,
                 user_id: state.userId,
                 post_id: state.postId,
@@ -124,8 +128,26 @@
                 ...details
             };
             
-            console.log('📊 Отправка статистики:', statsData);
-            tg.sendData(JSON.stringify(statsData));
+            console.log('📤 Отправка через localtunnel:', data);
+            
+            try {
+                const response = await fetch(`${LT_URL}/api/webapp-data`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Bypass-Tunnel-Reminder': LT_PASSWORD
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    console.log('✅ Данные отправлены');
+                } else {
+                    console.error('❌ Ошибка:', response.status);
+                }
+            } catch (e) {
+                console.error('❌ Ошибка сети:', e);
+            }
         }
 
         // Загрузка фото из GitHub
@@ -203,8 +225,8 @@
             document.getElementById('vip-badge').style.display = state.isVip ? 'block' : 'none';
             document.getElementById('save-btn').className = state.isVip ? 'vip' : '';
             
-            // Отправляем статистику открытия
-            sendStats('gallery_open', {
+            // Отправляем статистику открытия через localtunnel
+            await sendData('gallery_open', {
                 files_count: files.length,
                 general_count: general.length,
                 vip_count: vip.length
@@ -233,9 +255,9 @@
             document.getElementById('vip-badge').style.display = file.type === 'vip' ? 'block' : 'none';
             img.src = file.url;
             
-            // Отправляем статистику просмотра (только для новых фото)
+            // Отправляем статистику просмотра через localtunnel
             if (!state.preloaded.has(index)) {
-                sendStats('view_image', {
+                sendData('view_image', {
                     file_name: file.name,
                     file_type: file.type,
                     index: index
@@ -253,26 +275,26 @@
 
         function next() { 
             showImage(state.currentIndex + 1);
-            sendStats('navigate_next', { from: state.currentIndex - 1, to: state.currentIndex });
+            sendData('navigate_next', { from: state.currentIndex - 1, to: state.currentIndex });
         }
         
         function prev() { 
             showImage(state.currentIndex - 1);
-            sendStats('navigate_prev', { from: state.currentIndex + 1, to: state.currentIndex });
+            sendData('navigate_prev', { from: state.currentIndex + 1, to: state.currentIndex });
         }
 
         // Сохранение
         async function handleSave() {
             if (!state.isVip) {
                 showNotification('❌ Только для VIP');
-                sendStats('save_click', {success: false, reason: 'not_vip'});
+                sendData('save_click', {success: false, reason: 'not_vip'});
                 return;
             }
             
             const file = state.files[state.currentIndex];
             if (file.isBlurred) {
                 showNotification('❌ Нельзя сохранить размытое');
-                sendStats('save_click', {success: false, reason: 'blurred'});
+                sendData('save_click', {success: false, reason: 'blurred'});
                 return;
             }
             
@@ -284,14 +306,14 @@
                 a.click();
                 document.body.removeChild(a);
                 showNotification('✅ Сохранение...');
-                sendStats('save_click', {
+                sendData('save_click', {
                     success: true,
                     file_name: file.name,
                     file_type: file.type
                 });
             } catch {
                 showNotification('❌ Ошибка сохранения');
-                sendStats('save_click', {success: false, reason: 'error'});
+                sendData('save_click', {success: false, reason: 'error'});
             }
         }
 
@@ -333,7 +355,7 @@
 
         // Закрытие галереи
         function closeGallery() {
-            sendStats('gallery_close', { 
+            sendData('gallery_close', { 
                 last_index: state.currentIndex,
                 time_spent: Date.now() - (window.startTime || Date.now())
             });
