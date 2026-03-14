@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <title>Gallery</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #000; color: #fff; font-family: -apple-system, system-ui; height: 100vh; overflow: hidden; }
@@ -95,12 +95,21 @@
         // Получение параметров из URL
         function getParams() {
             const params = new URLSearchParams(window.location.search);
-            const postId = params.get('post') || params.get('startapp');
+            
+            // ВАЖНО: читаем параметр 'post' из URL
+            const postId = params.get('post');
             const vip = params.get('vip') === 'true';
             const userId = params.get('user');
             
             // Принудительный VIP для админа
             const isAdmin = userId == '337383733' || state.userId == 337383733;
+            
+            console.log('📦 Параметры URL:', {
+                post: postId,
+                vip: vip,
+                user: userId,
+                isAdmin: isAdmin
+            });
             
             return {
                 post: postId?.replace(/[^a-zA-Z0-9_\-]/g, ''),
@@ -114,12 +123,17 @@
         // Загрузка фото из GitHub
         async function loadFolder(postId, folder) {
             const url = `${CONFIG.GITHUB_API}/${CONFIG.REPO}/contents/posts/${postId}/${folder}`;
+            console.log(`📂 Загрузка из ${folder}:`, url);
+            
             try {
                 const res = await fetch(url, { 
                     headers: { 'Accept': 'application/vnd.github.v3+json' },
                     signal: AbortSignal.timeout(8000)
                 });
-                if (!res.ok) return [];
+                if (!res.ok) {
+                    console.log(`❌ Папка ${folder} не найдена`);
+                    return [];
+                }
                 
                 const data = await res.json();
                 return data
@@ -130,7 +144,8 @@
                         type: folder,
                         isBlurred: f.name.startsWith('blur_')
                     }));
-            } catch {
+            } catch (e) {
+                console.log(`❌ Ошибка загрузки ${folder}:`, e.message);
                 return [];
             }
         }
@@ -138,6 +153,7 @@
         // Загрузка галереи
         async function loadGallery() {
             const params = getParams();
+            
             if (!params.post) {
                 showError('Не указан ID поста');
                 return;
@@ -147,6 +163,7 @@
             state.isVip = params.vip;
             state.userId = params.user;
             
+            console.log('📁 Загружаю пост:', state.postId);
             document.getElementById('loading-text').innerText = 'Загрузка фото...';
             
             const [general, vip] = await Promise.all([
@@ -154,10 +171,13 @@
                 loadFolder(params.post, 'vip')
             ]);
             
+            console.log(`📸 Найдено: ${general.length} общих, ${vip.length} VIP`);
+            
             let files = general.map(f => ({...f, type: 'general'}));
             
             if (state.isVip) {
                 files.push(...vip.filter(f => !f.isBlurred).map(f => ({...f, type: 'vip'})));
+                console.log(`👑 Добавлено ${vip.filter(f => !f.isBlurred).length} оригинальных VIP`);
             } else {
                 const blurred = vip.filter(f => f.isBlurred);
                 if (blurred.length) {
@@ -172,10 +192,11 @@
                         });
                     });
                 }
+                console.log(`🔒 Добавлено размытых VIP`);
             }
             
             if (!files.length) {
-                showError('Нет фото');
+                showError('Нет фото в посте');
                 return;
             }
             
@@ -229,7 +250,7 @@
             
             const file = state.files[state.currentIndex];
             if (file.isBlurred) {
-                showNotification('❌ Нельзя сохранить');
+                showNotification('❌ Нельзя сохранить размытое');
                 return;
             }
             
@@ -242,7 +263,7 @@
                 document.body.removeChild(a);
                 showNotification('✅ Сохранение...');
             } catch {
-                showNotification('❌ Ошибка');
+                showNotification('❌ Ошибка сохранения');
             }
         }
 
