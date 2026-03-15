@@ -38,7 +38,7 @@
             const payload = {
                 user_id: tg.initDataUnsafe?.user?.id,
                 start_param: tg.initDataUnsafe?.start_param,
-                test: 'pinggy_fixed',
+                test: 'pinggy_working',
                 timestamp: Date.now()
             };
 
@@ -47,22 +47,22 @@
             statusEl.innerText = "📤 Отправка...";
 
             try {
-                const res = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
+                // ВАЖНО: добавляем параметр _pinggy в URL для обхода заглушки
+                const response = await fetch(`${TUNNEL_URL}/api/webapp-data?_pinggy=true`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'text/plain',
-                        'X-Pinggy-No-Screen': 'true'  // КЛЮЧЕВОЙ ЗАГОЛОВОК!
+                        'Content-Type': 'text/plain'
                     },
                     body: JSON.stringify(payload)
                 });
 
-                if (res.ok) {
-                    const json = await res.json();
+                if (response.ok) {
+                    const json = await response.json();
                     addLog(`✅ УСПЕХ: ${JSON.stringify(json)}`);
                     statusEl.innerText = "✅ Успех!";
                 } else {
-                    const text = await res.text();
-                    addLog(`❌ ОШИБКА ${res.status}: ${text.substring(0, 100)}`);
+                    const text = await response.text();
+                    addLog(`❌ ОШИБКА ${response.status}: ${text.substring(0, 100)}`);
                     statusEl.innerText = "❌ Ошибка";
                 }
             } catch (e) {
