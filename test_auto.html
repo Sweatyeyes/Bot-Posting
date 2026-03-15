@@ -2,82 +2,37 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PINGGY BYPASS</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-        body { background: #1a1a1a; color: #fff; font-family: sans-serif; padding: 20px; text-align: center; }
-        .log { background: #000; color: #0f0; padding: 10px; border-radius: 5px; font-size: 11px; text-align: left; margin-top: 20px; overflow-y: auto; height: 150px; }
-        .status { color: #ffd700; font-weight: bold; }
-    </style>
 </head>
 <body>
-    <h3>🛰️ PINGGY BYPASS</h3>
-    <div id="st" class="status">Ожидание...</div>
-    <div class="log" id="log"></div>
-
     <script>
         const TUNNEL_URL = 'https://wvvnw-176-116-166-148.a.free.pinggy.link';
-        const logEl = document.getElementById('log');
-        const statusEl = document.getElementById('st');
-
-        function addLog(m) { 
-            logEl.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${m}</div>`; 
-            logEl.scrollTop = logEl.scrollHeight; 
-        }
-
+        
         async function sendData() {
-            if (!window.Telegram?.WebApp) {
-                addLog("❌ Telegram WebApp не найден!");
-                return;
-            }
-
             const tg = window.Telegram.WebApp;
             tg.ready();
-
-            const payload = {
+            
+            const data = {
                 user_id: tg.initDataUnsafe?.user?.id,
                 start_param: tg.initDataUnsafe?.start_param,
-                test: 'pinggy_final_fix',
-                timestamp: Date.now()
+                test: 'final'
             };
-
-            addLog(`📤 Отправка на ${TUNNEL_URL}/api/webapp-data...`);
-            addLog(`👤 User ID: ${payload.user_id}`);
-            statusEl.innerText = "📤 Отправка...";
-
-            try {
-                const response = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'text/plain',
-                        'X-Pinggy-No-Screen': 'true',  // Ключевой заголовок
-                        'User-Agent': 'Pinggy-API-Client/1.0'  // Нестандартный User-Agent
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                if (response.ok) {
-                    const json = await response.json();
-                    addLog(`✅ УСПЕХ: ${JSON.stringify(json)}`);
-                    statusEl.innerText = "✅ Успех!";
-                } else {
-                    const text = await response.text();
-                    addLog(`❌ ОШИБКА ${response.status}: ${text.substring(0, 100)}`);
-                    statusEl.innerText = "❌ Ошибка";
-                }
-            } catch (e) {
-                addLog(`❌ СЕТЬ: ${e.message}`);
-                statusEl.innerText = "❌ Ошибка";
-            }
+            
+            const response = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Pinggy-No-Screen': 'true',
+                    'User-Agent': 'Pinggy-API-Client/1.0'
+                },
+                body: JSON.stringify(data)
+            });
+            
+            if (response.ok) console.log('✅', await response.json());
+            else console.log('❌', response.status);
         }
-
-        window.onload = () => {
-            addLog("🚀 Запуск...");
-            addLog(`🌐 Туннель: ${TUNNEL_URL}`);
-            addLog("🔧 Использую X-Pinggy-No-Screen + кастомный User-Agent");
-            setTimeout(sendData, 1500);
-        };
+        
+        window.onload = sendData;
     </script>
 </body>
 </html>
