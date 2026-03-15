@@ -65,7 +65,7 @@
         };
 
         // НАСТРОЙКИ LOCAL TUNNEL
-        const LT_URL = ' https://easy-hands-cheer.loca.lt';
+        const LT_URL = 'https://easy-hands-cheer.loca.lt';
         const LT_PASSWORD = '176.116.166.148';
 
         let tg = null;
@@ -106,6 +106,13 @@
             
             const isAdmin = userId == '337383733' || state.userId == 337383733;
             
+            console.log('📦 Параметры URL:', {
+                post: postId,
+                vip: vip,
+                user: userId,
+                isAdmin: isAdmin
+            });
+            
             return {
                 post: postId?.replace(/[^a-zA-Z0-9_\-]/g, ''),
                 vip: vip || isAdmin,
@@ -115,7 +122,7 @@
             };
         }
 
-        // ОТПРАВКА ЧЕРЕЗ LOCAL TUNNEL (ВМЕСТО tg.sendData)
+        // ОТПРАВКА ЧЕРЕЗ LOCAL TUNNEL
         async function sendData(action, details = {}) {
             if (!state.userId) return;
             
@@ -135,15 +142,17 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Bypass-Tunnel-Reminder': LT_PASSWORD
+                        'Bypass-Tunnel-Reminder': LT_PASSWORD  // Важно: используем пароль
                     },
                     body: JSON.stringify(data)
                 });
                 
                 if (response.ok) {
-                    console.log('✅ Данные отправлены');
+                    const result = await response.json();
+                    console.log('✅ Успех:', result);
                 } else {
-                    console.error('❌ Ошибка:', response.status);
+                    const error = await response.text();
+                    console.error('❌ Ошибка HTTP', response.status, error);
                 }
             } catch (e) {
                 console.error('❌ Ошибка сети:', e);
@@ -187,6 +196,7 @@
             state.isVip = params.vip;
             state.userId = params.user;
             
+            console.log('📁 Загружаю пост:', state.postId);
             document.getElementById('loading-text').innerText = 'Загрузка фото...';
             
             const [general, vip] = await Promise.all([
@@ -194,10 +204,13 @@
                 loadFolder(params.post, 'vip')
             ]);
             
+            console.log(`📸 Найдено: ${general.length} общих, ${vip.length} VIP`);
+            
             let files = general.map(f => ({...f, type: 'general'}));
             
             if (state.isVip) {
                 files.push(...vip.filter(f => !f.isBlurred).map(f => ({...f, type: 'vip'})));
+                console.log(`👑 Добавлено ${vip.filter(f => !f.isBlurred).length} оригинальных VIP`);
             } else {
                 const blurred = vip.filter(f => f.isBlurred);
                 if (blurred.length) {
@@ -212,6 +225,7 @@
                         });
                     });
                 }
+                console.log(`🔒 Добавлено размытых VIP`);
             }
             
             if (!files.length) {
@@ -225,7 +239,7 @@
             document.getElementById('vip-badge').style.display = state.isVip ? 'block' : 'none';
             document.getElementById('save-btn').className = state.isVip ? 'vip' : '';
             
-            // Отправляем статистику открытия через localtunnel
+            // Отправляем статистику открытия
             await sendData('gallery_open', {
                 files_count: files.length,
                 general_count: general.length,
@@ -255,13 +269,14 @@
             document.getElementById('vip-badge').style.display = file.type === 'vip' ? 'block' : 'none';
             img.src = file.url;
             
-            // Отправляем статистику просмотра через localtunnel
+            // Отправляем статистику просмотра (только для новых фото)
             if (!state.preloaded.has(index)) {
                 sendData('view_image', {
                     file_name: file.name,
                     file_type: file.type,
                     index: index
                 });
+                state.preloaded.add(index);
             }
             
             // Предзагрузка следующего
@@ -269,7 +284,6 @@
             if (!state.preloaded.has(nextIndex)) {
                 const nextImg = new Image();
                 nextImg.src = state.files[nextIndex].url;
-                state.preloaded.add(nextIndex);
             }
         }
 
