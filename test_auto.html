@@ -78,6 +78,7 @@
             const dataToSend = prepareData();
             
             log(`📤 Отправка на ${TUNNEL_URL}/api/webapp-data...`);
+            log(`🔑 Использую заголовок X-Pinggy-No-Screen: true`);
             statusEl.textContent = '📤 Отправка...';
 
             try {
@@ -121,7 +122,8 @@
                     const result = await response.json();
                     log(`✅ Соединение работает: ${JSON.stringify(result)}`);
                 } else {
-                    log(`❌ Ошибка соединения: ${response.status}`);
+                    const errorText = await response.text();
+                    log(`❌ Ошибка соединения: ${response.status} - ${errorText.substring(0, 100)}`);
                 }
             } catch (e) {
                 log(`❌ Не удалось подключиться: ${e.message}`);
