@@ -7,394 +7,147 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #000; color: #fff; font-family: -apple-system, system-ui; height: 100vh; overflow: hidden; }
-        #loading { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
-        .spinner { width: 40px; height: 40px; border: 3px solid #333; border-top-color: #2ea6ff; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        body { background: #000; color: #fff; font-family: sans-serif; height: 100vh; overflow: hidden; }
+        #loading { position: fixed; inset: 0; background: #000; display: flex; align-items: center; justify-content: center; z-index: 100; }
+        .spinner { width: 40px; height: 40px; border: 3px solid #333; border-top-color: #2ea6ff; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         #gallery { display: none; height: 100vh; position: relative; }
-        #image-container { height: 100%; display: flex; align-items: center; justify-content: center; }
-        #image { max-width: 100%; max-height: 100%; object-fit: contain; opacity: 0; transition: opacity 0.2s; }
-        #image.loaded { opacity: 1; }
-        #nav-left, #nav-right { position: absolute; top: 0; bottom: 80px; width: 30%; z-index: 10; cursor: pointer; }
+        #image { max-width: 100%; max-height: 100%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        #nav-left, #nav-right { position: absolute; top: 0; bottom: 0; width: 30%; z-index: 10; cursor: pointer; }
         #nav-left { left: 0; }
         #nav-right { right: 0; }
-        #bottom-bar { position: absolute; bottom: 0; width: 100%; height: 80px; background: linear-gradient(to top, #000, transparent); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }
-        #counter { background: rgba(0,0,0,0.5); padding: 8px 16px; border-radius: 20px; font-size: 14px; }
-        #save-btn { font-size: 30px; cursor: pointer; opacity: 0.5; }
-        #save-btn.vip { opacity: 1; }
-        #vip-badge { position: absolute; top: 20px; right: 20px; background: #ffd700; color: #000; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; display: none; }
+        #counter { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.5); padding: 8px 16px; border-radius: 20px; }
+        #vip-badge { position: absolute; top: 20px; right: 20px; background: #ffd700; color: #000; padding: 4px 12px; border-radius: 20px; display: none; }
         #notification { position: fixed; bottom: 100px; left: 20px; right: 20px; background: rgba(0,0,0,0.9); color: white; padding: 15px; border-radius: 10px; text-align: center; transform: translateY(200%); transition: transform 0.3s; z-index: 200; }
         #notification.show { transform: translateY(0); }
-        #error { display: none; flex-direction: column; align-items: center; justify-content: center; height: 100vh; padding: 20px; text-align: center; }
+        #error { display: none; text-align: center; padding: 20px; }
     </style>
 </head>
 <body>
-    <div id="loading">
-        <div class="spinner"></div>
-        <div id="loading-text">Загрузка...</div>
-    </div>
-    
+    <div id="loading"><div class="spinner"></div></div>
     <div id="gallery">
         <div id="vip-badge">VIP</div>
         <div id="nav-left" onclick="prev()"></div>
         <div id="nav-right" onclick="next()"></div>
-        <div id="image-container">
-            <img id="image" src="" alt="" onload="onImageLoad()" onerror="onImageError()">
-        </div>
-        <div id="bottom-bar">
-            <a href="https://t.me/neuroticababes_bot" target="_blank" style="font-size: 30px; text-decoration: none;">🍓</a>
-            <span id="counter">1 / 1</span>
-            <span id="save-btn" onclick="handleSave()">💾</span>
-        </div>
+        <img id="image" src="" onload="this.style.opacity=1" onerror="onError()">
+        <div id="counter">1/1</div>
     </div>
-    
     <div id="notification">Сообщение</div>
-    
-    <div id="error">
-        <div style="font-size: 48px; margin-bottom: 20px;">😢</div>
-        <div id="error-message">Что-то пошло не так</div>
-    </div>
+    <div id="error">😢 Ошибка загрузки</div>
 
     <script>
         const CONFIG = {
             REPO: "Sweatyeyes/Bot-Posting",
             BRANCH: "main",
             GITHUB_RAW: "https://raw.githubusercontent.com",
-            GITHUB_API: "https://api.github.com/repos",
-            SUPPORTED: ['.jpg', '.jpeg', '.png']
+            GITHUB_API: "https://api.github.com/repos"
         };
 
-        // НАСТРОЙКИ LOCAL TUNNEL
-        const LT_URL = 'https://easy-hands-cheer.loca.lt';
-        const LT_PASSWORD = '176.116.166.148';
+        // НАСТРОЙКИ LOCAL TUNNEL - ОБНОВЛЯТЬ ПРИ СМЕНЕ!
+        const TUNNEL_URL = 'https://thin-doors-drive.loca.lt';
+        const TUNNEL_PASS = '176.116.166.148';
 
-        let tg = null;
+        let tg = Telegram.WebApp;
+        tg.ready();
+        
         let state = {
             files: [],
-            currentIndex: 0,
-            isVip: false,
+            index: 0,
+            vip: false,
             postId: null,
-            userId: null,
-            touchStartX: 0,
-            preloaded: new Set(),
-            retries: 0,
+            userId: tg.initDataUnsafe?.user?.id,
             startTime: Date.now()
         };
 
-        // Инициализация Telegram
-        function initTelegram() {
-            if (window.Telegram?.WebApp) {
-                tg = window.Telegram.WebApp;
-                tg.ready();
-                tg.expand();
-                console.log('✅ Telegram WebApp готов');
-                
-                if (tg.initDataUnsafe?.user) {
-                    state.userId = tg.initDataUnsafe.user.id;
-                }
-                return true;
-            }
-            return false;
-        }
-
-        // Получение параметров из URL
-        function getParams() {
-            const params = new URLSearchParams(window.location.search);
-            
-            const postId = params.get('post');
-            const vip = params.get('vip') === 'true';
-            const userId = params.get('user');
-            
-            const isAdmin = userId == '337383733' || state.userId == 337383733;
-            
-            console.log('📦 Параметры URL:', {
-                post: postId,
-                vip: vip,
-                user: userId,
-                isAdmin: isAdmin
-            });
-            
-            return {
-                post: postId?.replace(/[^a-zA-Z0-9_\-]/g, ''),
-                vip: vip || isAdmin,
-                user: userId || state.userId,
-                general: parseInt(params.get('general')) || 0,
-                vip_count: parseInt(params.get('vip_count')) || 0
-            };
-        }
-
-        // ОТПРАВКА ЧЕРЕЗ LOCAL TUNNEL
+        // Отправка данных через localtunnel
         async function sendData(action, details = {}) {
-            if (!state.userId) return;
-            
             const data = {
                 action: action,
                 user_id: state.userId,
                 post_id: state.postId,
-                is_vip: state.isVip,
+                vip: state.vip,
                 timestamp: Date.now(),
                 ...details
             };
             
-            console.log('📤 Отправка через localtunnel:', data);
-            
             try {
-                const response = await fetch(`${LT_URL}/api/webapp-data`, {
+                await fetch(`${TUNNEL_URL}/api/webapp-data`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Bypass-Tunnel-Reminder': LT_PASSWORD
+                        'Bypass-Tunnel-Reminder': TUNNEL_PASS
                     },
                     body: JSON.stringify(data)
                 });
-                
-                if (response.ok) {
-                    const result = await response.json();
-                    console.log('✅ Успех:', result);
-                } else {
-                    const error = await response.text();
-                    console.error('❌ Ошибка HTTP', response.status, error);
-                }
             } catch (e) {
-                console.error('❌ Ошибка сети:', e);
+                console.log('Ошибка отправки:', e);
             }
         }
 
-        // Загрузка фото из GitHub
-        async function loadFolder(postId, folder) {
-            const url = `${CONFIG.GITHUB_API}/${CONFIG.REPO}/contents/posts/${postId}/${folder}`;
-            try {
-                const res = await fetch(url, { 
-                    headers: { 'Accept': 'application/vnd.github.v3+json' }
-                });
-                if (!res.ok) return [];
-                
-                const data = await res.json();
-                return data
-                    .filter(f => CONFIG.SUPPORTED.some(ext => f.name.toLowerCase().endsWith(ext)))
-                    .map(f => ({
-                        name: f.name,
-                        url: `${CONFIG.GITHUB_RAW}/${CONFIG.REPO}/${CONFIG.BRANCH}/posts/${postId}/${folder}/${f.name}`,
-                        type: folder,
-                        isBlurred: f.name.startsWith('blur_')
-                    }));
-            } catch (e) {
-                console.log(`❌ Ошибка загрузки ${folder}:`, e.message);
-                return [];
-            }
-        }
-
-        // Загрузка галереи
         async function loadGallery() {
-            const params = getParams();
+            let params = new URLSearchParams(location.search);
+            let postId = params.get('post');
+            if (!postId) return showError('Нет ID поста');
             
-            if (!params.post) {
-                showError('Не указан ID поста');
-                return;
-            }
+            state.postId = postId;
+            state.vip = params.get('vip') === 'true' || state.userId == 337383733;
             
-            state.postId = params.post;
-            state.isVip = params.vip;
-            state.userId = params.user;
-            
-            console.log('📁 Загружаю пост:', state.postId);
-            document.getElementById('loading-text').innerText = 'Загрузка фото...';
-            
-            const [general, vip] = await Promise.all([
-                loadFolder(params.post, 'general'),
-                loadFolder(params.post, 'vip')
+            let [general, vip] = await Promise.all([
+                fetch(`${CONFIG.GITHUB_API}/${CONFIG.REPO}/contents/posts/${postId}/general`).then(r => r.json()).catch(()=>[]),
+                fetch(`${CONFIG.GITHUB_API}/${CONFIG.REPO}/contents/posts/${postId}/vip`).then(r => r.json()).catch(()=>[])
             ]);
             
-            console.log(`📸 Найдено: ${general.length} общих, ${vip.length} VIP`);
+            general = Array.isArray(general) ? general.filter(f => f.name.match(/\.(jpg|jpeg|png)$/)) : [];
+            vip = Array.isArray(vip) ? vip.filter(f => f.name.match(/\.(jpg|jpeg|png)$/)) : [];
             
-            let files = general.map(f => ({...f, type: 'general'}));
+            state.files = general.map(f => ({
+                url: `${CONFIG.GITHUB_RAW}/${CONFIG.REPO}/${CONFIG.BRANCH}/posts/${postId}/general/${f.name}`,
+                name: f.name
+            }));
             
-            if (state.isVip) {
-                files.push(...vip.filter(f => !f.isBlurred).map(f => ({...f, type: 'vip'})));
-                console.log(`👑 Добавлено ${vip.filter(f => !f.isBlurred).length} оригинальных VIP`);
+            if (state.vip) {
+                state.files.push(...vip.map(f => ({
+                    url: `${CONFIG.GITHUB_RAW}/${CONFIG.REPO}/${CONFIG.BRANCH}/posts/${postId}/vip/${f.name}`,
+                    name: f.name,
+                    vip: true
+                })));
             } else {
-                const blurred = vip.filter(f => f.isBlurred);
-                if (blurred.length) {
-                    files.push(...blurred.map(f => ({...f, type: 'vip-blurred'})));
-                } else {
-                    vip.filter(f => !f.isBlurred).forEach(f => {
-                        files.push({
-                            ...f,
-                            url: f.url.replace('/vip/', '/vip/blur_'),
-                            type: 'vip-blurred',
-                            isBlurred: true
-                        });
-                    });
-                }
-                console.log(`🔒 Добавлено размытых VIP`);
+                state.files.push(...vip.map(f => ({
+                    url: `${CONFIG.GITHUB_RAW}/${CONFIG.REPO}/${CONFIG.BRANCH}/posts/${postId}/vip/blur_${f.name}`,
+                    name: f.name,
+                    blur: true
+                })));
             }
             
-            if (!files.length) {
-                showError('Нет фото в посте');
-                return;
-            }
+            if (!state.files.length) return showError('Нет фото');
             
-            files.sort((a, b) => a.name.localeCompare(b.name));
-            state.files = files;
-            
-            document.getElementById('vip-badge').style.display = state.isVip ? 'block' : 'none';
-            document.getElementById('save-btn').className = state.isVip ? 'vip' : '';
-            
-            // Отправляем статистику открытия
-            await sendData('gallery_open', {
-                files_count: files.length,
-                general_count: general.length,
-                vip_count: vip.length
-            });
-            
-            setTimeout(() => {
-                document.getElementById('loading').style.opacity = '0';
-                setTimeout(() => {
-                    document.getElementById('loading').style.display = 'none';
-                    document.getElementById('gallery').style.display = 'block';
-                    showImage(0);
-                }, 200);
-            }, 300);
-        }
-
-        // Показ фото
-        function showImage(index) {
-            if (!state.files.length) return;
-            index = (index + state.files.length) % state.files.length;
-            state.currentIndex = index;
-            
-            const file = state.files[index];
-            const img = document.getElementById('image');
-            img.classList.remove('loaded');
-            document.getElementById('counter').innerText = `${index + 1} / ${state.files.length}`;
-            document.getElementById('vip-badge').style.display = file.type === 'vip' ? 'block' : 'none';
-            img.src = file.url;
-            
-            // Отправляем статистику просмотра (только для новых фото)
-            if (!state.preloaded.has(index)) {
-                sendData('view_image', {
-                    file_name: file.name,
-                    file_type: file.type,
-                    index: index
-                });
-                state.preloaded.add(index);
-            }
-            
-            // Предзагрузка следующего
-            const nextIndex = (index + 1) % state.files.length;
-            if (!state.preloaded.has(nextIndex)) {
-                const nextImg = new Image();
-                nextImg.src = state.files[nextIndex].url;
-            }
-        }
-
-        function next() { 
-            showImage(state.currentIndex + 1);
-            sendData('navigate_next', { from: state.currentIndex - 1, to: state.currentIndex });
-        }
-        
-        function prev() { 
-            showImage(state.currentIndex - 1);
-            sendData('navigate_prev', { from: state.currentIndex + 1, to: state.currentIndex });
-        }
-
-        // Сохранение
-        async function handleSave() {
-            if (!state.isVip) {
-                showNotification('❌ Только для VIP');
-                sendData('save_click', {success: false, reason: 'not_vip'});
-                return;
-            }
-            
-            const file = state.files[state.currentIndex];
-            if (file.isBlurred) {
-                showNotification('❌ Нельзя сохранить размытое');
-                sendData('save_click', {success: false, reason: 'blurred'});
-                return;
-            }
-            
-            try {
-                const a = document.createElement('a');
-                a.href = file.url;
-                a.download = file.name;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                showNotification('✅ Сохранение...');
-                sendData('save_click', {
-                    success: true,
-                    file_name: file.name,
-                    file_type: file.type
-                });
-            } catch {
-                showNotification('❌ Ошибка сохранения');
-                sendData('save_click', {success: false, reason: 'error'});
-            }
-        }
-
-        function showNotification(text, duration = 2000) {
-            const el = document.getElementById('notification');
-            el.innerText = text;
-            el.classList.add('show');
-            setTimeout(() => el.classList.remove('show'), duration);
-        }
-
-        function onImageLoad() {
-            document.getElementById('image').classList.add('loaded');
-            state.retries = 0;
-        }
-
-        function onImageError() {
-            if (state.retries < 2) {
-                state.retries++;
-                setTimeout(() => {
-                    const img = document.getElementById('image');
-                    img.src = img.src.split('?')[0] + '?retry=' + Date.now();
-                }, 1000);
-            }
-        }
-
-        function showError(msg) {
+            document.getElementById('vip-badge').style.display = state.vip ? 'block' : 'none';
             document.getElementById('loading').style.display = 'none';
-            document.getElementById('error').style.display = 'flex';
-            document.getElementById('error-message').innerText = msg;
+            document.getElementById('gallery').style.display = 'block';
+            showImage(0);
+            
+            sendData('open', { files: state.files.length });
         }
 
-        function handleTouchStart(e) { state.touchStartX = e.touches[0].clientX; }
-        function handleTouchEnd(e) {
-            if (!state.touchStartX) return;
-            const diff = e.changedTouches[0].clientX - state.touchStartX;
-            if (Math.abs(diff) > 50) diff > 0 ? prev() : next();
-            state.touchStartX = 0;
+        function showImage(i) {
+            state.index = (i + state.files.length) % state.files.length;
+            let img = document.getElementById('image');
+            img.style.opacity = 0;
+            img.src = state.files[state.index].url;
+            document.getElementById('counter').innerText = `${state.index+1}/${state.files.length}`;
+            sendData('view', { index: state.index, name: state.files[state.index].name });
         }
 
-        // Закрытие галереи
-        function closeGallery() {
-            sendData('gallery_close', { 
-                last_index: state.currentIndex,
-                time_spent: Date.now() - state.startTime
-            });
-            if (tg) tg.close();
-        }
+        function next() { showImage(state.index + 1); sendData('next'); }
+        function prev() { showImage(state.index - 1); sendData('prev'); }
+        function onError() { setTimeout(() => showImage(state.index), 1000); }
+        function showError(msg) { document.getElementById('loading').style.display = 'none'; document.getElementById('error').style.display = 'block'; }
 
-        // Запуск
-        window.addEventListener('load', () => {
-            initTelegram();
-            loadGallery();
-            document.addEventListener('touchstart', handleTouchStart);
-            document.addEventListener('touchend', handleTouchEnd);
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'ArrowLeft') prev();
-                if (e.key === 'ArrowRight') next();
-            });
+        window.addEventListener('load', loadGallery);
+        window.addEventListener('beforeunload', () => {
+            sendData('close', { time_spent: Date.now() - state.startTime });
         });
-
-        window.next = next;
-        window.prev = prev;
-        window.closeGallery = closeGallery;
-        window.handleSave = handleSave;
-        window.onImageLoad = onImageLoad;
-        window.onImageError = onImageError;
+        window.next = next; window.prev = prev;
     </script>
 </body>
 </html>
