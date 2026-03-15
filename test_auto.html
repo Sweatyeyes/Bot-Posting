@@ -3,8 +3,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PINGGY TEST</title>
-    <script src="https://telegram.org"></script>
+    <title>PINGGY BYPASS</title>
+    <!-- ИСПРАВЛЕНО: правильный URL для Telegram WebApp -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { background: #1a1a1a; color: #fff; font-family: sans-serif; padding: 20px; text-align: center; }
         .log { background: #000; color: #0f0; padding: 10px; border-radius: 5px; font-size: 11px; text-align: left; margin-top: 20px; overflow-y: auto; height: 150px; }
@@ -17,45 +18,71 @@
     <div class="log" id="log"></div>
 
     <script>
-        // !!! ОБЯЗАТЕЛЬНО ПРОВЕРЬТЕ ЭТОТ URL !!!
+        // ВАЖНО: используйте актуальный URL от Pinggy!
         const TUNNEL_URL = 'https://wvvnw-176-116-166-148.a.free.pinggy.link';
         const logEl = document.getElementById('log');
+        const statusEl = document.getElementById('st');
 
-        function addLog(m) { logEl.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${m}</div>`; logEl.scrollTop = logEl.scrollHeight; }
+        function addLog(m) { 
+            logEl.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${m}</div>`; 
+            logEl.scrollTop = logEl.scrollHeight; 
+        }
 
         async function sendData() {
+            // Проверяем, что Telegram WebApp доступен
+            if (!window.Telegram?.WebApp) {
+                addLog("❌ Telegram WebApp не найден!");
+                statusEl.innerText = "❌ Ошибка";
+                return;
+            }
+
             const tg = window.Telegram.WebApp;
             tg.ready();
 
             const payload = {
-                user: tg.initDataUnsafe?.user || 'no_user',
-                start_param: tg.initDataUnsafe?.start_param || 'no_param',
-                pinggy_mode: 'simple_request'
+                user_id: tg.initDataUnsafe?.user?.id,
+                start_param: tg.initDataUnsafe?.start_param,
+                test: 'pinggy_fixed',
+                timestamp: Date.now()
             };
 
-            addLog("📤 Пробую отправить (Simple Request)...");
-            
+            addLog(`📤 Отправка на ${TUNNEL_URL}/api/webapp-data...`);
+            addLog(`👤 User ID: ${payload.user_id || 'неизвестно'}`);
+            statusEl.innerText = "📤 Отправка...";
+
             try {
                 const res = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' }, // ОБХОД OPTIONS
+                    headers: { 'Content-Type': 'text/plain' },
                     body: JSON.stringify(payload)
                 });
 
                 if (res.ok) {
                     const json = await res.json();
-                    addLog("✅ ПРИНЯТО: " + JSON.stringify(json));
-                    document.getElementById('st').innerText = "✅ УСПЕХ!";
+                    addLog(`✅ УСПЕХ: ${JSON.stringify(json)}`);
+                    statusEl.innerText = "✅ Успех!";
                 } else {
-                    addLog("❌ ОШИБКА: " + res.status);
+                    addLog(`❌ ОШИБКА ${res.status}: ${await res.text()}`);
+                    statusEl.innerText = "❌ Ошибка";
                 }
             } catch (e) {
-                addLog("❌ СЕТЬ: " + e.message);
+                addLog(`❌ СЕТЬ: ${e.message}`);
+                statusEl.innerText = "❌ Ошибка";
             }
         }
 
         window.onload = () => {
             addLog("🚀 Запуск...");
+            addLog(`🌐 Туннель: ${TUNNEL_URL}`);
+            addLog("🔍 Проверка Telegram WebApp...");
+            
+            // Проверяем наличие Telegram WebApp
+            if (window.Telegram?.WebApp) {
+                addLog("✅ Telegram WebApp доступен");
+            } else {
+                addLog("❌ Telegram WebApp НЕ доступен!");
+            }
+            
             setTimeout(sendData, 1500);
         };
     </script>
