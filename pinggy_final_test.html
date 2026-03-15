@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PINGGY FINAL TEST</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { background: #1a1a1a; color: #fff; font-family: sans-serif; padding: 20px; text-align: center; }
+        .log { background: #000; color: #0f0; padding: 10px; border-radius: 5px; font-size: 11px; text-align: left; margin-top: 20px; overflow-y: auto; height: 200px; }
+        .status { color: #ffd700; font-weight: bold; margin: 10px 0; }
+        button { background: #2ea6ff; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-size: 16px; cursor: pointer; margin: 10px; }
+    </style>
+</head>
+<body>
+    <h3>🛰️ PINGGY FINAL TEST</h3>
+    <div id="status" class="status">Ожидание...</div>
+    <button onclick="sendData()">📤 ОТПРАВИТЬ ТЕСТ</button>
+    <div class="log" id="log"></div>
+
+    <script>
+        const TUNNEL_URL = 'https://wvvnw-176-116-166-148.a.free.pinggy.link';
+        const logEl = document.getElementById('log');
+        const statusEl = document.getElementById('status');
+
+        function addLog(msg) { 
+            logEl.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${msg}</div>`; 
+            logEl.scrollTop = logEl.scrollHeight; 
+        }
+
+        async function sendData() {
+            const tg = window.Telegram?.WebApp;
+            if (!tg) {
+                addLog("❌ Telegram WebApp не доступен");
+                return;
+            }
+            
+            tg.ready();
+            
+            const payload = {
+                user_id: tg.initDataUnsafe?.user?.id,
+                start_param: tg.initDataUnsafe?.start_param,
+                test: 'pinggy_final',
+                timestamp: Date.now()
+            };
+
+            addLog(`📤 Отправка на ${TUNNEL_URL}/api/webapp-data...`);
+            statusEl.innerText = '📤 Отправка...';
+
+            try {
+                const response = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    addLog(`✅ Успех: ${JSON.stringify(result)}`);
+                    statusEl.innerText = '✅ Отправлено!';
+                } else {
+                    addLog(`❌ Ошибка: ${response.status}`);
+                    statusEl.innerText = '❌ Ошибка';
+                }
+            } catch (e) {
+                addLog(`❌ Ошибка сети: ${e.message}`);
+                statusEl.innerText = '❌ Ошибка';
+            }
+        }
+
+        // Автоматическая отправка при загрузке
+        window.addEventListener('load', () => {
+            addLog("🚀 Страница загружена");
+            addLog(`🌐 Туннель: ${TUNNEL_URL}`);
+            setTimeout(sendData, 1000);
+        });
+    </script>
+</body>
+</html>
