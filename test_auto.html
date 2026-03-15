@@ -24,8 +24,8 @@
 
     <script>
         // ==================== НАСТРОЙКИ PINGGY ====================
-        const TUNNEL_URL = 'https://gjpjk-176-116-166-148.a.free.pinggy.link';  // Ваш HTTPS URL от Pinggy
-        // Пароль НЕ НУЖЕН для Pinggy!
+        // ВАЖНО: Меняйте этот URL при каждом перезапуске туннеля!
+        const TUNNEL_URL = 'https://gjpjk-176-116-166-148.a.free.pinggy.link';
         
         // ==================== ЛОГИРОВАНИЕ ====================
         const debugLog = document.getElementById('debug-log');
@@ -41,7 +41,7 @@
             console.log(logLine);
         }
 
-        // ==================== ПОЛУЧЕНИЕ ДАННЫХ ====================
+        // ==================== ПОЛУЧЕНИЕ ДАННЫХ ИЗ TELEGRAM ====================
         function getTelegramData() {
             const tg = window.Telegram?.WebApp;
             if (!tg) {
@@ -84,8 +84,8 @@
                 const response = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
-                        // Для Pinggy не нужен заголовок Bypass-Tunnel-Reminder!
+                        'Content-Type': 'application/json',
+                        'X-Pinggy-No-Screen': 'true'  // КЛЮЧЕВОЙ ЗАГОЛОВОК!
                     },
                     body: JSON.stringify(dataToSend)
                 });
@@ -112,12 +112,14 @@
                 const response = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'X-Pinggy-No-Screen': 'true'
                     },
                     body: JSON.stringify({test: 'ping', timestamp: Date.now()})
                 });
                 if (response.ok) {
-                    log('✅ Соединение работает');
+                    const result = await response.json();
+                    log(`✅ Соединение работает: ${JSON.stringify(result)}`);
                 } else {
                     log(`❌ Ошибка соединения: ${response.status}`);
                 }
