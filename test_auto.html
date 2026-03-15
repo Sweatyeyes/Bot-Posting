@@ -78,15 +78,15 @@
             const dataToSend = prepareData();
             
             log(`📤 Отправка на ${TUNNEL_URL}/api/webapp-data...`);
-            log(`🔑 Использую заголовок X-Pinggy-No-Screen: true`);
+            log(`🔑 Заголовок X-Pinggy-No-Screen удален для совместимости с CORS`);
             statusEl.textContent = '📤 Отправка...';
 
             try {
                 const response = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Pinggy-No-Screen': 'true'  // КЛЮЧЕВОЙ ЗАГОЛОВОК!
+                        'Content-Type': 'application/json'
+                        // X-Pinggy-No-Screen УДАЛЕН!
                     },
                     body: JSON.stringify(dataToSend)
                 });
@@ -113,8 +113,8 @@
                 const response = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Pinggy-No-Screen': 'true'
+                        'Content-Type': 'application/json'
+                        // X-Pinggy-No-Screen УДАЛЕН!
                     },
                     body: JSON.stringify({test: 'ping', timestamp: Date.now()})
                 });
@@ -152,6 +152,7 @@
         window.addEventListener('load', () => {
             log('🚀 Страница загружена');
             log(`🌐 Pinggy URL: ${TUNNEL_URL}`);
+            log(`ℹ️ Заголовок X-Pinggy-No-Screen удален для совместимости с CORS`);
             
             // Проверяем соединение
             testConnection();
