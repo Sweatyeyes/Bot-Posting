@@ -23,68 +23,132 @@
     </div>
 
     <script>
-        const LT_URL = 'https://chubby-bobcats-dress.loca.lt';
+        // ==================== НАСТРОЙКИ ====================
+        const LT_URL = 'https://chubby-bobcats-dress.loca.lt';  // текущий URL localtunnel
+        const LT_PASSWORD = '176.116.166.148';  // пароль для заголовка (проверь curl https://loca.lt/mytunnelpassword)
+        
+        // ==================== ЛОГИРОВАНИЕ ====================
+        const debugLog = document.getElementById('debug-log');
+        const statusEl = document.getElementById('status');
+        const userIdEl = document.getElementById('user-id');
+        const startParamEl = document.getElementById('start-param');
         
         function log(msg) {
-            const el = document.getElementById('debug-log');
-            el.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${msg}</div>`;
-            el.scrollTop = el.scrollHeight;
-            console.log(msg);
+            const timestamp = new Date().toLocaleTimeString();
+            const logLine = `[${timestamp}] ${msg}`;
+            debugLog.innerHTML += `<div>${logLine}</div>`;
+            debugLog.scrollTop = debugLog.scrollHeight;
+            console.log(logLine);
         }
 
-        async function autoSend() {
+        // ==================== ПОЛУЧЕНИЕ ДАННЫХ ====================
+        function getTelegramData() {
             const tg = window.Telegram?.WebApp;
-            if (!tg) { log('❌ Нет Telegram WebApp'); return; }
+            if (!tg) {
+                log('❌ Telegram WebApp не доступен');
+                return null;
+            }
             
             tg.ready();
             
-            const user = tg.initDataUnsafe?.user;
-            const startParam = tg.initDataUnsafe?.start_param || 'не передан';
+            return {
+                user: tg.initDataUnsafe?.user,
+                start_param: tg.initDataUnsafe?.start_param || 'не передан'
+            };
+        }
+
+        // ==================== ФОРМИРОВАНИЕ ДАННЫХ ====================
+        function prepareData() {
+            const tgData = getTelegramData();
             
-            document.getElementById('user-id').textContent = user?.id || '-';
-            document.getElementById('start-param').textContent = startParam;
-            
-            const data = {
+            return {
                 type: 'auto_data',
                 timestamp: Date.now(),
-                user: user ? {
-                    id: user.id,
-                    first_name: user.first_name,
-                    username: user.username
+                user: tgData?.user ? {
+                    id: tgData.user.id,
+                    first_name: tgData.user.first_name,
+                    username: tgData.user.username
                 } : null,
-                start_param: startParam
+                start_param: tgData?.start_param
             };
+        }
+
+        // ==================== ОТПРАВКА ЧЕРЕЗ LOCAL TUNNEL ====================
+        async function autoSend() {
+            const dataToSend = prepareData();
             
-            log('📤 Отправка данных...');
-            document.getElementById('status').textContent = '📤 Отправка...';
-            
+            log(`📤 Отправка на ${LT_URL}/api/webapp-data...`);
+            log(`🔑 Использую пароль: ${LT_PASSWORD}`);
+            statusEl.textContent = '📤 Отправка...';
+
             try {
                 const response = await fetch(`${LT_URL}/api/webapp-data`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Bypass-Tunnel-Reminder': 'true'
+                        'Bypass-Tunnel-Reminder': LT_PASSWORD  // ВАЖНО: используем пароль!
                     },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify(dataToSend)
                 });
-                
+
                 if (response.ok) {
-                    log('✅ Данные отправлены!');
-                    document.getElementById('status').textContent = '✅ Отправлено!';
+                    const result = await response.json();
+                    log(`✅ Успех: ${JSON.stringify(result)}`);
+                    statusEl.textContent = '✅ Отправлено!';
                 } else {
-                    log('❌ Ошибка HTTP');
-                    document.getElementById('status').textContent = '❌ Ошибка';
+                    const errorText = await response.text();
+                    log(`❌ Ошибка HTTP ${response.status}: ${errorText.substring(0, 100)}`);
+                    statusEl.textContent = '❌ Ошибка';
                 }
             } catch (e) {
-                log(`❌ Ошибка: ${e.message}`);
-                document.getElementById('status').textContent = '❌ Ошибка';
+                log(`❌ Ошибка сети: ${e.message}`);
+                statusEl.textContent = '❌ Ошибка';
             }
         }
 
+        // ==================== ПРОВЕРКА СОЕДИНЕНИЯ ====================
+        async function testConnection() {
+            try {
+                log('🔄 Проверка соединения с localtunnel...');
+                const response = await fetch(`${LT_URL}/api/webapp-data`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Bypass-Tunnel-Reminder': LT_PASSWORD
+                    },
+                    body: JSON.stringify({test: 'ping', timestamp: Date.now()})
+                });
+                if (response.ok) {
+                    log('✅ Соединение работает');
+                } else {
+                    log(`❌ Ошибка соединения: ${response.status}`);
+                }
+            } catch (e) {
+                log(`❌ Не удалось подключиться: ${e.message}`);
+            }
+        }
+
+        // ==================== ЗАПУСК ====================
         window.addEventListener('load', () => {
             log('🚀 Страница загружена');
-            setTimeout(autoSend, 1000);
+            log(`🌐 localtunnel URL: ${LT_URL}`);
+            
+            // Показываем данные пользователя если есть
+            const tgData = getTelegramData();
+            if (tgData?.user) {
+                userIdEl.textContent = tgData.user.id;
+                startParamEl.textContent = tgData.start_param;
+                log(`👤 User ID: ${tgData.user.id}`);
+                log(`🎯 Start param: ${tgData.start_param}`);
+            }
+            
+            // Проверяем соединение
+            testConnection();
+            
+            // Автоматическая отправка через 2 секунды
+            setTimeout(autoSend, 2000);
         });
+
     </script>
 </body>
 </html>
