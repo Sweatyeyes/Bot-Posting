@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -85,17 +86,17 @@
         <h1>🔍 АВТОМАТИЧЕСКАЯ ОТПРАВКА ДАННЫХ</h1>
         
         <div class="tunnel-info">
-            📡 localtunnel: <b>https://light-walls-jump.loca.lt</b><br>
-            🔑 Заголовок: <b>Bypass-Tunnel-Reminder: 150.40.160.19</b>
+            📡 localtunnel: <b>https://breezy-guests-wink.loca.lt</b><br>
+            🔑 Заголовок: <b>Bypass-Tunnel-Reminder: true</b>
         </div>
         
         <div class="data-box">
             <div>📦 Статус: <span id="status" class="status">Инициализация...</span></div>
             <div>👤 User ID: <span id="user-id">загрузка...</span></div>
-            <div>🎯 Пост: <span id="start-param">загрузка...</span></div>
+            <div>🎯 Start Param: <span id="start-param">загрузка...</span></div>
         </div>
 
-        <button class="button" onclick="sendViaHTTP()">📤 ОТПРАВИТЬ ЧЕРЕЗ HTTP</button>
+        <button class="button" onclick="sendViaHTTP()">📤 ОТПРАВИТЬ ЧЕРЕЗ HTTP (localtunnel)</button>
         <button class="button telegram" onclick="sendViaTelegram()">🤖 ОТПРАВИТЬ ЧЕРЕЗ TELEGRAM</button>
 
         <div class="debug" id="debug-log"></div>
@@ -103,8 +104,7 @@
 
     <script>
         // ==================== НАСТРОЙКИ ====================
-        const LT_URL = 'https://light-walls-jump.loca.lt';  // текущий URL localtunnel
-        const LT_PASSWORD = '150.40.160.19';  // пароль для заголовка
+        const LT_URL = 'https://breezy-guests-wink.loca.lt';  // текущий URL localtunnel
         const BOT_USERNAME = 't3st_back_bot';
         
         // ==================== ЛОГИРОВАНИЕ ====================
@@ -130,6 +130,13 @@
             }
             
             tg.ready();
+            
+            // Логируем информацию о чате для отладки
+            console.log('Chat info:', {
+                chat_instance: tg.initDataUnsafe?.chat_instance,
+                chat_type: tg.initDataUnsafe?.chat_type,
+                start_param: tg.initDataUnsafe?.start_param
+            });
             
             return {
                 user: tg.initDataUnsafe?.user,
@@ -168,14 +175,14 @@
                 const dataToSend = prepareData();
                 
                 log(`📤 Отправка через HTTPS на ${LT_URL}/api/webapp-data...`);
-                log(`🔑 Использую заголовок Bypass-Tunnel-Reminder: ${LT_PASSWORD}`);
+                log(`🔑 Использую заголовок Bypass-Tunnel-Reminder: true`);
                 statusEl.textContent = '📤 Отправка...';
 
                 const response = await fetch(`${LT_URL}/api/webapp-data`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Bypass-Tunnel-Reminder': LT_PASSWORD,
+                        'Bypass-Tunnel-Reminder': 'true',  // КЛЮЧЕВОЙ МОМЕНТ!
                         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
                     },
                     body: JSON.stringify(dataToSend)
@@ -200,6 +207,7 @@
                     log(`❌ Ошибка HTTP ${response.status}: ${errorText.substring(0, 200)}`);
                     statusEl.textContent = '❌ Ошибка HTTP';
                     
+                    // Сохраняем ошибку
                     const history = JSON.parse(localStorage.getItem('http_history') || '[]');
                     history.push({
                         time: new Date().toISOString(),
@@ -247,7 +255,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Bypass-Tunnel-Reminder': LT_PASSWORD
+                        'Bypass-Tunnel-Reminder': 'true'
                     },
                     body: JSON.stringify({test: 'ping', timestamp: Date.now()})
                 });
@@ -271,8 +279,10 @@
                 log(`👤 User ID: ${tgData.user.id}`);
                 log(`🎯 Start param: ${tgData.start_param}`);
                 
-                // Пробуем отправить через HTTP
-                await sendViaHTTP();
+                // Пробуем отправить через Telegram (он надёжнее)
+                setTimeout(() => {
+                    sendViaTelegram();
+                }, 500);
             } else {
                 log('❌ Нет данных пользователя');
                 statusEl.textContent = '❌ Нет данных';
