@@ -77,7 +77,8 @@
             userId: null,
             touchStartX: 0,
             preloaded: new Set(),
-            retries: 0
+            retries: 0,
+            startTime: Date.now()
         };
 
         // Инициализация Telegram
@@ -142,7 +143,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Bypass-Tunnel-Reminder': LT_PASSWORD  // Важно: используем пароль
+                        'Bypass-Tunnel-Reminder': LT_PASSWORD
                     },
                     body: JSON.stringify(data)
                 });
@@ -371,14 +372,13 @@
         function closeGallery() {
             sendData('gallery_close', { 
                 last_index: state.currentIndex,
-                time_spent: Date.now() - (window.startTime || Date.now())
+                time_spent: Date.now() - state.startTime
             });
             if (tg) tg.close();
         }
 
         // Запуск
         window.addEventListener('load', () => {
-            window.startTime = Date.now();
             initTelegram();
             loadGallery();
             document.addEventListener('touchstart', handleTouchStart);
