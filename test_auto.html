@@ -23,9 +23,9 @@
     </div>
 
     <script>
-        // ==================== НАСТРОЙКИ ====================
-        const LT_URL = 'https://silly-facts-enter.loca.lt';  // текущий URL localtunnel
-        const LT_PASSWORD = '176.116.166.148';  // пароль для заголовка (проверь curl https://loca.lt/mytunnelpassword)
+        // ==================== НАСТРОЙКИ PINGGY ====================
+        const TUNNEL_URL = 'https://nhicc-176-116-166-148.a.free.pinggy.link';  // Ваш HTTPS URL от Pinggy
+        // Пароль НЕ НУЖЕН для Pinggy!
         
         // ==================== ЛОГИРОВАНИЕ ====================
         const debugLog = document.getElementById('debug-log');
@@ -73,20 +73,19 @@
             };
         }
 
-        // ==================== ОТПРАВКА ЧЕРЕЗ LOCAL TUNNEL ====================
-        async function autoSend() {
+        // ==================== ОТПРАВКА ЧЕРЕЗ PINGGY ====================
+        async function sendData() {
             const dataToSend = prepareData();
             
-            log(`📤 Отправка на ${LT_URL}/api/webapp-data...`);
-            log(`🔑 Использую пароль: ${LT_PASSWORD}`);
+            log(`📤 Отправка на ${TUNNEL_URL}/api/webapp-data...`);
             statusEl.textContent = '📤 Отправка...';
 
             try {
-                const response = await fetch(`${LT_URL}/api/webapp-data`, {
+                const response = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Bypass-Tunnel-Reminder': LT_PASSWORD  // ВАЖНО: используем пароль!
+                        'Content-Type': 'application/json'
+                        // Для Pinggy не нужен заголовок Bypass-Tunnel-Reminder!
                     },
                     body: JSON.stringify(dataToSend)
                 });
@@ -109,12 +108,11 @@
         // ==================== ПРОВЕРКА СОЕДИНЕНИЯ ====================
         async function testConnection() {
             try {
-                log('🔄 Проверка соединения с localtunnel...');
-                const response = await fetch(`${LT_URL}/api/webapp-data`, {
+                log('🔄 Проверка соединения с Pinggy...');
+                const response = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Bypass-Tunnel-Reminder': LT_PASSWORD
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({test: 'ping', timestamp: Date.now()})
                 });
@@ -128,10 +126,31 @@
             }
         }
 
+        // ==================== АВТОМАТИЧЕСКАЯ ОТПРАВКА ====================
+        async function autoSend() {
+            const tgData = getTelegramData();
+            
+            if (tgData?.user) {
+                userIdEl.textContent = tgData.user.id;
+                startParamEl.textContent = tgData.start_param;
+                log(`👤 User ID: ${tgData.user.id}`);
+                log(`🎯 Start param: ${tgData.start_param}`);
+                
+                // Отправляем данные
+                await sendData();
+            } else {
+                log('❌ Нет данных пользователя');
+                statusEl.textContent = '❌ Нет данных';
+            }
+        }
+
         // ==================== ЗАПУСК ====================
         window.addEventListener('load', () => {
             log('🚀 Страница загружена');
-            log(`🌐 localtunnel URL: ${LT_URL}`);
+            log(`🌐 Pinggy URL: ${TUNNEL_URL}`);
+            
+            // Проверяем соединение
+            testConnection();
             
             // Показываем данные пользователя если есть
             const tgData = getTelegramData();
@@ -140,10 +159,10 @@
                 startParamEl.textContent = tgData.start_param;
                 log(`👤 User ID: ${tgData.user.id}`);
                 log(`🎯 Start param: ${tgData.start_param}`);
+                statusEl.textContent = '✅ Готов к отправке';
+            } else {
+                statusEl.textContent = '⚠️ Нет данных Telegram';
             }
-            
-            // Проверяем соединение
-            testConnection();
             
             // Автоматическая отправка через 2 секунды
             setTimeout(autoSend, 2000);
