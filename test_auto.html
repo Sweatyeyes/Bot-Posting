@@ -5,6 +5,8 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
+    <button onclick="sendData()">📤 ОТПРАВИТЬ</button>
+    <div id="log"></div>
     <script>
         const TUNNEL_URL = 'https://wvvnw-176-116-166-148.a.free.pinggy.link';
         
@@ -12,27 +14,34 @@
             const tg = window.Telegram.WebApp;
             tg.ready();
             
-            const data = {
-                user_id: tg.initDataUnsafe?.user?.id,
-                start_param: tg.initDataUnsafe?.start_param,
-                test: 'final'
-            };
+            const log = document.getElementById('log');
+            log.innerHTML = '📤 Отправка...';
             
-            const response = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Pinggy-No-Screen': 'true',
-                    'User-Agent': 'Pinggy-API-Client/1.0'
-                },
-                body: JSON.stringify(data)
-            });
-            
-            if (response.ok) console.log('✅', await response.json());
-            else console.log('❌', response.status);
+            try {
+                const response = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Pinggy-No-Screen': 'true',
+                        'User-Agent': 'Pinggy-API-Client/1.0'
+                    },
+                    body: JSON.stringify({
+                        user_id: tg.initDataUnsafe?.user?.id,
+                        start_param: tg.initDataUnsafe?.start_param,
+                        timestamp: Date.now()
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log.innerHTML = '✅ Успех: ' + JSON.stringify(data);
+                } else {
+                    log.innerHTML = '❌ Ошибка ' + response.status;
+                }
+            } catch (e) {
+                log.innerHTML = '❌ Сеть: ' + e.message;
+            }
         }
-        
-        window.onload = sendData;
     </script>
 </body>
 </html>
