@@ -372,9 +372,26 @@
             font-weight: bold;
             background: #330000;
         }
+        
+        /* Красный баннер ошибок */
+        #error-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #ff0000;
+            color: white;
+            padding: 10px;
+            z-index: 10000;
+            font-size: 12px;
+            word-break: break-all;
+            text-align: center;
+            display: none;
+        }
     </style>
 </head>
 <body>
+    <div id="error-banner"></div>
     <!-- Аудиоплеер для фоновой музыки -->
     <audio id="bg-music" loop preload="auto">
         <source src="song.mp3" type="audio/mpeg">
@@ -385,7 +402,7 @@
 
     <div id="gallery">
         <div id="debug-panel">
-            <div class="debug-entry">🔍 ДИАГНОСТИКА v6.0 - С МУЗЫКОЙ</div>
+            <div class="debug-entry">🔍 ДИАГНОСТИКА v7.0 - С ОТЛОВОМ ОШИБОК</div>
         </div>
 
         <div id="badges">
@@ -470,9 +487,18 @@
     <div id="error"></div>
 
     <script>
+        // ==================== ПЕРЕХВАТ ОШИБОК НА ЭКРАН ====================
+        window.onerror = function(msg, url, line, col, error) {
+            const banner = document.getElementById('error-banner');
+            banner.style.display = 'block';
+            banner.innerHTML = `❌ ОШИБКА: ${msg}<br>${url ? url.split('/').pop() : 'unknown'}:${line}:${col}`;
+            console.error('ПЕРЕХВАЧЕНА ОШИБКА:', msg, url, line, col, error);
+            return false;
+        };
+        
         // ==================== ГЛОБАЛЬНАЯ ДИАГНОСТИКА ====================
         console.log('🚀 СКРИПТ НАЧАЛ ЗАГРУЗКУ');
-
+        
         const CONFIG = {
             REPO: "Sweatyeyes/Bot-Posting",
             BRANCH: "main",
@@ -585,94 +611,58 @@
             debugLog('🔄 ОБНАРУЖЕНО: есть start_param, но нет параметров в URL');
             debugLog(`🔄 Создаем URL с параметрами для поста: ${tgStartParam}`);
 
-            // Создаем параметры (временно ставим false, бот потом обновит)
             const params = new URLSearchParams({
                 'post': tgStartParam,
                 'subscribed': 'false',
                 'purchased': 'false',
                 'bananas': '3',
-                'v': '6.0',
+                'v': '7.0',
                 't': Date.now()
             });
 
             const newUrl = `${window.location.pathname}?${params.toString()}`;
             debugLog(`🔗 Новый URL с параметрами: ${newUrl}`);
             debugLog('🔄 Выполняем перенаправление...');
-
-            // Перенаправляем и останавливаем выполнение
+            
             window.location.replace(newUrl);
             return;
         }
 
         // ==================== ПОЛУЧЕНИЕ ПАРАМЕТРОВ ИЗ URL ====================
         debugLog('📊 АНАЛИЗ URL...');
-
-        // Получаем параметры из URL
+        
         const urlParams = new URLSearchParams(window.location.search);
-
-        // Сохраняем ВСЕ параметры для диагностики
+        
         const allParams = {};
         for (let [key, value] of urlParams.entries()) {
             allParams[key] = value;
             debugLog(`📥 URL param: ${key} = "${value}" (length: ${value.length})`);
         }
-
-        // Показываем полный URL
+        
         debugLog(`🔗 Полный URL: ${window.location.href}`);
         debugLog(`🔗 Search: ${window.location.search}`);
-
-        // Получаем параметры
+        
         const rawPost = urlParams.get('post');
         const rawUser = urlParams.get('user');
         const rawSubscribed = urlParams.get('subscribed');
         const rawPurchased = urlParams.get('purchased');
         const rawBananas = urlParams.get('bananas');
-        const rawVersion = urlParams.get('v') || 'не указана';
-        const rawTimestamp = urlParams.get('t') || 'не указан';
-
+        
         debugLog('='.repeat(50));
         debugLog('📦 ПОЛУЧЕННЫЕ ПАРАМЕТРЫ:');
         debugLog(`   • post: "${rawPost}"`);
         debugLog(`   • user: "${rawUser}"`);
-        debugLog(`   • subscribed: "${rawSubscribed}" (тип: ${typeof rawSubscribed})`);
-        debugLog(`   • purchased: "${rawPurchased}" (тип: ${typeof rawPurchased})`);
-        debugLog(`   • bananas: "${rawBananas}" (тип: ${typeof rawBananas})`);
-        debugLog(`   • version: "${rawVersion}"`);
-        debugLog(`   • timestamp: "${rawTimestamp}"`);
+        debugLog(`   • subscribed: "${rawSubscribed}"`);
+        debugLog(`   • purchased: "${rawPurchased}"`);
+        debugLog(`   • bananas: "${rawBananas}"`);
         debugLog('='.repeat(50));
-
-        // Преобразуем в boolean с диагностикой
-        let parsedSubscribed = false;
-        if (rawSubscribed === 'true') {
-            parsedSubscribed = true;
-            debugLog('✅ subscribed = true (получен true)');
-        } else if (rawSubscribed === 'false') {
-            parsedSubscribed = false;
-            debugLog('❌ subscribed = false (получен false)');
-        } else if (rawSubscribed) {
-            debugLog(`⚠️ subscribed = "${rawSubscribed}" (нестандартное значение)`, 'warning');
-            parsedSubscribed = rawSubscribed === 'true';
-        } else {
-            debugLog(`⚠️ subscribed отсутствует в URL`, 'warning');
-        }
-
-        let parsedPurchased = false;
-        if (rawPurchased === 'true') {
-            parsedPurchased = true;
-            debugLog('✅ purchased = true (получен true)');
-        } else if (rawPurchased === 'false') {
-            parsedPurchased = false;
-            debugLog('❌ purchased = false (получен false)');
-        } else if (rawPurchased) {
-            debugLog(`⚠️ purchased = "${rawPurchased}" (нестандартное значение)`, 'warning');
-            parsedPurchased = rawPurchased === 'true';
-        } else {
-            debugLog(`⚠️ purchased отсутствует в URL`, 'warning');
-        }
-
+        
+        let parsedSubscribed = rawSubscribed === 'true';
+        let parsedPurchased = rawPurchased === 'true';
         const parsedBananas = rawBananas ? parseInt(rawBananas) : 3;
-        debugLog(`🍌 bananas = ${parsedBananas} (из "${rawBananas}")`);
-
+        
+        debugLog(`🔍 Парсинг: subscribed=${parsedSubscribed}, purchased=${parsedPurchased}, bananas=${parsedBananas}`);
+        
         // ==================== СОСТОЯНИЕ ====================
         let state = {
             files: [],
@@ -688,59 +678,15 @@
             currentFileType: null,
             offlineMode: false,
             tunnelErrorCount: 0,
-            networkOnline: navigator.onLine,
-            debug: {
-                rawSubscribed: rawSubscribed,
-                rawPurchased: rawPurchased,
-                parsedSubscribed: parsedSubscribed,
-                parsedPurchased: parsedPurchased
-            }
+            networkOnline: navigator.onLine
         };
 
-        debugLog('='.repeat(50));
         debugLog('📊 ИНИЦИАЛИЗАЦИЯ СОСТОЯНИЯ:');
         debugLog(`   • Пост: ${state.postId}`);
         debugLog(`   • User: ${state.userId}`);
         debugLog(`   • Подписка: ${state.isSubscribed}`);
         debugLog(`   • Куплен: ${state.hasPurchased}`);
         debugLog(`   • Бананов: ${state.bananasLeft}`);
-        debugLog(`   • Сырая подписка: "${state.debug.rawSubscribed}"`);
-        debugLog(`   • Сырая покупка: "${state.debug.rawPurchased}"`);
-        debugLog('='.repeat(50));
-
-        // ==================== ДИАГНОСТИЧЕСКОЕ СООБЩЕНИЕ ====================
-        if (state.userId) {
-            debugLog('📤 ОТПРАВКА ДИАГНОСТИКИ В БОТ...');
-
-            // Отправляем диагностику в бот
-            fetch(`${TUNNEL_URL}/api/webapp-data`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Bypass-Tunnel-Reminder': TUNNEL_PASS
-                },
-                body: JSON.stringify({
-                    action: 'debug_params',
-                    user_id: state.userId,
-                    post_id: state.postId,
-                    timestamp: Date.now(),
-                    details: {
-                        url: window.location.href,
-                        search: window.location.search,
-                        params: allParams,
-                        parsed: {
-                            subscribed: state.isSubscribed,
-                            purchased: state.hasPurchased,
-                            bananas: state.bananasLeft
-                        }
-                    }
-                })
-            }).then(() => {
-                debugLog('✅ Диагностика отправлена');
-            }).catch(e => {
-                debugLog(`❌ Ошибка отправки диагностики: ${e}`, 'error');
-            });
-        }
 
         // ==================== ПРОВЕРКА TELEGRAM ====================
         if (!checkTelegramContext()) {
@@ -763,7 +709,7 @@
         // ==================== ПРОВЕРКА СОЕДИНЕНИЯ ====================
         async function checkConnectionAndLoad() {
             debugLog('🔍 ПРОВЕРКА СОЕДИНЕНИЯ...');
-
+            
             if (!navigator.onLine) {
                 debugLog('📴 НЕТ ИНТЕРНЕТА', 'error');
                 state.offlineMode = true;
@@ -771,11 +717,11 @@
                 loadGallery();
                 return;
             }
-
+            
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 3000);
-
+                
                 const response = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
                     method: 'OPTIONS',
                     headers: {
@@ -783,9 +729,9 @@
                     },
                     signal: controller.signal
                 });
-
+                
                 clearTimeout(timeoutId);
-
+                
                 if (response.ok) {
                     debugLog('✅ Туннель доступен');
                     state.offlineMode = false;
@@ -800,7 +746,7 @@
                 state.tunnelErrorCount++;
                 document.getElementById('offline-badge').style.display = 'block';
             }
-
+            
             loadGallery();
         }
 
@@ -808,30 +754,30 @@
         async function loadFolder(postId, folder) {
             const url = `${CONFIG.GITHUB_API}/${CONFIG.REPO}/contents/posts/${postId}/${folder}`;
             debugLog(`📁 Запрос: ${folder}...`);
-
+            
             try {
                 const res = await fetch(url, {
                     headers: { 'Accept': 'application/vnd.github.v3+json' }
                 });
-
+                
                 if (res.status === 404) {
                     debugLog(`❌ Папка ${folder} не существует (404)`, 'error');
                     return [];
                 }
-
+                
                 if (!res.ok) {
                     debugLog(`❌ Ошибка ${res.status} для ${folder}`, 'error');
                     return [];
                 }
-
+                
                 const data = await res.json();
                 const images = data.filter(f => f.name.match(/\.(jpg|jpeg|png)$/i));
-
+                
                 debugLog(`✅ ${folder}: найдено ${images.length} фото`);
                 if (images.length > 0) {
                     images.forEach(img => debugLog(`   • ${img.name}`));
                 }
-
+                
                 return images;
             } catch (e) {
                 debugLog(`❌ Ошибка загрузки ${folder}: ${e.message}`, 'error');
@@ -842,31 +788,23 @@
         async function loadGallery() {
             debugLog('🔄 НАЧАЛО ЗАГРУЗКИ ГАЛЕРЕИ...');
             debugLog(`📌 Режим: ${state.offlineMode ? 'ОФФЛАЙН' : 'ОНЛАЙН'}`);
-
+            
             try {
                 const [general, banana, strawberry] = await Promise.all([
                     loadFolder(state.postId, 'general'),
                     loadFolder(state.postId, 'banana'),
                     loadFolder(state.postId, 'strawberry')
                 ]);
-
+                
                 debugLog(`📊 ИТОГО: general=${general.length}, banana=${banana.length}, strawberry=${strawberry.length}`);
-
-                // В оффлайн режиме принудительно отключаем доступ
+                
                 const effectivePurchased = state.offlineMode ? false : state.hasPurchased;
                 const effectiveSubscribed = state.offlineMode ? false : state.isSubscribed;
-
-                debugLog('='.repeat(50));
+                
                 debugLog('🔒 ЭФФЕКТИВНЫЕ ПАРАМЕТРЫ:');
                 debugLog(`   • purchased = ${effectivePurchased} (raw=${state.hasPurchased}, offline=${state.offlineMode})`);
                 debugLog(`   • subscribed = ${effectiveSubscribed} (raw=${state.isSubscribed}, offline=${state.offlineMode})`);
-
-                debugLog('🍓 КРИТИЧЕСКАЯ ЛОГИКА:');
-                debugLog(`   • Условие: purchased = true ИЛИ subscribed = true`);
-                debugLog(`   • Текущие значения: purchased=${effectivePurchased}, subscribed=${effectiveSubscribed}`);
-                debugLog(`   • Результат: ${effectivePurchased || effectiveSubscribed ? '✅ ДОСТУП ЕСТЬ' : '❌ ДОСТУПА НЕТ'}`);
-                debugLog('='.repeat(50));
-
+                
                 let files = [];
 
                 // Общие фото
@@ -884,15 +822,15 @@
                 // Банановые фото
                 banana.forEach(f => {
                     const isOriginal = !f.name.startsWith('banana_banana_');
-
+                    
                     if (isOriginal) {
                         const baseName = f.name.replace('banana_', '');
                         const blurredFileName = `banana_banana_banana_${baseName}`;
                         const blurredFile = banana.find(b => b.name === blurredFileName);
-
+                        
                         let imageUrl;
                         let isBlurred;
-
+                        
                         if (effectivePurchased) {
                             imageUrl = f.download_url;
                             isBlurred = false;
@@ -906,7 +844,7 @@
                             isBlurred = false;
                             debugLog(`🍌 НЕТ БЛЮРА: показываем оригинал ${f.name}`, 'warning');
                         }
-
+                        
                         files.push({
                             name: f.name,
                             originalName: f.name,
@@ -922,16 +860,15 @@
                 // Клубничные фото
                 strawberry.forEach(f => {
                     const isOriginal = !f.name.startsWith('strawberry_strawberry_');
-
+                    
                     if (isOriginal) {
                         const baseName = f.name.replace('strawberry_', '');
                         const blurredFileName = `strawberry_strawberry_strawberry_${baseName}`;
                         const blurredFile = strawberry.find(b => b.name === blurredFileName);
-
+                        
                         let imageUrl;
                         let isBlurred;
-
-                        // КРИТИЧЕСКАЯ ЛОГИКА: purchased ИЛИ subscribed
+                        
                         if (effectivePurchased || effectiveSubscribed) {
                             imageUrl = f.download_url;
                             isBlurred = false;
@@ -945,7 +882,7 @@
                             isBlurred = true;
                             debugLog(`🍓 НЕТ ДОСТУПА И НЕТ БЛЮРА: ${f.name}`, 'critical');
                         }
-
+                        
                         files.push({
                             name: f.name,
                             originalName: f.name,
@@ -957,29 +894,27 @@
                         });
                     }
                 });
-
+                
                 if (files.length === 0) {
                     debugLog('❌ НЕТ ФОТО', 'critical');
                     showError('В этом посте нет фото');
                     return;
                 }
-
+                
                 state.files = files;
-
-                debugLog('='.repeat(50));
+                
                 debugLog(`✅ ВСЕГО ЗАГРУЖЕНО: ${files.length} фото`);
                 files.forEach((f, i) => {
                     const access = f.isBlurred ? '🔒 БЛЮР' : '✅ ОРИГИНАЛ';
                     debugLog(`   [${i+1}] ${f.name} (${f.type}) ${access}`);
                 });
-                debugLog('='.repeat(50));
-
+                
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('gallery').style.display = 'block';
                 updateUI();
-
+                
                 showImage(0);
-
+                
             } catch (e) {
                 debugLog(`❌ КРИТИЧЕСКАЯ ОШИБКА: ${e.message}`, 'critical');
                 showError('Ошибка загрузки галереи');
@@ -988,23 +923,23 @@
 
         function showImage(i) {
             if (!state.files || state.files.length === 0) return;
-
+            
             state.index = (i + state.files.length) % state.files.length;
             const image = document.getElementById('image');
             const file = state.files[state.index];
-
+            
             image.classList.remove('loaded');
             image.src = file.url + '?t=' + Date.now();
-
+            
             document.getElementById('counter').innerText = `${state.index+1}/${state.files.length}`;
-
+            
             const accessInfo = file.isBlurred ? '🔒 БЛЮР' : '✅ ОРИГИНАЛ';
             debugLog(`🖼 Показ ${state.index+1}/${state.files.length}: ${file.name} (${file.type}) ${accessInfo}`);
-
+            
             if (file.isBlurred && file.type === 'strawberry') {
                 debugLog(`🍓 ПРИЧИНА БЛЮРА: purchased=${state.hasPurchased}, subscribed=${state.isSubscribed}, offline=${state.offlineMode}`, 'warning');
             }
-
+            
             sendData('view_image', {
                 index: state.index,
                 name: file.name,
@@ -1016,9 +951,9 @@
         function onImageError() {
             const file = state.files[state.index];
             debugLog(`❌ Ошибка загрузки: ${file?.name}`, 'error');
-
+            
             state.loadingAttempts++;
-
+            
             if (state.loadingAttempts < 3) {
                 setTimeout(() => {
                     showImage(state.index);
@@ -1045,7 +980,7 @@
         async function sendData(action, details = {}) {
             if (!state.userId) return;
             if (state.offlineMode) return;
-
+            
             const data = {
                 action: action,
                 user_id: state.userId,
@@ -1053,7 +988,7 @@
                 timestamp: Date.now(),
                 details: details
             };
-
+            
             try {
                 await fetch(`${TUNNEL_URL}/api/webapp-data`, {
                     method: 'POST',
@@ -1078,31 +1013,31 @@
 
         function handleBanana() {
             sendData('banana_click');
-
+            
             const currentFile = state.files[state.index];
-
+            
             if (!currentFile || !currentFile.isBanana) {
                 showToast('🍌 Это фото нельзя разблокировать бананом');
                 return;
             }
-
+            
             if (!currentFile.isBlurred) {
                 showToast('✅ Это фото уже разблокировано');
                 return;
             }
-
+            
             if (state.bananasLeft <= 0) {
                 showToast('❌ У вас нет бананов!');
                 return;
             }
-
+            
             state.bananasLeft--;
             currentFile.isBlurred = false;
             currentFile.url = currentFile.originalUrl;
             showImage(state.index);
             updateUI();
             showToast('🍌 Банан потрачен!');
-
+            
             sendData('spend_banana', {
                 photo_name: currentFile.originalName || currentFile.name
             });
@@ -1136,9 +1071,9 @@
             const bananaBadge = document.getElementById('banana-count-badge');
             bananaBadge.textContent = state.bananasLeft;
             bananaBadge.style.display = state.bananasLeft > 0 ? 'flex' : 'none';
-
+            
             document.getElementById('banana-info-count').textContent = state.bananasLeft;
-
+            
             const subStatus = document.getElementById('sub-status');
             if (state.isSubscribed) {
                 subStatus.textContent = '(у вас она есть)';
@@ -1147,11 +1082,11 @@
                 subStatus.textContent = '(у вас её пока нет)';
                 subStatus.style.color = '#ff6b6b';
             }
-
+            
             document.getElementById('subscribed-badge').style.display = state.isSubscribed ? 'block' : 'none';
             document.getElementById('purchased-badge').style.display = state.hasPurchased ? 'block' : 'none';
             document.getElementById('offline-badge').style.display = state.offlineMode ? 'block' : 'none';
-
+            
             debugLog(`🔄 UI обновлен: бананов=${state.bananasLeft}, подписка=${state.isSubscribed}, покупка=${state.hasPurchased}`);
         }
 
@@ -1186,7 +1121,6 @@
             sendData('gallery_close', { time_spent: Date.now() - state.startTime });
         });
 
-        // Глобальные функции
         window.next = next;
         window.prev = prev;
         window.toggleMusic = toggleMusic;
