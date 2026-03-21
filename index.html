@@ -118,15 +118,6 @@
             filter: grayscale(50%);
         }
         
-        .music-btn-playing {
-            animation: pulse 1s infinite;
-        }
-
-        @keyframes pulse {
-            0% { text-shadow: 0 0 5px #2ea6ff; }
-            100% { text-shadow: 0 0 20px #2ea6ff; }
-        }
-
         .banana-count-badge {
             position: absolute;
             top: -5px;
@@ -146,15 +137,15 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
             z-index: 600;
         }
-
-        #counter {
+        
+        #counter { 
             color: white;
-            font-size: 16px;
+            font-size: 16px; 
             font-weight: 500;
             min-width: 70px;
             text-align: center;
         }
-
+        
         #badges {
             position: absolute;
             top: 20px;
@@ -165,32 +156,32 @@
             flex-wrap: wrap;
             justify-content: flex-end;
         }
-
+        
         .badge {
             padding: 4px 12px;
             border-radius: 20px;
             font-size: 12px;
             font-weight: bold;
         }
-
+        
         #subscribed-badge {
             background: #ffd700;
             color: #000;
             display: none;
         }
-
+        
         #purchased-badge {
             background: #2ea6ff;
             color: #fff;
             display: none;
         }
-
+        
         #offline-badge {
             background: #666;
             color: #fff;
             display: none;
         }
-
+        
         #info-modal {
             position: fixed;
             inset: 0;
@@ -202,9 +193,9 @@
             justify-content: center;
             padding: 20px;
         }
-
+        
         #info-modal.active { display: flex; }
-
+        
         .modal-content {
             background: #2d2d2d;
             border-radius: 20px;
@@ -214,12 +205,12 @@
             border: 1px solid #404040;
             animation: slideUp 0.3s ease;
         }
-
+        
         @keyframes slideUp {
             from { transform: translateY(50px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
         }
-
+        
         .modal-title {
             color: #ffd700;
             font-size: 22px;
@@ -227,7 +218,7 @@
             text-align: center;
             margin-bottom: 20px;
         }
-
+        
         .modal-item {
             display: flex;
             align-items: center;
@@ -236,22 +227,22 @@
             border-bottom: 1px solid #404040;
             cursor: pointer;
         }
-
+        
         .modal-item:last-child { border-bottom: none; }
-
+        
         .modal-icon { font-size: 32px; width: 50px; text-align: center; }
-
+        
         .modal-text-title {
             font-weight: bold;
             color: #2ea6ff;
             margin-bottom: 4px;
         }
-
+        
         .modal-text-desc {
             font-size: 14px;
             color: #b1b1b1;
         }
-
+        
         .offline-note {
             margin-top: 15px;
             padding: 10px;
@@ -261,7 +252,7 @@
             color: #ffaa00;
             text-align: center;
         }
-
+        
         .modal-close {
             background: #2ea6ff;
             color: white;
@@ -274,7 +265,7 @@
             margin-top: 20px;
             cursor: pointer;
         }
-
+        
         #toast {
             position: fixed;
             bottom: 100px;
@@ -292,21 +283,21 @@
             white-space: nowrap;
             opacity: 0;
         }
-
+        
         #toast.show {
             transform: translateX(-50%) translateY(0);
             opacity: 1;
         }
-
+        
         #toast.warning {
             border-color: #ffaa00;
             background: rgba(0,0,0,0.95);
         }
-
-        #error {
-            display: none;
-            text-align: center;
-            padding: 20px;
+        
+        #error { 
+            display: none; 
+            text-align: center; 
+            padding: 20px; 
             position: absolute;
             top: 50%;
             left: 50%;
@@ -318,14 +309,14 @@
             border-radius: 10px;
             width: 80%;
         }
-
+        
         #error small {
             display: block;
             margin-top: 10px;
             color: #999;
             font-size: 14px;
         }
-
+        
         #debug-panel {
             position: absolute;
             bottom: 90px;
@@ -343,30 +334,30 @@
             border: 2px solid #ffaa00;
             font-family: monospace;
         }
-
+        
         .debug-entry {
             border-bottom: 1px solid #333;
             padding: 3px 0;
             font-family: monospace;
             word-break: break-all;
         }
-
+        
         .debug-error {
             color: #ff6b6b;
         }
-
+        
         .debug-success {
             color: #6bff6b;
         }
-
+        
         .debug-warning {
             color: #ffaa00;
         }
-
+        
         .debug-info {
             color: #2ea6ff;
         }
-
+        
         .debug-critical {
             color: #ff0000;
             font-weight: bold;
@@ -375,32 +366,26 @@
     </style>
 </head>
 <body>
-    <!-- Аудиоплеер для фоновой музыки -->
-    <audio id="bg-music" loop preload="auto">
-        <source src="song.mp3" type="audio/mpeg">
-        Ваш браузер не поддерживает аудио
-    </audio>
-
     <div id="loading"><div class="spinner"></div></div>
-
+    
     <div id="gallery">
         <div id="debug-panel">
-            <div class="debug-entry">🔍 ДИАГНОСТИКА v6.0 - С МУЗЫКОЙ</div>
+            <div class="debug-entry">🔍 ДИАГНОСТИКА v5.0 - ОЖИДАНИЕ ПАРАМЕТРОВ ОТ БОТА</div>
         </div>
-
+        
         <div id="badges">
             <div id="subscribed-badge" class="badge">🍓 Подписчик</div>
             <div id="purchased-badge" class="badge">🪙 Куплено</div>
             <div id="offline-badge" class="badge">📴 Оффлайн</div>
         </div>
-
+        
         <div id="nav-left" onclick="prev()"></div>
         <div id="nav-right" onclick="next()"></div>
-
+        
         <div id="image-container">
             <img id="image" src="" onload="this.classList.add('loaded')" onerror="onImageError()">
         </div>
-
+        
         <div id="bottom-bar">
             <button class="bottom-btn" onclick="handleStrawberry()" id="strawberry-btn" title="Клубничка (для подписчиков)">🍓</button>
             <button class="bottom-btn" onclick="handleBanana()" id="banana-btn" title="Потратить банан">
@@ -409,15 +394,14 @@
             </button>
             <div id="counter">1/1</div>
             <button class="bottom-btn" onclick="handleCoin()" id="coin-btn" title="Купить весь пост">🪙</button>
-            <button class="bottom-btn" onclick="toggleMusic()" id="music-btn" title="Музыка 🎵">🎵</button>
             <button class="bottom-btn" onclick="showInfo()" id="info-btn" title="Помощь">❓</button>
         </div>
     </div>
-
+    
     <div id="info-modal" onclick="hideInfo(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
             <div class="modal-title">ℹ️ О КНОПКАХ</div>
-
+            
             <div class="modal-item">
                 <div class="modal-icon">🍓</div>
                 <div class="modal-text">
@@ -425,7 +409,7 @@
                     <div class="modal-text-desc">Для подписчиков канала <span id="sub-status">(у вас её пока нет)</span></div>
                 </div>
             </div>
-
+            
             <div class="modal-item">
                 <div class="modal-icon">🍌</div>
                 <div class="modal-text">
@@ -433,7 +417,7 @@
                     <div class="modal-text-desc">Трать на банановые фото (осталось <span id="banana-info-count">0</span>)</div>
                 </div>
             </div>
-
+            
             <div class="modal-item">
                 <div class="modal-icon">🪙</div>
                 <div class="modal-text">
@@ -441,15 +425,7 @@
                     <div class="modal-text-desc">Купить весь пост (199₽)</div>
                 </div>
             </div>
-
-            <div class="modal-item">
-                <div class="modal-icon">🎵</div>
-                <div class="modal-text">
-                    <div class="modal-text-title">Музыка</div>
-                    <div class="modal-text-desc">Включить/выключить фоновую музыку</div>
-                </div>
-            </div>
-
+            
             <div class="modal-item" onclick="forceReload()">
                 <div class="modal-icon">🔄</div>
                 <div class="modal-text">
@@ -457,22 +433,22 @@
                     <div class="modal-text-desc">Очистить кэш и перезагрузить</div>
                 </div>
             </div>
-
+            
             <div class="offline-note" id="offline-note" style="display: none;">
                 📴 Режим оффлайн - статистика не отправляется, все фото заблюрены
             </div>
-
+            
             <button class="modal-close" onclick="hideInfo()">Понятно</button>
         </div>
     </div>
-
+    
     <div id="toast"></div>
     <div id="error"></div>
 
     <script>
         // ==================== ГЛОБАЛЬНАЯ ДИАГНОСТИКА ====================
         console.log('🚀 СКРИПТ НАЧАЛ ЗАГРУЗКУ');
-
+        
         const CONFIG = {
             REPO: "Sweatyeyes/Bot-Posting",
             BRANCH: "main",
@@ -485,45 +461,10 @@
         const BOT_USERNAME = 'k0tbezzabot';
 
         const tg = window.Telegram?.WebApp;
-
-        // ==================== МУЗЫКА ====================
-        let musicPlaying = false;
-        const audio = document.getElementById('bg-music');
-        const musicBtn = document.getElementById('music-btn');
-
-        function toggleMusic() {
-            if (musicPlaying) {
-                audio.pause();
-                musicPlaying = false;
-                musicBtn.style.opacity = '0.5';
-                musicBtn.classList.remove('music-btn-playing');
-                showToast('🎵 Музыка выключена');
-                sendData('music_off');
-            } else {
-                audio.play().catch(e => {
-                    console.log('Автовоспроизведение заблокировано', e);
-                    showToast('🎵 Нажмите ещё раз для включения музыки');
-                });
-                musicPlaying = true;
-                musicBtn.style.opacity = '1';
-                musicBtn.classList.add('music-btn-playing');
-                showToast('🎵 Музыка включена');
-                sendData('music_on');
-            }
-        }
-
-        // Попытка запустить музыку после первого взаимодействия
-        let musicAttempted = false;
-        document.addEventListener('click', () => {
-            if (!musicAttempted && !musicPlaying && audio.paused) {
-                audio.play().catch(e => {});
-                musicAttempted = true;
-            }
-        }, { once: true });
-
+        
         // ==================== ОТЛАДОЧНАЯ ПАНЕЛЬ ====================
         const debugPanel = document.getElementById('debug-panel');
-
+        
         function debugLog(message, type = 'info') {
             const entry = document.createElement('div');
             entry.className = 'debug-entry';
@@ -532,44 +473,44 @@
             if (type === 'warning') entry.classList.add('debug-warning');
             if (type === 'info') entry.classList.add('debug-info');
             if (type === 'critical') entry.classList.add('debug-critical');
-
+            
             const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
             entry.textContent = `[${time}] ${message}`;
-
+            
             debugPanel.appendChild(entry);
             debugPanel.scrollTop = debugPanel.scrollHeight;
-
+            
             while (debugPanel.children.length > 50) {
                 debugPanel.removeChild(debugPanel.firstChild);
             }
-
+            
             console.log(`🔍 [${type}] ${message}`);
         }
 
         // ==================== ПРОВЕРКА КОНТЕКСТА TELEGRAM ====================
         function checkTelegramContext() {
             debugLog('🔍 ПРОВЕРКА КОНТЕКСТА TELEGRAM...');
-
+            
             if (!window.Telegram) {
                 debugLog('❌ window.Telegram не найден', 'critical');
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('error').style.display = 'block';
-                document.getElementById('error').innerHTML =
+                document.getElementById('error').innerHTML = 
                     '😢 Библиотека Telegram не загрузилась<br>' +
                     '<small>Проверьте подключение к интернету</small>';
                 return false;
             }
-
+            
             if (!window.Telegram.WebApp) {
                 debugLog('❌ window.Telegram.WebApp не найден', 'critical');
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('error').style.display = 'block';
-                document.getElementById('error').innerHTML =
+                document.getElementById('error').innerHTML = 
                     '😢 Это приложение должно быть открыто в Telegram<br>' +
                     '<small>Нажмите кнопку в канале или чате с ботом</small>';
                 return false;
             }
-
+            
             debugLog('✅ Контекст Telegram OK');
             return true;
         }
@@ -584,43 +525,43 @@
         if (tgStartParam && !window.location.search.includes('post=')) {
             debugLog('🔄 ОБНАРУЖЕНО: есть start_param, но нет параметров в URL');
             debugLog(`🔄 Создаем URL с параметрами для поста: ${tgStartParam}`);
-
+            
             // Создаем параметры (временно ставим false, бот потом обновит)
             const params = new URLSearchParams({
                 'post': tgStartParam,
                 'subscribed': 'false',
                 'purchased': 'false',
                 'bananas': '3',
-                'v': '6.0',
+                'v': '4.0',
                 't': Date.now()
             });
-
+            
             const newUrl = `${window.location.pathname}?${params.toString()}`;
             debugLog(`🔗 Новый URL с параметрами: ${newUrl}`);
             debugLog('🔄 Выполняем перенаправление...');
-
+            
             // Перенаправляем и останавливаем выполнение
             window.location.replace(newUrl);
-            return;
+            // Этот код дальше не выполнится из-за перенаправления
         }
 
         // ==================== ПОЛУЧЕНИЕ ПАРАМЕТРОВ ИЗ URL ====================
         debugLog('📊 АНАЛИЗ URL...');
-
+        
         // Получаем параметры из URL
         const urlParams = new URLSearchParams(window.location.search);
-
+        
         // Сохраняем ВСЕ параметры для диагностики
         const allParams = {};
         for (let [key, value] of urlParams.entries()) {
             allParams[key] = value;
             debugLog(`📥 URL param: ${key} = "${value}" (length: ${value.length})`);
         }
-
+        
         // Показываем полный URL
         debugLog(`🔗 Полный URL: ${window.location.href}`);
         debugLog(`🔗 Search: ${window.location.search}`);
-
+        
         // Получаем параметры
         const rawPost = urlParams.get('post');
         const rawUser = urlParams.get('user');
@@ -629,7 +570,7 @@
         const rawBananas = urlParams.get('bananas');
         const rawVersion = urlParams.get('v') || 'не указана';
         const rawTimestamp = urlParams.get('t') || 'не указан';
-
+        
         debugLog('='.repeat(50));
         debugLog('📦 ПОЛУЧЕННЫЕ ПАРАМЕТРЫ:');
         debugLog(`   • post: "${rawPost}"`);
@@ -640,7 +581,7 @@
         debugLog(`   • version: "${rawVersion}"`);
         debugLog(`   • timestamp: "${rawTimestamp}"`);
         debugLog('='.repeat(50));
-
+        
         // Преобразуем в boolean с диагностикой
         let parsedSubscribed = false;
         if (rawSubscribed === 'true') {
@@ -655,7 +596,7 @@
         } else {
             debugLog(`⚠️ subscribed отсутствует в URL`, 'warning');
         }
-
+        
         let parsedPurchased = false;
         if (rawPurchased === 'true') {
             parsedPurchased = true;
@@ -669,10 +610,10 @@
         } else {
             debugLog(`⚠️ purchased отсутствует в URL`, 'warning');
         }
-
+        
         const parsedBananas = rawBananas ? parseInt(rawBananas) : 3;
         debugLog(`🍌 bananas = ${parsedBananas} (из "${rawBananas}")`);
-
+        
         // ==================== СОСТОЯНИЕ ====================
         let state = {
             files: [],
@@ -711,7 +652,7 @@
         // ==================== ДИАГНОСТИЧЕСКОЕ СООБЩЕНИЕ ====================
         if (state.userId) {
             debugLog('📤 ОТПРАВКА ДИАГНОСТИКИ В БОТ...');
-
+            
             // Отправляем диагностику в бот
             fetch(`${TUNNEL_URL}/api/webapp-data`, {
                 method: 'POST',
@@ -763,7 +704,7 @@
         // ==================== ПРОВЕРКА СОЕДИНЕНИЯ ====================
         async function checkConnectionAndLoad() {
             debugLog('🔍 ПРОВЕРКА СОЕДИНЕНИЯ...');
-
+            
             if (!navigator.onLine) {
                 debugLog('📴 НЕТ ИНТЕРНЕТА', 'error');
                 state.offlineMode = true;
@@ -771,11 +712,11 @@
                 loadGallery();
                 return;
             }
-
+            
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 3000);
-
+                
                 const response = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
                     method: 'OPTIONS',
                     headers: {
@@ -783,9 +724,9 @@
                     },
                     signal: controller.signal
                 });
-
+                
                 clearTimeout(timeoutId);
-
+                
                 if (response.ok) {
                     debugLog('✅ Туннель доступен');
                     state.offlineMode = false;
@@ -800,7 +741,7 @@
                 state.tunnelErrorCount++;
                 document.getElementById('offline-badge').style.display = 'block';
             }
-
+            
             loadGallery();
         }
 
@@ -808,30 +749,30 @@
         async function loadFolder(postId, folder) {
             const url = `${CONFIG.GITHUB_API}/${CONFIG.REPO}/contents/posts/${postId}/${folder}`;
             debugLog(`📁 Запрос: ${folder}...`);
-
+            
             try {
-                const res = await fetch(url, {
+                const res = await fetch(url, { 
                     headers: { 'Accept': 'application/vnd.github.v3+json' }
                 });
-
+                
                 if (res.status === 404) {
                     debugLog(`❌ Папка ${folder} не существует (404)`, 'error');
                     return [];
                 }
-
+                
                 if (!res.ok) {
                     debugLog(`❌ Ошибка ${res.status} для ${folder}`, 'error');
                     return [];
                 }
-
+                
                 const data = await res.json();
                 const images = data.filter(f => f.name.match(/\.(jpg|jpeg|png)$/i));
-
+                
                 debugLog(`✅ ${folder}: найдено ${images.length} фото`);
                 if (images.length > 0) {
                     images.forEach(img => debugLog(`   • ${img.name}`));
                 }
-
+                
                 return images;
             } catch (e) {
                 debugLog(`❌ Ошибка загрузки ${folder}: ${e.message}`, 'error');
@@ -842,31 +783,32 @@
         async function loadGallery() {
             debugLog('🔄 НАЧАЛО ЗАГРУЗКИ ГАЛЕРЕИ...');
             debugLog(`📌 Режим: ${state.offlineMode ? 'ОФФЛАЙН' : 'ОНЛАЙН'}`);
-
+            
             try {
                 const [general, banana, strawberry] = await Promise.all([
                     loadFolder(state.postId, 'general'),
                     loadFolder(state.postId, 'banana'),
                     loadFolder(state.postId, 'strawberry')
                 ]);
-
+                
                 debugLog(`📊 ИТОГО: general=${general.length}, banana=${banana.length}, strawberry=${strawberry.length}`);
-
+                
                 // В оффлайн режиме принудительно отключаем доступ
                 const effectivePurchased = state.offlineMode ? false : state.hasPurchased;
                 const effectiveSubscribed = state.offlineMode ? false : state.isSubscribed;
-
+                
                 debugLog('='.repeat(50));
                 debugLog('🔒 ЭФФЕКТИВНЫЕ ПАРАМЕТРЫ:');
                 debugLog(`   • purchased = ${effectivePurchased} (raw=${state.hasPurchased}, offline=${state.offlineMode})`);
                 debugLog(`   • subscribed = ${effectiveSubscribed} (raw=${state.isSubscribed}, offline=${state.offlineMode})`);
-
+                
+                // ИСПРАВЛЕННАЯ ДИАГНОСТИКА
                 debugLog('🍓 КРИТИЧЕСКАЯ ЛОГИКА:');
                 debugLog(`   • Условие: purchased = true ИЛИ subscribed = true`);
                 debugLog(`   • Текущие значения: purchased=${effectivePurchased}, subscribed=${effectiveSubscribed}`);
                 debugLog(`   • Результат: ${effectivePurchased || effectiveSubscribed ? '✅ ДОСТУП ЕСТЬ' : '❌ ДОСТУПА НЕТ'}`);
                 debugLog('='.repeat(50));
-
+                
                 let files = [];
 
                 // Общие фото
@@ -884,15 +826,15 @@
                 // Банановые фото
                 banana.forEach(f => {
                     const isOriginal = !f.name.startsWith('banana_banana_');
-
+                    
                     if (isOriginal) {
                         const baseName = f.name.replace('banana_', '');
                         const blurredFileName = `banana_banana_banana_${baseName}`;
                         const blurredFile = banana.find(b => b.name === blurredFileName);
-
+                        
                         let imageUrl;
                         let isBlurred;
-
+                        
                         if (effectivePurchased) {
                             imageUrl = f.download_url;
                             isBlurred = false;
@@ -906,7 +848,7 @@
                             isBlurred = false;
                             debugLog(`🍌 НЕТ БЛЮРА: показываем оригинал ${f.name}`, 'warning');
                         }
-
+                        
                         files.push({
                             name: f.name,
                             originalName: f.name,
@@ -919,18 +861,18 @@
                     }
                 });
 
-                // Клубничные фото
+                // Клубничные фото - ИСПРАВЛЕННАЯ ЛОГИКА
                 strawberry.forEach(f => {
                     const isOriginal = !f.name.startsWith('strawberry_strawberry_');
-
+                    
                     if (isOriginal) {
                         const baseName = f.name.replace('strawberry_', '');
                         const blurredFileName = `strawberry_strawberry_strawberry_${baseName}`;
                         const blurredFile = strawberry.find(b => b.name === blurredFileName);
-
+                        
                         let imageUrl;
                         let isBlurred;
-
+                        
                         // КРИТИЧЕСКАЯ ЛОГИКА: purchased ИЛИ subscribed
                         if (effectivePurchased || effectiveSubscribed) {
                             imageUrl = f.download_url;
@@ -945,7 +887,7 @@
                             isBlurred = true;
                             debugLog(`🍓 НЕТ ДОСТУПА И НЕТ БЛЮРА: ${f.name}`, 'critical');
                         }
-
+                        
                         files.push({
                             name: f.name,
                             originalName: f.name,
@@ -957,15 +899,15 @@
                         });
                     }
                 });
-
+                
                 if (files.length === 0) {
                     debugLog('❌ НЕТ ФОТО', 'critical');
                     showError('В этом посте нет фото');
                     return;
                 }
-
+                
                 state.files = files;
-
+                
                 debugLog('='.repeat(50));
                 debugLog(`✅ ВСЕГО ЗАГРУЖЕНО: ${files.length} фото`);
                 files.forEach((f, i) => {
@@ -973,13 +915,13 @@
                     debugLog(`   [${i+1}] ${f.name} (${f.type}) ${access}`);
                 });
                 debugLog('='.repeat(50));
-
+                
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('gallery').style.display = 'block';
                 updateUI();
-
+                
                 showImage(0);
-
+                
             } catch (e) {
                 debugLog(`❌ КРИТИЧЕСКАЯ ОШИБКА: ${e.message}`, 'critical');
                 showError('Ошибка загрузки галереи');
@@ -988,25 +930,25 @@
 
         function showImage(i) {
             if (!state.files || state.files.length === 0) return;
-
+            
             state.index = (i + state.files.length) % state.files.length;
             const image = document.getElementById('image');
             const file = state.files[state.index];
-
+            
             image.classList.remove('loaded');
             image.src = file.url + '?t=' + Date.now();
-
+            
             document.getElementById('counter').innerText = `${state.index+1}/${state.files.length}`;
-
+            
             const accessInfo = file.isBlurred ? '🔒 БЛЮР' : '✅ ОРИГИНАЛ';
             debugLog(`🖼 Показ ${state.index+1}/${state.files.length}: ${file.name} (${file.type}) ${accessInfo}`);
-
+            
             if (file.isBlurred && file.type === 'strawberry') {
                 debugLog(`🍓 ПРИЧИНА БЛЮРА: purchased=${state.hasPurchased}, subscribed=${state.isSubscribed}, offline=${state.offlineMode}`, 'warning');
             }
-
-            sendData('view_image', {
-                index: state.index,
+            
+            sendData('view_image', { 
+                index: state.index, 
                 name: file.name,
                 type: file.type,
                 is_blurred: file.isBlurred || false
@@ -1016,9 +958,9 @@
         function onImageError() {
             const file = state.files[state.index];
             debugLog(`❌ Ошибка загрузки: ${file?.name}`, 'error');
-
+            
             state.loadingAttempts++;
-
+            
             if (state.loadingAttempts < 3) {
                 setTimeout(() => {
                     showImage(state.index);
@@ -1030,22 +972,22 @@
             }
         }
 
-        function next() {
+        function next() { 
             state.loadingAttempts = 0;
-            showImage(state.index + 1);
+            showImage(state.index + 1); 
             sendData('navigate_next');
         }
-
-        function prev() {
+        
+        function prev() { 
             state.loadingAttempts = 0;
-            showImage(state.index - 1);
+            showImage(state.index - 1); 
             sendData('navigate_prev');
         }
 
         async function sendData(action, details = {}) {
             if (!state.userId) return;
             if (state.offlineMode) return;
-
+            
             const data = {
                 action: action,
                 user_id: state.userId,
@@ -1053,7 +995,7 @@
                 timestamp: Date.now(),
                 details: details
             };
-
+            
             try {
                 await fetch(`${TUNNEL_URL}/api/webapp-data`, {
                     method: 'POST',
@@ -1075,55 +1017,55 @@
                 showToast('✅ Вы уже подписаны!');
             }
         }
-
+        
         function handleBanana() {
             sendData('banana_click');
-
+            
             const currentFile = state.files[state.index];
-
+            
             if (!currentFile || !currentFile.isBanana) {
                 showToast('🍌 Это фото нельзя разблокировать бананом');
                 return;
             }
-
+            
             if (!currentFile.isBlurred) {
                 showToast('✅ Это фото уже разблокировано');
                 return;
             }
-
+            
             if (state.bananasLeft <= 0) {
                 showToast('❌ У вас нет бананов!');
                 return;
             }
-
+            
             state.bananasLeft--;
             currentFile.isBlurred = false;
             currentFile.url = currentFile.originalUrl;
             showImage(state.index);
             updateUI();
             showToast('🍌 Банан потрачен!');
-
-            sendData('spend_banana', {
+            
+            sendData('spend_banana', { 
                 photo_name: currentFile.originalName || currentFile.name
             });
         }
-
+        
         function handleCoin() {
             sendData('coin_click');
             const botLink = `https://t.me/${BOT_USERNAME}?start=buy_vip_${state.postId}`;
             tg.openLink(botLink);
             showToast('🪙 Переходим в бот для оплаты...');
         }
-
+        
         function showInfo() {
             sendData('info_click');
             document.getElementById('info-modal').classList.add('active');
         }
-
+        
         function hideInfo(event) {
             document.getElementById('info-modal').classList.remove('active');
         }
-
+        
         function forceReload() {
             localStorage.clear();
             showToast('🔄 Кэш очищен, перезагружаем...');
@@ -1136,9 +1078,9 @@
             const bananaBadge = document.getElementById('banana-count-badge');
             bananaBadge.textContent = state.bananasLeft;
             bananaBadge.style.display = state.bananasLeft > 0 ? 'flex' : 'none';
-
+            
             document.getElementById('banana-info-count').textContent = state.bananasLeft;
-
+            
             const subStatus = document.getElementById('sub-status');
             if (state.isSubscribed) {
                 subStatus.textContent = '(у вас она есть)';
@@ -1147,11 +1089,11 @@
                 subStatus.textContent = '(у вас её пока нет)';
                 subStatus.style.color = '#ff6b6b';
             }
-
+            
             document.getElementById('subscribed-badge').style.display = state.isSubscribed ? 'block' : 'none';
             document.getElementById('purchased-badge').style.display = state.hasPurchased ? 'block' : 'none';
             document.getElementById('offline-badge').style.display = state.offlineMode ? 'block' : 'none';
-
+            
             debugLog(`🔄 UI обновлен: бананов=${state.bananasLeft}, подписка=${state.isSubscribed}, покупка=${state.hasPurchased}`);
         }
 
@@ -1173,8 +1115,8 @@
             setTimeout(() => toast.classList.remove('show'), duration);
         }
 
-        function showError(msg) {
-            document.getElementById('loading').style.display = 'none';
+        function showError(msg) { 
+            document.getElementById('loading').style.display = 'none'; 
             document.getElementById('error').style.display = 'block';
             document.getElementById('error').innerHTML = msg;
         }
@@ -1186,10 +1128,8 @@
             sendData('gallery_close', { time_spent: Date.now() - state.startTime });
         });
 
-        // Глобальные функции
         window.next = next;
         window.prev = prev;
-        window.toggleMusic = toggleMusic;
         window.handleStrawberry = handleStrawberry;
         window.handleBanana = handleBanana;
         window.handleCoin = handleCoin;
