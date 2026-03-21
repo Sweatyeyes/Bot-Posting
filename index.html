@@ -69,9 +69,6 @@
             cursor: pointer; 
             background: transparent;
         }
-        /* Временно для отладки - раскомментировать чтобы увидеть зоны нажатия */
-        /* #nav-left { background: rgba(255,0,0,0.1); } */
-        /* #nav-right { background: rgba(0,255,0,0.1); } */
         #nav-left { left: 0; }
         #nav-right { right: 0; }
         
@@ -275,7 +272,7 @@
 
     <div id="gallery">
         <div id="debug-panel">
-            <div class="debug-entry">🔍 ДИАГНОСТИКА v7.0 - ИСПРАВЛЕНА НАВИГАЦИЯ</div>
+            <div class="debug-entry">🔍 ДИАГНОСТИКА v8.0 - ИСПРАВЛЕНА ГАЛЕРЕЯ</div>
         </div>
 
         <div id="badges">
@@ -352,7 +349,7 @@
 
     <script>
         // ==================== ГЛОБАЛЬНАЯ ДИАГНОСТИКА ====================
-        console.log('🚀 СКРИПТ НАЧАЛ ЗАГРУЗКУ v7.0');
+        console.log('🚀 СКРИПТ НАЧАЛ ЗАГРУЗКУ v8.0');
 
         const CONFIG = {
             REPO: "Sweatyeyes/Bot-Posting",
@@ -367,35 +364,107 @@
 
         const tg = window.Telegram?.WebApp;
 
-        // ==================== МУЗЫКА ====================
-        let musicPlaying = false;
-        const audio = document.getElementById('bg-music');
-        let musicBtn = null;
-
-        function toggleMusic() {
-            if (musicPlaying) {
-                audio.pause();
-                musicPlaying = false;
-                if (musicBtn) {
-                    musicBtn.style.opacity = '0.5';
-                    musicBtn.classList.remove('music-btn-playing');
-                }
-                showToast('🎵 Музыка выключена');
-                sendData('music_off');
-            } else {
-                audio.play().catch(e => {
-                    console.log('Автовоспроизведение заблокировано', e);
-                    showToast('🎵 Нажмите ещё раз для включения музыки');
-                });
-                musicPlaying = true;
-                if (musicBtn) {
-                    musicBtn.style.opacity = '1';
-                    musicBtn.classList.add('music-btn-playing');
-                }
-                showToast('🎵 Музыка включена');
-                sendData('music_on');
+        // ==================== ПОЛУЧЕНИЕ POST_ID ИЗ РАЗНЫХ ИСТОЧНИКОВ ====================
+        function getPostId() {
+            // 1. Сначала из URL параметров
+            const urlParams = new URLSearchParams(window.location.search);
+            let postId = urlParams.get('post');
+            
+            if (postId) {
+                console.log('📁 post_id из URL:', postId);
+                return postId;
             }
+            
+            // 2. Из start_param Telegram
+            const tgStartParam = tg?.initDataUnsafe?.start_param;
+            if (tgStartParam) {
+                console.log('📁 post_id из start_param:', tgStartParam);
+                
+                // Если start_param в формате buy_vip_xxx - это не ID поста
+                if (tgStartParam.startsWith('buy_vip_')) {
+                    console.log('⚠️ Это buy_vip_, а не ID поста');
+                    return null;
+                }
+                
+                // Если start_param содержит дефис и подчеркивание - это ID поста
+                if (tgStartParam.includes('-') && tgStartParam.includes('_')) {
+                    return tgStartParam;
+                }
+                
+                // Если start_param в формате post:user
+                if (tgStartParam.includes(':')) {
+                    const parts = tgStartParam.split(':');
+                    if (parts.length >= 1 && parts[0].includes('-') && parts[0].includes('_')) {
+                        return parts[0];
+                    }
+                }
+            }
+            
+            // 3. Из hash
+            const hash = window.location.hash;
+            if (hash && hash.includes('post=')) {
+                const hashParams = new URLSearchParams(hash.replace('#', ''));
+                postId = hashParams.get('post');
+                if (postId) return postId;
+            }
+            
+            return null;
         }
+
+        function getUserId() {
+            const urlParams = new URLSearchParams(window.location.search);
+            let userId = urlParams.get('user');
+            if (userId) return parseInt(userId);
+            
+            const tgStartParam = tg?.initDataUnsafe?.start_param;
+            if (tgStartParam && tgStartParam.includes(':')) {
+                const parts = tgStartParam.split(':');
+                if (parts.length >= 2 && !isNaN(parseInt(parts[1]))) {
+                    return parseInt(parts[1]);
+                }
+            }
+            
+            const user = tg?.initDataUnsafe?.user;
+            if (user && user.id) return user.id;
+            
+            return null;
+        }
+
+        // ==================== ПОЛУЧЕНИЕ ПАРАМЕТРОВ ====================
+        const rawPost = getPostId();
+        const rawUser = getUserId();
+        
+        // Параметры из URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const rawSubscribed = urlParams.get('subscribed');
+        const rawPurchased = urlParams.get('purchased');
+        const rawBananas = urlParams.get('bananas');
+
+        console.log('=== ПОЛУЧЕННЫЕ ПАРАМЕТРЫ ===');
+        console.log('post:', rawPost);
+        console.log('user:', rawUser);
+        console.log('subscribed:', rawSubscribed);
+        console.log('purchased:', rawPurchased);
+        console.log('bananas:', rawBananas);
+
+        const parsedSubscribed = rawSubscribed === 'true';
+        const parsedPurchased = rawPurchased === 'true';
+        const parsedBananas = rawBananas ? parseInt(rawBananas) : 3;
+
+        // ==================== СОСТОЯНИЕ ====================
+        let state = {
+            files: [],
+            index: 0,
+            postId: rawPost,
+            userId: rawUser,
+            isSubscribed: parsedSubscribed,
+            hasPurchased: parsedPurchased,
+            bananasLeft: parsedBananas,
+            startTime: Date.now(),
+            touchStartX: 0,
+            loadingAttempts: 0,
+            offlineMode: false
+        };
 
         // ==================== ОТЛАДОЧНАЯ ПАНЕЛЬ ====================
         const debugPanel = document.getElementById('debug-panel');
@@ -422,7 +491,7 @@
             console.log(`🔍 [${type}] ${message}`);
         }
 
-        // ==================== ПРОВЕРКА КОНТЕКСТА TELEGRAM ====================
+        // ==================== ПРОВЕРКА TELEGRAM ====================
         function checkTelegramContext() {
             debugLog('🔍 ПРОВЕРКА КОНТЕКСТА TELEGRAM...');
 
@@ -446,60 +515,6 @@
             return true;
         }
 
-        // ==================== ПОЛУЧЕНИЕ ПАРАМЕТРОВ ИЗ URL ====================
-        debugLog('📊 АНАЛИЗ URL...');
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const allParams = {};
-        for (let [key, value] of urlParams.entries()) {
-            allParams[key] = value;
-            debugLog(`📥 URL param: ${key} = "${value}"`);
-        }
-
-        debugLog(`🔗 Полный URL: ${window.location.href}`);
-
-        const rawPost = urlParams.get('post');
-        const rawUser = urlParams.get('user');
-        const rawSubscribed = urlParams.get('subscribed');
-        const rawPurchased = urlParams.get('purchased');
-        const rawBananas = urlParams.get('bananas');
-
-        debugLog('='.repeat(50));
-        debugLog('📦 ПОЛУЧЕННЫЕ ПАРАМЕТРЫ:');
-        debugLog(`   • post: "${rawPost}"`);
-        debugLog(`   • user: "${rawUser}"`);
-        debugLog(`   • subscribed: "${rawSubscribed}"`);
-        debugLog(`   • purchased: "${rawPurchased}"`);
-        debugLog(`   • bananas: "${rawBananas}"`);
-        debugLog('='.repeat(50));
-
-        let parsedSubscribed = rawSubscribed === 'true';
-        let parsedPurchased = rawPurchased === 'true';
-        const parsedBananas = rawBananas ? parseInt(rawBananas) : 3;
-
-        // ==================== СОСТОЯНИЕ ====================
-        let state = {
-            files: [],
-            index: 0,
-            postId: rawPost,
-            userId: rawUser ? parseInt(rawUser) : null,
-            isSubscribed: parsedSubscribed,
-            hasPurchased: parsedPurchased,
-            bananasLeft: parsedBananas,
-            startTime: Date.now(),
-            touchStartX: 0,
-            loadingAttempts: 0,
-            offlineMode: false
-        };
-
-        debugLog('📊 СОСТОЯНИЕ:');
-        debugLog(`   • Пост: ${state.postId}`);
-        debugLog(`   • User: ${state.userId}`);
-        debugLog(`   • Подписка: ${state.isSubscribed}`);
-        debugLog(`   • Куплен: ${state.hasPurchased}`);
-        debugLog(`   • Бананов: ${state.bananasLeft}`);
-
-        // ==================== ПРОВЕРКА TELEGRAM ====================
         if (!checkTelegramContext()) {
             throw new Error('Not in Telegram');
         }
@@ -510,18 +525,21 @@
             tg.enableClosingConfirmation();
         }
 
+        debugLog('='.repeat(50));
+        debugLog('📊 СОСТОЯНИЕ:');
+        debugLog(`   • Пост: ${state.postId}`);
+        debugLog(`   • User: ${state.userId}`);
+        debugLog(`   • Подписка: ${state.isSubscribed}`);
+        debugLog(`   • Куплен: ${state.hasPurchased}`);
+        debugLog(`   • Бананов: ${state.bananasLeft}`);
+        debugLog('='.repeat(50));
+
         if (!state.postId) {
             debugLog('❌ НЕТ ID ПОСТА', 'critical');
             showError('Не указан ID поста. Нажми на кнопку в канале.');
         } else {
             localStorage.removeItem(`gallery_${state.postId}`);
             debugLog('🧹 Кэш очищен');
-            checkConnectionAndLoad();
-        }
-
-        // ==================== ПРОВЕРКА СОЕДИНЕНИЯ ====================
-        async function checkConnectionAndLoad() {
-            debugLog('🔍 ПРОВЕРКА СОЕДИНЕНИЯ...');
             loadGallery();
         }
 
@@ -534,7 +552,7 @@
                 const res = await fetch(url, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
 
                 if (res.status === 404) {
-                    debugLog(`❌ Папка ${folder} не существует (404)`, 'error');
+                    debugLog(`❌ Папка ${folder} не существует (404)`, 'warning');
                     return [];
                 }
                 if (!res.ok) return [];
@@ -551,6 +569,7 @@
 
         async function loadGallery() {
             debugLog('🔄 НАЧАЛО ЗАГРУЗКИ ГАЛЕРЕИ...');
+            debugLog(`📁 Пост: ${state.postId}`);
 
             try {
                 const [general, banana, strawberry] = await Promise.all([
@@ -559,7 +578,14 @@
                     loadFolder(state.postId, 'strawberry')
                 ]);
 
-                debugLog(`📊 ИТОГО: general=${general.length}, banana=${banana.length}, strawberry=${strawberry.length}`);
+                const totalFiles = general.length + banana.length + strawberry.length;
+                debugLog(`📊 ИТОГО: general=${general.length}, banana=${banana.length}, strawberry=${strawberry.length}, всего=${totalFiles}`);
+
+                if (totalFiles === 0) {
+                    debugLog('❌ НЕТ ФОТО В ПОСТЕ', 'critical');
+                    showError(`В посте ${state.postId} нет фото. Проверьте, что папки существуют на GitHub.`);
+                    return;
+                }
 
                 const effectivePurchased = state.hasPurchased;
                 const effectiveSubscribed = state.isSubscribed;
@@ -641,26 +667,18 @@
                     }
                 });
 
-                if (files.length === 0) {
-                    debugLog('❌ НЕТ ФОТО', 'critical');
-                    showError('В этом посте нет фото');
-                    return;
-                }
-
                 state.files = files;
-                debugLog(`✅ ВСЕГО ЗАГРУЖЕНО: ${files.length} фото`);
+                debugLog(`✅ ЗАГРУЖЕНО ${files.length} фото`);
 
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('gallery').style.display = 'block';
                 updateUI();
                 showImage(0);
-
-                // Привязываем навигацию ПОСЛЕ загрузки
                 setupNavigation();
 
             } catch (e) {
                 debugLog(`❌ КРИТИЧЕСКАЯ ОШИБКА: ${e.message}`, 'critical');
-                showError('Ошибка загрузки галереи');
+                showError('Ошибка загрузки галереи: ' + e.message);
             }
         }
 
@@ -692,28 +710,21 @@
         }
 
         function next() {
-            debugLog(`➡️ next() вызвана, текущий индекс: ${state.index}, всего фото: ${state.files.length}`);
-            if (!state.files || state.files.length === 0) {
-                debugLog('❌ Нет фото для навигации', 'error');
-                return;
-            }
+            debugLog(`➡️ next() - индекс: ${state.index}, всего: ${state.files.length}`);
+            if (!state.files || state.files.length === 0) return;
             state.loadingAttempts = 0;
             showImage(state.index + 1);
             sendData('navigate_next');
         }
 
         function prev() {
-            debugLog(`⬅️ prev() вызвана, текущий индекс: ${state.index}, всего фото: ${state.files.length}`);
-            if (!state.files || state.files.length === 0) {
-                debugLog('❌ Нет фото для навигации', 'error');
-                return;
-            }
+            debugLog(`⬅️ prev() - индекс: ${state.index}, всего: ${state.files.length}`);
+            if (!state.files || state.files.length === 0) return;
             state.loadingAttempts = 0;
             showImage(state.index - 1);
             sendData('navigate_prev');
         }
 
-        // ==================== НАСТРОЙКА НАВИГАЦИИ ====================
         function setupNavigation() {
             debugLog('🔧 НАСТРОЙКА НАВИГАЦИИ...');
             
@@ -721,17 +732,14 @@
             const navRight = document.getElementById('nav-right');
             
             if (navLeft) {
-                // Удаляем старые обработчики
                 const newNavLeft = navLeft.cloneNode(true);
                 navLeft.parentNode.replaceChild(newNavLeft, navLeft);
                 newNavLeft.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    debugLog('🔘 НАЖАТА ЛЕВАЯ КНОПКА (область)');
+                    debugLog('🔘 НАЖАТА ЛЕВАЯ ОБЛАСТЬ');
                     prev();
                 });
                 debugLog('✅ Левая область навигации привязана');
-            } else {
-                debugLog('❌ Элемент nav-left не найден!', 'error');
             }
             
             if (navRight) {
@@ -739,26 +747,17 @@
                 navRight.parentNode.replaceChild(newNavRight, navRight);
                 newNavRight.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    debugLog('🔘 НАЖАТА ПРАВАЯ КНОПКА (область)');
+                    debugLog('🔘 НАЖАТА ПРАВАЯ ОБЛАСТЬ');
                     next();
                 });
                 debugLog('✅ Правая область навигации привязана');
-            } else {
-                debugLog('❌ Элемент nav-right не найден!', 'error');
             }
         }
 
-        // ==================== КЛАВИАТУРНАЯ НАВИГАЦИЯ ====================
+        // Клавиатурная навигация
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowLeft') {
-                debugLog('⌨️ Стрелка влево');
-                prev();
-                e.preventDefault();
-            } else if (e.key === 'ArrowRight') {
-                debugLog('⌨️ Стрелка вправо');
-                next();
-                e.preventDefault();
-            }
+            if (e.key === 'ArrowLeft') { prev(); e.preventDefault(); }
+            else if (e.key === 'ArrowRight') { next(); e.preventDefault(); }
         });
 
         async function sendData(action, details = {}) {
@@ -816,6 +815,32 @@
             }
         }
 
+        let musicPlaying = false;
+        const audio = document.getElementById('bg-music');
+        let musicBtn = null;
+
+        function toggleMusic() {
+            if (musicPlaying) {
+                audio.pause();
+                musicPlaying = false;
+                if (musicBtn) {
+                    musicBtn.style.opacity = '0.5';
+                    musicBtn.classList.remove('music-btn-playing');
+                }
+                showToast('🎵 Музыка выключена');
+                sendData('music_off');
+            } else {
+                audio.play().catch(e => console.log('Автовоспроизведение заблокировано'));
+                musicPlaying = true;
+                if (musicBtn) {
+                    musicBtn.style.opacity = '1';
+                    musicBtn.classList.add('music-btn-playing');
+                }
+                showToast('🎵 Музыка включена');
+                sendData('music_on');
+            }
+        }
+
         function showInfo() {
             sendData('info_click');
             document.getElementById('info-modal').classList.add('active');
@@ -842,13 +867,8 @@
             
             const subStatus = document.getElementById('sub-status');
             if (subStatus) {
-                if (state.isSubscribed) {
-                    subStatus.textContent = '(у вас она есть)';
-                    subStatus.style.color = '#ffd700';
-                } else {
-                    subStatus.textContent = '(у вас её пока нет)';
-                    subStatus.style.color = '#ff6b6b';
-                }
+                subStatus.textContent = state.isSubscribed ? '(у вас она есть)' : '(у вас её пока нет)';
+                subStatus.style.color = state.isSubscribed ? '#ffd700' : '#ff6b6b';
             }
             
             const subBadge = document.getElementById('subscribed-badge');
@@ -875,12 +895,12 @@
         function showError(msg) {
             document.getElementById('loading').style.display = 'none';
             document.getElementById('error').style.display = 'block';
-            document.getElementById('error').innerHTML = msg;
+            document.getElementById('error').innerHTML = msg + '<br><small>Попробуйте открыть галерею заново</small>';
         }
 
         // ==================== ПРИВЯЗКА КНОПОК ====================
         document.addEventListener('DOMContentLoaded', () => {
-            debugLog('🔧 DOM загружен, привязываем кнопки...');
+            debugLog('🔧 Привязываем кнопки...');
             
             const strawberryBtn = document.getElementById('strawberry-btn');
             const bananaBtn = document.getElementById('banana-btn');
@@ -907,7 +927,6 @@
             sendData('gallery_close', { time_spent: Date.now() - state.startTime });
         });
 
-        // Глобальные функции
         window.next = next;
         window.prev = prev;
         window.toggleMusic = toggleMusic;
@@ -919,7 +938,7 @@
         window.forceReload = forceReload;
         window.onImageError = onImageError;
         
-        debugLog('✅ Скрипт загружен, навигация будет настроена после загрузки галереи');
+        debugLog('✅ Скрипт загружен, ожидаем загрузки галереи');
     </script>
 </body>
 </html>
