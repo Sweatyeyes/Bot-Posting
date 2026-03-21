@@ -278,7 +278,7 @@
 
     <div id="gallery">
         <div id="debug-panel">
-            <div class="debug-entry">🔍 ДИАГНОСТИКА v8.1 - АВТОМУЗЫКА</div>
+            <div class="debug-entry">🔍 ДИАГНОСТИКА v9.0 - NGROK</div>
         </div>
 
         <div id="badges">
@@ -355,18 +355,21 @@
 
     <script>
         // ==================== ГЛОБАЛЬНАЯ ДИАГНОСТИКА ====================
-        console.log('🚀 СКРИПТ НАЧАЛ ЗАГРУЗКУ v8.1');
+        console.log('🚀 СКРИПТ НАЧАЛ ЗАГРУЗКУ v9.0');
 
         const CONFIG = {
             REPO: "Sweatyeyes/Bot-Posting",
             BRANCH: "main",
-            GITHUB_RAW: "https://unresident-hyperfine-nikola.ngrok-free.dev",
-            GITHUB_API: "null
+            GITHUB_API: "https://api.github.com/repos"
         };
 
-        const TUNNEL_URL = 'https://my-super-app.loca.lt';
-        const TUNNEL_PASS = '176.116.166.148';
+        // НГРОК ТУННЕЛЬ - ОБНОВЛЕНО!
+        const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
+        const TUNNEL_PASS = null;
         const BOT_USERNAME = 'k0tbezzabot';
+
+        console.log('🌐 TUNNEL_URL:', TUNNEL_URL);
+        console.log('📁 REPO:', CONFIG.REPO);
 
         const tg = window.Telegram?.WebApp;
 
@@ -375,7 +378,6 @@
         const audio = document.getElementById('bg-music');
         let musicBtn = null;
 
-        // Функция для запуска музыки с обработкой автоблокировки
         function startMusic() {
             if (musicPlaying) return;
             
@@ -389,28 +391,17 @@
                     }
                     console.log('🎵 Музыка запущена автоматически');
                     debugLog('🎵 Музыка запущена автоматически', 'success');
-                    sendData('music_auto_start');
                 }).catch(e => {
-                    console.log('🎵 Автозапуск заблокирован браузером:', e);
-                    debugLog('🎵 Автозапуск заблокирован, нужно нажать кнопку', 'warning');
-                    // Показываем подсказку
-                    setTimeout(() => {
-                        showToast('🎵 Нажмите 🎵 для включения музыки', 3000);
-                    }, 1000);
+                    console.log('🎵 Автозапуск заблокирован:', e);
+                    debugLog('🎵 Нажмите 🎵 для включения музыки', 'warning');
+                    setTimeout(() => showToast('🎵 Нажмите 🎵 для включения музыки', 3000), 1000);
                 });
             }
         }
 
-        // Пытаемся запустить музыку сразу
-        setTimeout(() => {
-            startMusic();
-        }, 500);
-
-        // Дополнительная попытка после взаимодействия с пользователем
+        setTimeout(() => startMusic(), 500);
         document.addEventListener('click', function musicOnFirstClick() {
-            if (!musicPlaying) {
-                startMusic();
-            }
+            if (!musicPlaying) startMusic();
             document.removeEventListener('click', musicOnFirstClick);
         }, { once: true });
 
@@ -423,15 +414,13 @@
                     musicBtn.classList.remove('music-btn-playing');
                 }
                 showToast('🎵 Музыка выключена');
-                sendData('music_off');
             } else {
                 startMusic();
                 showToast('🎵 Музыка включена');
-                sendData('music_on');
             }
         }
 
-        // ==================== ПОЛУЧЕНИЕ POST_ID ИЗ РАЗНЫХ ИСТОЧНИКОВ ====================
+        // ==================== ПОЛУЧЕНИЕ POST_ID ====================
         function getPostId() {
             const urlParams = new URLSearchParams(window.location.search);
             let postId = urlParams.get('post');
@@ -448,7 +437,6 @@
                     return parts[0];
                 }
             }
-            
             return null;
         }
 
@@ -467,7 +455,6 @@
             
             const user = tg?.initDataUnsafe?.user;
             if (user && user.id) return user.id;
-            
             return null;
         }
 
@@ -483,6 +470,9 @@
         console.log('=== ПОЛУЧЕННЫЕ ПАРАМЕТРЫ ===');
         console.log('post:', rawPost);
         console.log('user:', rawUser);
+        console.log('subscribed:', rawSubscribed);
+        console.log('purchased:', rawPurchased);
+        console.log('bananas:', rawBananas);
 
         const parsedSubscribed = rawSubscribed === 'true';
         const parsedPurchased = rawPurchased === 'true';
@@ -500,7 +490,7 @@
             startTime: Date.now(),
             touchStartX: 0,
             loadingAttempts: 0,
-            offlineMode: true  // По умолчанию оффлайн, пока не проверим туннель
+            offlineMode: false  // Пытаемся работать онлайн
         };
 
         // ==================== ОТЛАДОЧНАЯ ПАНЕЛЬ ====================
@@ -520,11 +510,7 @@
 
             debugPanel.appendChild(entry);
             debugPanel.scrollTop = debugPanel.scrollHeight;
-
-            while (debugPanel.children.length > 50) {
-                debugPanel.removeChild(debugPanel.firstChild);
-            }
-
+            while (debugPanel.children.length > 50) debugPanel.removeChild(debugPanel.firstChild);
             console.log(`🔍 [${type}] ${message}`);
         }
 
@@ -569,12 +555,7 @@
         debugLog(`   • Подписка: ${state.isSubscribed}`);
         debugLog(`   • Куплен: ${state.hasPurchased}`);
         debugLog(`   • Бананов: ${state.bananasLeft}`);
-        debugLog(`   • Режим: ОФФЛАЙН (статистика не отправляется)`);
         debugLog('='.repeat(50));
-
-        // Показываем оффлайн бейдж
-        document.getElementById('offline-badge').style.display = 'block';
-        document.getElementById('offline-note').style.display = 'block';
 
         if (!state.postId) {
             debugLog('❌ НЕТ ID ПОСТА', 'critical');
@@ -592,7 +573,7 @@
                 const res = await fetch(url, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
 
                 if (res.status === 404) {
-                    debugLog(`❌ Папка ${folder} не существует (404)`, 'warning');
+                    debugLog(`❌ Папка ${folder} не существует`, 'warning');
                     return [];
                 }
                 if (!res.ok) return [];
@@ -627,11 +608,6 @@
                     return;
                 }
 
-                const effectivePurchased = state.hasPurchased;
-                const effectiveSubscribed = state.isSubscribed;
-
-                debugLog(`🔒 ДОСТУП: purchased=${effectivePurchased}, subscribed=${effectiveSubscribed} -> ${effectivePurchased || effectiveSubscribed ? 'ЕСТЬ' : 'НЕТ'}`);
-
                 let files = [];
 
                 // Общие фото
@@ -653,7 +629,7 @@
                         const blurredFile = banana.find(b => b.name === blurredFileName);
 
                         let imageUrl, isBlurred;
-                        if (effectivePurchased) {
+                        if (state.hasPurchased) {
                             imageUrl = f.download_url;
                             isBlurred = false;
                         } else if (blurredFile) {
@@ -684,7 +660,7 @@
                         const blurredFile = strawberry.find(b => b.name === blurredFileName);
 
                         let imageUrl, isBlurred;
-                        if (effectivePurchased || effectiveSubscribed) {
+                        if (state.hasPurchased || state.isSubscribed) {
                             imageUrl = f.download_url;
                             isBlurred = false;
                         } else if (blurredFile) {
@@ -733,7 +709,7 @@
             image.src = file.url + '?t=' + Date.now();
 
             document.getElementById('counter').innerText = `${state.index+1}/${state.files.length}`;
-            debugLog(`🖼 Показ ${state.index+1}/${state.files.length}: ${file.name} (${file.type}) ${file.isBlurred ? '🔒 БЛЮР' : '✅ ОРИГИНАЛ'}`);
+            debugLog(`🖼 Показ ${state.index+1}/${state.files.length}: ${file.name}`);
         }
 
         function onImageError() {
@@ -750,19 +726,15 @@
         }
 
         function next() {
-            debugLog(`➡️ next() - индекс: ${state.index}, всего: ${state.files.length}`);
             if (!state.files || state.files.length === 0) return;
             state.loadingAttempts = 0;
             showImage(state.index + 1);
-            sendData('navigate_next');
         }
 
         function prev() {
-            debugLog(`⬅️ prev() - индекс: ${state.index}, всего: ${state.files.length}`);
             if (!state.files || state.files.length === 0) return;
             state.loadingAttempts = 0;
             showImage(state.index - 1);
-            sendData('navigate_prev');
         }
 
         function setupNavigation() {
@@ -774,51 +746,34 @@
             if (navLeft) {
                 const newNavLeft = navLeft.cloneNode(true);
                 navLeft.parentNode.replaceChild(newNavLeft, navLeft);
-                newNavLeft.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    debugLog('🔘 НАЖАТА ЛЕВАЯ ОБЛАСТЬ');
-                    prev();
-                });
+                newNavLeft.addEventListener('click', (e) => { e.stopPropagation(); prev(); });
                 debugLog('✅ Левая область навигации привязана');
             }
             
             if (navRight) {
                 const newNavRight = navRight.cloneNode(true);
                 navRight.parentNode.replaceChild(newNavRight, navRight);
-                newNavRight.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    debugLog('🔘 НАЖАТА ПРАВАЯ ОБЛАСТЬ');
-                    next();
-                });
+                newNavRight.addEventListener('click', (e) => { e.stopPropagation(); next(); });
                 debugLog('✅ Правая область навигации привязана');
             }
         }
 
-        // Клавиатурная навигация
         document.addEventListener('keydown', (e) => {
             if (e.key === 'ArrowLeft') { prev(); e.preventDefault(); }
             else if (e.key === 'ArrowRight') { next(); e.preventDefault(); }
         });
 
         async function sendData(action, details = {}) {
-            // В оффлайн режиме не отправляем
-            if (state.offlineMode) return;
             if (!state.userId) return;
-            
             const data = { action, user_id: state.userId, post_id: state.postId, timestamp: Date.now(), details };
             try {
                 await fetch(`${TUNNEL_URL}/api/webapp-data`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Bypass-Tunnel-Reminder': TUNNEL_PASS },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
             } catch (e) {
-                // Если ошибка - переключаемся в оффлайн
-                if (!state.offlineMode) {
-                    state.offlineMode = true;
-                    document.getElementById('offline-badge').style.display = 'block';
-                    debugLog('📴 Переключен в оффлайн режим', 'warning');
-                }
+                debugLog(`⚠️ Не удалось отправить статистику: ${e.message}`, 'warning');
             }
         }
 
@@ -859,8 +814,7 @@
         function handleCoin() {
             sendData('coin_click');
             if (tg) {
-                const botLink = `https://t.me/${BOT_USERNAME}?start=buy_vip_${state.postId}`;
-                tg.openLink(botLink);
+                tg.openLink(`https://t.me/${BOT_USERNAME}?start=buy_vip_${state.postId}`);
                 showToast('🪙 Переходим в бот для оплаты...');
             }
         }
@@ -919,7 +873,7 @@
         function showError(msg) {
             document.getElementById('loading').style.display = 'none';
             document.getElementById('error').style.display = 'block';
-            document.getElementById('error').innerHTML = msg + '<br><small>Попробуйте открыть галерею заново</small>';
+            document.getElementById('error').innerHTML = msg;
         }
 
         // ==================== ПРИВЯЗКА КНОПОК ====================
@@ -942,12 +896,7 @@
             if (modalCloseBtn) modalCloseBtn.onclick = () => hideInfo();
             if (forceReloadItem) forceReloadItem.onclick = forceReload;
             
-            // Инициализируем состояние кнопки музыки
-            if (musicBtn) {
-                musicBtn.style.opacity = musicPlaying ? '1' : '0.5';
-                if (musicPlaying) musicBtn.classList.add('music-btn-playing');
-            }
-            
+            if (musicBtn) musicBtn.style.opacity = musicPlaying ? '1' : '0.5';
             debugLog('✅ Все кнопки привязаны');
         });
 
@@ -968,7 +917,7 @@
         window.forceReload = forceReload;
         window.onImageError = onImageError;
         
-        debugLog('✅ Скрипт загружен, ожидаем загрузки галереи');
+        debugLog('✅ Скрипт загружен');
     </script>
 </body>
 </html>
