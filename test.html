@@ -2,121 +2,52 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>ТЕСТ ГАЛЕРЕИ</title>
+    <title>ТЕСТ</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body {
-            background: #000;
-            color: #fff;
-            font-family: monospace;
-            padding: 20px;
-        }
-        #status {
-            background: #222;
-            padding: 10px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            font-size: 12px;
-        }
-        #photos {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-        img {
-            max-width: 100%;
-            border-radius: 10px;
-        }
-        .error {
-            color: #ff6b6b;
-            background: #330000;
-            padding: 10px;
-            border-radius: 5px;
-            margin: 10px 0;
-        }
-        .success {
-            color: #6bff6b;
-        }
+        body { background: #000; color: #0f0; font-family: monospace; padding: 20px; }
+        .error { color: #f00; }
+        img { max-width: 100%; margin: 10px 0; }
     </style>
 </head>
 <body>
-    <div id="status">🔄 Загрузка...</div>
-    <div id="photos"></div>
+    <div id="log">🔍 Загрузка...</div>
+    <div id="images"></div>
 
     <script>
-        const tg = window.Telegram?.WebApp;
-        if (tg) {
-            tg.ready();
-            tg.expand();
-        }
-
-        // ПОЛУЧАЕМ ID ПОСТА ИЗ URL
         const urlParams = new URLSearchParams(window.location.search);
-        const postId = urlParams.get('post');
+        const postId = urlParams.get('post') || '21-03_13-10';
+        const log = document.getElementById('log');
+        const imagesDiv = document.getElementById('images');
         
-        const statusDiv = document.getElementById('status');
-        const photosDiv = document.getElementById('photos');
+        log.innerHTML = `📁 Пост: ${postId}<br>🔄 Проверяем папки...`;
         
-        if (!postId) {
-            statusDiv.innerHTML = '❌ Нет параметра post в URL. Используй: ?post=21-03_13-10';
-            statusDiv.className = 'error';
-        } else {
-            statusDiv.innerHTML = `📁 Пост: ${postId}<br>🔄 Загружаю фото...`;
-            loadPhotos(postId);
-        }
-        
-        async function loadPhotos(postId) {
-            const folders = ['general', 'banana', 'strawberry'];
-            
-            for (const folder of folders) {
-                const url = `https://api.github.com/repos/Sweatyeyes/Bot-Posting/contents/posts/${postId}/${folder}`;
-                statusDiv.innerHTML += `<br>📂 ${folder}: запрос...`;
-                
-                try {
-                    const res = await fetch(url, {
-                        headers: { 'Accept': 'application/vnd.github.v3+json' }
-                    });
-                    
-                    if (!res.ok) {
-                        statusDiv.innerHTML += `<br>❌ ${folder}: ${res.status} ${res.statusText}`;
-                        continue;
+        async function checkFolder(folder) {
+            const url = `https://api.github.com/repos/Sweatyeyes/Bot-Posting/contents/posts/${postId}/${folder}`;
+            log.innerHTML += `<br>📂 ${folder}...`;
+            try {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`${res.status}`);
+                const data = await res.json();
+                const imgs = data.filter(f => f.name.match(/\.(jpg|jpeg|png)$/i));
+                if (imgs.length === 0) {
+                    log.innerHTML += ` ⚠️ пусто`;
+                } else {
+                    log.innerHTML += ` ✅ ${imgs.length} фото`;
+                    for (let img of imgs) {
+                        const el = document.createElement('img');
+                        el.src = img.download_url;
+                        imagesDiv.appendChild(el);
                     }
-                    
-                    const data = await res.json();
-                    const images = data.filter(f => f.name.match(/\.(jpg|jpeg|png)$/i));
-                    
-                    if (images.length === 0) {
-                        statusDiv.innerHTML += `<br>⚠️ ${folder}: нет фото (только .gitkeep)`;
-                    } else {
-                        statusDiv.innerHTML += `<br>✅ ${folder}: ${images.length} фото`;
-                        
-                        // ПОКАЗЫВАЕМ ФОТО
-                        for (const img of images) {
-                            const imgElement = document.createElement('img');
-                            imgElement.src = img.download_url;
-                            imgElement.style.maxWidth = '100%';
-                            imgElement.style.margin = '10px 0';
-                            imgElement.style.borderRadius = '10px';
-                            photosDiv.appendChild(imgElement);
-                            
-                            // Добавляем подпись
-                            const caption = document.createElement('div');
-                            caption.textContent = `📷 ${img.name} (${folder})`;
-                            caption.style.fontSize = '10px';
-                            caption.style.color = '#888';
-                            caption.style.marginBottom = '10px';
-                            photosDiv.appendChild(caption);
-                        }
-                    }
-                } catch (e) {
-                    statusDiv.innerHTML += `<br>❌ ${folder}: ошибка - ${e.message}`;
                 }
+            } catch(e) {
+                log.innerHTML += ` ❌ ${e.message}`;
             }
-            
-            statusDiv.innerHTML += `<br><br>✅ Загрузка завершена!`;
-            statusDiv.className = 'success';
         }
+        
+        checkFolder('general');
+        checkFolder('banana');
+        checkFolder('strawberry');
     </script>
 </body>
 </html>
