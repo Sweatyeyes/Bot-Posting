@@ -110,6 +110,11 @@
         .bottom-btn.disabled { opacity: 0.3; pointer-events: none; }
         .bottom-btn.offline { opacity: 0.7; filter: grayscale(50%); }
         
+        .music-btn-off {
+            filter: grayscale(100%);
+            opacity: 0.5;
+        }
+        
         .music-btn-playing { animation: pulse 1s infinite; }
         @keyframes pulse {
             0% { text-shadow: 0 0 5px #2ea6ff; }
@@ -142,7 +147,23 @@
             font-weight: 500;
             min-width: 70px;
             text-align: center;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
+
+        #save-btn {
+            font-size: 24px;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            color: white;
+            transition: all 0.2s ease;
+            padding: 0 5px;
+        }
+        
+        #save-btn:active { transform: scale(0.9); }
+        #save-btn.disabled { opacity: 0.3; pointer-events: none; }
 
         #badges {
             position: absolute;
@@ -267,7 +288,7 @@
     </style>
 </head>
 <body>
-    <audio id="bg-music" loop preload="auto" autoplay>
+    <audio id="bg-music" loop preload="auto">
         <source src="song.mp3" type="audio/mpeg">
     </audio>
 
@@ -278,7 +299,7 @@
 
     <div id="gallery">
         <div id="debug-panel">
-            <div class="debug-entry">🔍 ДИАГНОСТИКА v9.0 - NGROK</div>
+            <div class="debug-entry">🔍 ДИАГНОСТИКА v10.0 - СОХРАНЕНИЕ ФОТО</div>
         </div>
 
         <div id="badges">
@@ -300,7 +321,10 @@
                 🍌
                 <span id="banana-count-badge" class="banana-count-badge">0</span>
             </button>
-            <div id="counter">1/1</div>
+            <div id="counter">
+                <button id="save-btn" title="Сохранить фото (только для подписчиков)">💾</button>
+                <span id="counter-text">1/1</span>
+            </div>
             <button class="bottom-btn" id="coin-btn" title="Купить весь пост">🪙</button>
             <button class="bottom-btn" id="music-btn" title="Музыка 🎵">🎵</button>
             <button class="bottom-btn" id="info-btn" title="Помощь">❓</button>
@@ -310,6 +334,7 @@
     <div id="info-modal" onclick="hideInfo(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
             <div class="modal-title">ℹ️ О КНОПКАХ</div>
+
             <div class="modal-item">
                 <div class="modal-icon">🍓</div>
                 <div class="modal-text">
@@ -317,6 +342,7 @@
                     <div class="modal-text-desc">Для подписчиков канала <span id="sub-status">(у вас её пока нет)</span></div>
                 </div>
             </div>
+
             <div class="modal-item">
                 <div class="modal-icon">🍌</div>
                 <div class="modal-text">
@@ -324,6 +350,15 @@
                     <div class="modal-text-desc">Трать на банановые фото (осталось <span id="banana-info-count">0</span>)</div>
                 </div>
             </div>
+
+            <div class="modal-item">
+                <div class="modal-icon">💾</div>
+                <div class="modal-text">
+                    <div class="modal-text-title">Сохранить фото</div>
+                    <div class="modal-text-desc">🍓 Сохранить фото можно только подписчикам канала (клубничка)</div>
+                </div>
+            </div>
+
             <div class="modal-item">
                 <div class="modal-icon">🪙</div>
                 <div class="modal-text">
@@ -331,6 +366,7 @@
                     <div class="modal-text-desc">Купить весь пост (199₽)</div>
                 </div>
             </div>
+
             <div class="modal-item">
                 <div class="modal-icon">🎵</div>
                 <div class="modal-text">
@@ -338,6 +374,7 @@
                     <div class="modal-text-desc">Включить/выключить фоновую музыку</div>
                 </div>
             </div>
+
             <div class="modal-item" id="force-reload-item">
                 <div class="modal-icon">🔄</div>
                 <div class="modal-text">
@@ -345,6 +382,7 @@
                     <div class="modal-text-desc">Очистить кэш и перезагрузить</div>
                 </div>
             </div>
+
             <div class="offline-note" id="offline-note" style="display: none;">📴 Режим оффлайн - статистика не отправляется</div>
             <button class="modal-close" id="modal-close-btn">Понятно</button>
         </div>
@@ -355,7 +393,7 @@
 
     <script>
         // ==================== ГЛОБАЛЬНАЯ ДИАГНОСТИКА ====================
-        console.log('🚀 СКРИПТ НАЧАЛ ЗАГРУЗКУ v9.0');
+        console.log('🚀 СКРИПТ НАЧАЛ ЗАГРУЗКУ v10.0');
 
         const CONFIG = {
             REPO: "Sweatyeyes/Bot-Posting",
@@ -363,20 +401,32 @@
             GITHUB_API: "https://api.github.com/repos"
         };
 
-        // НГРОК ТУННЕЛЬ - ОБНОВЛЕНО!
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const TUNNEL_PASS = null;
         const BOT_USERNAME = 'k0tbezzabot';
 
         console.log('🌐 TUNNEL_URL:', TUNNEL_URL);
-        console.log('📁 REPO:', CONFIG.REPO);
 
         const tg = window.Telegram?.WebApp;
 
-        // ==================== АВТОМУЗЫКА ====================
+        // ==================== МУЗЫКА С ЗАЧЕРКНУТОЙ КНОПКОЙ ====================
         let musicPlaying = false;
         const audio = document.getElementById('bg-music');
         let musicBtn = null;
+
+        function updateMusicButton() {
+            if (musicBtn) {
+                if (musicPlaying) {
+                    musicBtn.style.opacity = '1';
+                    musicBtn.classList.add('music-btn-playing');
+                    musicBtn.classList.remove('music-btn-off');
+                } else {
+                    musicBtn.style.opacity = '0.5';
+                    musicBtn.classList.remove('music-btn-playing');
+                    musicBtn.classList.add('music-btn-off');
+                }
+            }
+        }
 
         function startMusic() {
             if (musicPlaying) return;
@@ -385,12 +435,9 @@
             if (playPromise !== undefined) {
                 playPromise.then(() => {
                     musicPlaying = true;
-                    if (musicBtn) {
-                        musicBtn.style.opacity = '1';
-                        musicBtn.classList.add('music-btn-playing');
-                    }
-                    console.log('🎵 Музыка запущена автоматически');
-                    debugLog('🎵 Музыка запущена автоматически', 'success');
+                    updateMusicButton();
+                    console.log('🎵 Музыка запущена');
+                    debugLog('🎵 Музыка запущена', 'success');
                 }).catch(e => {
                     console.log('🎵 Автозапуск заблокирован:', e);
                     debugLog('🎵 Нажмите 🎵 для включения музыки', 'warning');
@@ -399,24 +446,72 @@
             }
         }
 
-        setTimeout(() => startMusic(), 500);
-        document.addEventListener('click', function musicOnFirstClick() {
-            if (!musicPlaying) startMusic();
-            document.removeEventListener('click', musicOnFirstClick);
-        }, { once: true });
-
         function toggleMusic() {
             if (musicPlaying) {
                 audio.pause();
                 musicPlaying = false;
-                if (musicBtn) {
-                    musicBtn.style.opacity = '0.5';
-                    musicBtn.classList.remove('music-btn-playing');
-                }
+                updateMusicButton();
                 showToast('🎵 Музыка выключена');
             } else {
                 startMusic();
                 showToast('🎵 Музыка включена');
+            }
+        }
+
+        setTimeout(() => startMusic(), 500);
+
+        // ==================== СОХРАНЕНИЕ ФОТО ====================
+        async function saveCurrentPhoto() {
+            debugLog('💾 Попытка сохранить фото...');
+            
+            // Проверяем подписку
+            if (!state.isSubscribed) {
+                debugLog('❌ Сохранение доступно только подписчикам', 'warning');
+                showToast('🍓 Сохранять фото могут только подписчики канала!');
+                
+                if (tg) {
+                    tg.openLink('https://t.me/neuroticababes_bot');
+                }
+                return;
+            }
+            
+            const currentFile = state.files[state.index];
+            if (!currentFile) {
+                debugLog('❌ Нет текущего фото', 'error');
+                showToast('❌ Не удалось сохранить фото');
+                return;
+            }
+            
+            debugLog(`💾 Сохраняем: ${currentFile.name}`);
+            showToast('📥 Сохраняем фото...');
+            
+            try {
+                // Создаём ссылку на фото
+                const response = await fetch(currentFile.url);
+                const blob = await response.blob();
+                
+                // Создаём объект URL для скачивания
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = currentFile.name;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                
+                debugLog('✅ Фото сохранено', 'success');
+                showToast('✅ Фото сохранено в галерею!');
+                
+                // Отправляем статистику
+                sendData('save_photo', {
+                    photo_name: currentFile.name,
+                    photo_type: currentFile.type
+                });
+                
+            } catch (e) {
+                debugLog(`❌ Ошибка сохранения: ${e.message}`, 'error');
+                showToast('❌ Не удалось сохранить фото');
             }
         }
 
@@ -472,7 +567,6 @@
         console.log('user:', rawUser);
         console.log('subscribed:', rawSubscribed);
         console.log('purchased:', rawPurchased);
-        console.log('bananas:', rawBananas);
 
         const parsedSubscribed = rawSubscribed === 'true';
         const parsedPurchased = rawPurchased === 'true';
@@ -490,7 +584,7 @@
             startTime: Date.now(),
             touchStartX: 0,
             loadingAttempts: 0,
-            offlineMode: false  // Пытаемся работать онлайн
+            offlineMode: false
         };
 
         // ==================== ОТЛАДОЧНАЯ ПАНЕЛЬ ====================
@@ -610,7 +704,6 @@
 
                 let files = [];
 
-                // Общие фото
                 general.forEach(f => {
                     files.push({
                         name: f.name,
@@ -621,7 +714,6 @@
                     });
                 });
 
-                // Банановые фото
                 banana.forEach(f => {
                     const isOriginal = !f.name.startsWith('banana_banana_');
                     if (isOriginal) {
@@ -652,7 +744,6 @@
                     }
                 });
 
-                // Клубничные фото
                 strawberry.forEach(f => {
                     const isOriginal = !f.name.startsWith('strawberry_strawberry_');
                     if (isOriginal) {
@@ -708,7 +799,7 @@
             image.classList.remove('loaded');
             image.src = file.url + '?t=' + Date.now();
 
-            document.getElementById('counter').innerText = `${state.index+1}/${state.files.length}`;
+            document.getElementById('counter-text').innerText = `${state.index+1}/${state.files.length}`;
             debugLog(`🖼 Показ ${state.index+1}/${state.files.length}: ${file.name}`);
         }
 
@@ -853,6 +944,18 @@
             if (subBadge) subBadge.style.display = state.isSubscribed ? 'block' : 'none';
             const purchasedBadge = document.getElementById('purchased-badge');
             if (purchasedBadge) purchasedBadge.style.display = state.hasPurchased ? 'block' : 'none';
+            
+            // Обновляем доступность кнопки сохранения
+            const saveBtn = document.getElementById('save-btn');
+            if (saveBtn) {
+                if (state.isSubscribed) {
+                    saveBtn.classList.remove('disabled');
+                    saveBtn.title = 'Сохранить фото';
+                } else {
+                    saveBtn.classList.add('disabled');
+                    saveBtn.title = 'Сохранить фото могут только подписчики канала 🍓';
+                }
+            }
         }
 
         function handleTouchStart(e) { state.touchStartX = e.touches[0].clientX; }
@@ -887,6 +990,7 @@
             const infoBtn = document.getElementById('info-btn');
             const modalCloseBtn = document.getElementById('modal-close-btn');
             const forceReloadItem = document.getElementById('force-reload-item');
+            const saveBtn = document.getElementById('save-btn');
             
             if (strawberryBtn) strawberryBtn.onclick = handleStrawberry;
             if (bananaBtn) bananaBtn.onclick = handleBanana;
@@ -895,8 +999,9 @@
             if (infoBtn) infoBtn.onclick = showInfo;
             if (modalCloseBtn) modalCloseBtn.onclick = () => hideInfo();
             if (forceReloadItem) forceReloadItem.onclick = forceReload;
+            if (saveBtn) saveBtn.onclick = saveCurrentPhoto;
             
-            if (musicBtn) musicBtn.style.opacity = musicPlaying ? '1' : '0.5';
+            updateMusicButton();
             debugLog('✅ Все кнопки привязаны');
         });
 
@@ -916,6 +1021,7 @@
         window.hideInfo = hideInfo;
         window.forceReload = forceReload;
         window.onImageError = onImageError;
+        window.saveCurrentPhoto = saveCurrentPhoto;
         
         debugLog('✅ Скрипт загружен');
     </script>
