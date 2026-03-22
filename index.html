@@ -299,7 +299,7 @@
 
     <div id="gallery">
         <div id="debug-panel">
-            <div class="debug-entry">🔍 ДИАГНОСТИКА v10.1 - ОТОБРАЖЕНИЕ ОФФЛАЙН</div>
+            <div class="debug-entry">🔍 ДИАГНОСТИКА v10.2 - ОТЛАДКА ПОДПИСКИ</div>
         </div>
 
         <div id="badges">
@@ -383,6 +383,14 @@
                 </div>
             </div>
 
+            <div class="modal-item" id="refresh-subscription-item" style="border-top: 1px solid #404040;">
+                <div class="modal-icon">🍓🔄</div>
+                <div class="modal-text">
+                    <div class="modal-text-title">Проверить подписку</div>
+                    <div class="modal-text-desc">Обновить статус подписки на канал</div>
+                </div>
+            </div>
+
             <div class="offline-note" id="offline-note" style="display: none;">📴 Режим оффлайн - статистика не отправляется</div>
             <button class="modal-close" id="modal-close-btn">Понятно</button>
         </div>
@@ -393,7 +401,7 @@
 
     <script>
         // ==================== ГЛОБАЛЬНАЯ ДИАГНОСТИКА ====================
-        console.log('🚀 СКРИПТ НАЧАЛ ЗАГРУЗКУ v10.1');
+        console.log('🚀 СКРИПТ НАЧАЛ ЗАГРУЗКУ v10.2 (ОТЛАДКА ПОДПИСКИ)');
 
         const CONFIG = {
             REPO: "Sweatyeyes/Bot-Posting",
@@ -409,56 +417,71 @@
 
         const tg = window.Telegram?.WebApp;
 
-        // ==================== ПРОВЕРКА СОЕДИНЕНИЯ С ТУННЕЛЕМ ====================
-        let isTunnelOnline = false;
-        let tunnelCheckDone = false;
-
-        async function checkTunnelConnection() {
-            debugLog('🔍 Проверка подключения к туннелю...');
+        // ==================== ПРОВЕРКА ПОДПИСКИ В РЕАЛЬНОМ ВРЕМЕНИ ====================
+        async function checkSubscriptionRealtime() {
+            debugLog('🔍 [ПОДПИСКА] Запрос актуального статуса подписки...', 'info');
+            
+            if (!state.userId) {
+                debugLog('❌ [ПОДПИСКА] Нет user_id, проверка невозможна', 'error');
+                return false;
+            }
+            
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-                
-                const response = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
-                    method: 'OPTIONS',
-                    signal: controller.signal
+                const response = await fetch(`${TUNNEL_URL}/api/check-subscription`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: state.userId,
+                        post_id: state.postId
+                    })
                 });
                 
-                clearTimeout(timeoutId);
+                const data = await response.json();
+                debugLog(`📥 [ПОДПИСКА] Ответ от сервера: ${JSON.stringify(data)}`, 'info');
                 
-                if (response.ok || response.status === 405 || response.status === 400) {
-                    // 405 Method Not Allowed - это нормально для OPTIONS запроса
-                    isTunnelOnline = true;
-                    debugLog('✅ Туннель доступен (онлайн)', 'success');
+                if (data.is_subscribed !== undefined) {
+                    const newStatus = data.is_subscribed === true;
+                    debugLog(`🔄 [ПОДПИСКА] Статус обновлён: ${state.isSubscribed} → ${newStatus}`, 'success');
+                    
+                    if (state.isSubscribed !== newStatus) {
+                        state.isSubscribed = newStatus;
+                        updateUI();
+                        
+                        // Если подписка появилась - перезагружаем доступные фото
+                        if (newStatus) {
+                            debugLog('🍓 [ПОДПИСКА] Подписка подтверждена! Перезагружаем доступ к фото...', 'success');
+                            showToast('🍓 Подписка подтверждена! Клубничные фото теперь доступны!');
+                            // Перезагружаем галерею, чтобы обновить доступ к фото
+                            setTimeout(() => {
+                                loadGallery();
+                            }, 500);
+                        } else {
+                            debugLog('⚠️ [ПОДПИСКА] Подписка не найдена', 'warning');
+                            showToast('🍓 Вы не подписаны на канал. Подпишитесь, чтобы видеть клубничные фото!');
+                        }
+                    } else {
+                        debugLog(`✅ [ПОДПИСКА] Статус подписки актуален: ${state.isSubscribed}`, 'success');
+                    }
+                    
+                    return state.isSubscribed;
                 } else {
-                    isTunnelOnline = false;
-                    debugLog('⚠️ Туннель недоступен, статус: ' + response.status, 'warning');
+                    debugLog('⚠️ [ПОДПИСКА] Неверный ответ от сервера', 'warning');
+                    return state.isSubscribed;
                 }
             } catch (e) {
-                isTunnelOnline = false;
-                debugLog(`❌ Туннель НЕДОСТУПЕН: ${e.message}`, 'error');
+                debugLog(`❌ [ПОДПИСКА] Ошибка проверки: ${e.message}`, 'error');
+                return state.isSubscribed;
             }
-            
-            tunnelCheckDone = true;
-            
-            // Обновляем отображение оффлайн бейджа
-            const offlineBadge = document.getElementById('offline-badge');
-            const offlineNote = document.getElementById('offline-note');
-            
-            if (!isTunnelOnline) {
-                if (offlineBadge) offlineBadge.style.display = 'block';
-                if (offlineNote) offlineNote.style.display = 'block';
-                debugLog('📴 Режим ОФФЛАЙН - статистика не будет отправляться', 'warning');
-            } else {
-                if (offlineBadge) offlineBadge.style.display = 'none';
-                if (offlineNote) offlineNote.style.display = 'none';
-                debugLog('🌐 Режим ОНЛАЙН - статистика отправляется', 'success');
-            }
-            
-            return isTunnelOnline;
+        }
+        
+        // Кнопка принудительной проверки подписки
+        async function refreshSubscription() {
+            debugLog('🍓 [ПОДПИСКА] ПРИНУДИТЕЛЬНАЯ ПРОВЕРКА ПО ЗАПРОСУ ПОЛЬЗОВАТЕЛЯ', 'info');
+            showToast('🔄 Проверяем статус подписки...');
+            await checkSubscriptionRealtime();
         }
 
-        // ==================== МУЗЫКА С ЗАЧЕРКНУТОЙ КНОПКОЙ ====================
+        // ==================== МУЗЫКА ====================
         let musicPlaying = false;
         const audio = document.getElementById('bg-music');
         let musicBtn = null;
@@ -479,7 +502,6 @@
 
         function startMusic() {
             if (musicPlaying) return;
-
             const playPromise = audio.play();
             if (playPromise !== undefined) {
                 playPromise.then(() => {
@@ -514,12 +536,13 @@
         // ==================== СОХРАНЕНИЕ ФОТО ====================
         async function saveCurrentPhoto() {
             debugLog('💾 Попытка сохранить фото...');
-
-            // Проверяем подписку
-            if (!state.isSubscribed) {
+            
+            // Сначала проверяем подписку в реальном времени
+            const isSubscribedNow = await checkSubscriptionRealtime();
+            
+            if (!isSubscribedNow) {
                 debugLog('❌ Сохранение доступно только подписчикам', 'warning');
                 showToast('🍓 Сохранять фото могут только подписчики канала!');
-
                 if (tg) {
                     tg.openLink('https://t.me/neuroticababes_bot');
                 }
@@ -564,37 +587,51 @@
         function getPostId() {
             const urlParams = new URLSearchParams(window.location.search);
             let postId = urlParams.get('post');
-            if (postId) return postId;
+            if (postId) {
+                debugLog(`📁 [URL] post из параметров: "${postId}"`, 'info');
+                return postId;
+            }
 
             const tgStartParam = tg?.initDataUnsafe?.start_param;
             if (tgStartParam && tgStartParam.includes('-') && tgStartParam.includes('_')) {
+                debugLog(`📁 [TG] post из start_param: "${tgStartParam}"`, 'info');
                 return tgStartParam;
             }
 
             if (tgStartParam && tgStartParam.includes(':')) {
                 const parts = tgStartParam.split(':');
                 if (parts.length >= 1 && parts[0].includes('-') && parts[0].includes('_')) {
+                    debugLog(`📁 [TG] post из start_param (разбор): "${parts[0]}"`, 'info');
                     return parts[0];
                 }
             }
+            debugLog(`❌ [URL] post НЕ НАЙДЕН!`, 'error');
             return null;
         }
 
         function getUserId() {
             const urlParams = new URLSearchParams(window.location.search);
             let userId = urlParams.get('user');
-            if (userId) return parseInt(userId);
+            if (userId) {
+                debugLog(`👤 [URL] user из параметров: "${userId}"`, 'info');
+                return parseInt(userId);
+            }
 
             const tgStartParam = tg?.initDataUnsafe?.start_param;
             if (tgStartParam && tgStartParam.includes(':')) {
                 const parts = tgStartParam.split(':');
                 if (parts.length >= 2 && !isNaN(parseInt(parts[1]))) {
+                    debugLog(`👤 [TG] user из start_param: "${parts[1]}"`, 'info');
                     return parseInt(parts[1]);
                 }
             }
 
             const user = tg?.initDataUnsafe?.user;
-            if (user && user.id) return user.id;
+            if (user && user.id) {
+                debugLog(`👤 [TG] user из Telegram: "${user.id}"`, 'info');
+                return user.id;
+            }
+            debugLog(`❌ [URL] user НЕ НАЙДЕН!`, 'error');
             return null;
         }
 
@@ -610,10 +647,34 @@
         console.log('=== ПОЛУЧЕННЫЕ ПАРАМЕТРЫ ===');
         console.log('post:', rawPost);
         console.log('user:', rawUser);
-
-        const parsedSubscribed = rawSubscribed === 'true';
+        console.log('subscribed (raw):', rawSubscribed, 'тип:', typeof rawSubscribed);
+        console.log('purchased (raw):', rawPurchased);
+        console.log('bananas (raw):', rawBananas);
+        
+        // ДЕТАЛЬНАЯ ОТЛАДКА ПАРАМЕТРА subscribed
+        debugLog('='.repeat(60), 'info');
+        debugLog('🔍 [ПОДПИСКА] АНАЛИЗ ПАРАМЕТРА subscribed ИЗ URL', 'info');
+        debugLog(`📥 rawSubscribed = "${rawSubscribed}" (тип: ${typeof rawSubscribed}, длина: ${rawSubscribed?.length || 0})`, 'info');
+        
+        let parsedSubscribed = false;
+        if (rawSubscribed === 'true') {
+            parsedSubscribed = true;
+            debugLog('✅ [ПОДПИСКА] rawSubscribed === "true" → parsedSubscribed = true', 'success');
+        } else if (rawSubscribed === 'false') {
+            parsedSubscribed = false;
+            debugLog('❌ [ПОДПИСКА] rawSubscribed === "false" → parsedSubscribed = false', 'warning');
+        } else if (rawSubscribed) {
+            debugLog(`⚠️ [ПОДПИСКА] rawSubscribed = "${rawSubscribed}" (нестандартное значение)`, 'warning');
+            parsedSubscribed = rawSubscribed === 'true';
+            debugLog(`   → parsedSubscribed = ${parsedSubscribed}`, 'info');
+        } else {
+            debugLog('⚠️ [ПОДПИСКА] rawSubscribed отсутствует в URL', 'warning');
+        }
+        
         const parsedPurchased = rawPurchased === 'true';
         const parsedBananas = rawBananas ? parseInt(rawBananas) : 3;
+        
+        debugLog(`📊 [ПОДПИСКА] ИТОГОВОЕ ЗНАЧЕНИЕ: parsedSubscribed = ${parsedSubscribed}`, parsedSubscribed ? 'success' : 'error');
 
         // ==================== СОСТОЯНИЕ ====================
         let state = {
@@ -627,7 +688,7 @@
             startTime: Date.now(),
             touchStartX: 0,
             loadingAttempts: 0,
-            offlineMode: false  // будет обновлено после проверки туннеля
+            offlineMode: false
         };
 
         // ==================== ОТЛАДОЧНАЯ ПАНЕЛЬ ====================
@@ -686,10 +747,10 @@
         }
 
         debugLog('='.repeat(50));
-        debugLog('📊 СОСТОЯНИЕ:');
+        debugLog('📊 СОСТОЯНИЕ ПРИ ЗАГРУЗКЕ:');
         debugLog(`   • Пост: ${state.postId}`);
         debugLog(`   • User: ${state.userId}`);
-        debugLog(`   • Подписка: ${state.isSubscribed}`);
+        debugLog(`   • Подписка (из URL): ${state.isSubscribed}`, state.isSubscribed ? 'success' : 'error');
         debugLog(`   • Куплен: ${state.hasPurchased}`);
         debugLog(`   • Бананов: ${state.bananasLeft}`);
         debugLog('='.repeat(50));
@@ -700,8 +761,58 @@
         } else {
             // Сначала проверяем туннель, потом грузим галерею
             checkTunnelConnection().then(() => {
-                loadGallery();
+                // После проверки туннеля, проверяем подписку в реальном времени
+                checkSubscriptionRealtime().then(() => {
+                    loadGallery();
+                });
             });
+        }
+
+        // ==================== ПРОВЕРКА СОЕДИНЕНИЯ С ТУННЕЛЕМ ====================
+        let isTunnelOnline = false;
+        let tunnelCheckDone = false;
+
+        async function checkTunnelConnection() {
+            debugLog('🔍 Проверка подключения к туннелю...');
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                
+                const response = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
+                    method: 'OPTIONS',
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (response.ok || response.status === 405 || response.status === 400) {
+                    isTunnelOnline = true;
+                    debugLog('✅ Туннель доступен (онлайн)', 'success');
+                } else {
+                    isTunnelOnline = false;
+                    debugLog('⚠️ Туннель недоступен, статус: ' + response.status, 'warning');
+                }
+            } catch (e) {
+                isTunnelOnline = false;
+                debugLog(`❌ Туннель НЕДОСТУПЕН: ${e.message}`, 'error');
+            }
+            
+            tunnelCheckDone = true;
+            
+            const offlineBadge = document.getElementById('offline-badge');
+            const offlineNote = document.getElementById('offline-note');
+            
+            if (!isTunnelOnline) {
+                if (offlineBadge) offlineBadge.style.display = 'block';
+                if (offlineNote) offlineNote.style.display = 'block';
+                debugLog('📴 Режим ОФФЛАЙН - статистика не будет отправляться', 'warning');
+            } else {
+                if (offlineBadge) offlineBadge.style.display = 'none';
+                if (offlineNote) offlineNote.style.display = 'none';
+                debugLog('🌐 Режим ОНЛАЙН - статистика отправляется', 'success');
+            }
+            
+            return isTunnelOnline;
         }
 
         // ==================== ЗАГРУЗКА ФОТО ====================
@@ -731,6 +842,7 @@
         async function loadGallery() {
             debugLog('🔄 НАЧАЛО ЗАГРУЗКИ ГАЛЕРЕИ...');
             debugLog(`📁 Пост: ${state.postId}`);
+            debugLog(`🍓 [ПОДПИСКА] Текущий статус при загрузке галереи: ${state.isSubscribed}`, state.isSubscribed ? 'success' : 'error');
 
             try {
                 const [general, banana, strawberry] = await Promise.all([
@@ -748,8 +860,19 @@
                     return;
                 }
 
+                const effectivePurchased = state.hasPurchased;
+                const effectiveSubscribed = state.isSubscribed;
+
+                debugLog('='.repeat(50));
+                debugLog(`🍓 [ПОДПИСКА] КРИТИЧЕСКАЯ ЛОГИКА ДОСТУПА К КЛУБНИЧНЫМ ФОТО:`, 'info');
+                debugLog(`   • purchased = ${effectivePurchased}`, 'info');
+                debugLog(`   • subscribed = ${effectiveSubscribed}`, effectiveSubscribed ? 'success' : 'error');
+                debugLog(`   • ДОСТУП ЕСТЬ (purchased ИЛИ subscribed) = ${effectivePurchased || effectiveSubscribed}`, (effectivePurchased || effectiveSubscribed) ? 'success' : 'error');
+                debugLog('='.repeat(50));
+
                 let files = [];
 
+                // Общие фото
                 general.forEach(f => {
                     files.push({
                         name: f.name,
@@ -760,6 +883,7 @@
                     });
                 });
 
+                // Банановые фото
                 banana.forEach(f => {
                     const isOriginal = !f.name.startsWith('banana_banana_');
                     if (isOriginal) {
@@ -790,6 +914,8 @@
                     }
                 });
 
+                // Клубничные фото - КРИТИЧЕСКАЯ ЛОГИКА
+                debugLog(`🍓 [ПОДПИСКА] Обработка ${strawberry.length} клубничных фото...`, 'info');
                 strawberry.forEach(f => {
                     const isOriginal = !f.name.startsWith('strawberry_strawberry_');
                     if (isOriginal) {
@@ -797,15 +923,21 @@
                         const blurredFile = strawberry.find(b => b.name === blurredFileName);
 
                         let imageUrl, isBlurred;
+                        let accessReason = '';
+                        
                         if (state.hasPurchased || state.isSubscribed) {
                             imageUrl = f.download_url;
                             isBlurred = false;
+                            accessReason = state.hasPurchased ? 'куплен пост' : 'подписка есть';
+                            debugLog(`🍓 [ПОДПИСКА] Фото ${f.name}: ДОСТУП ЕСТЬ (${accessReason})`, 'success');
                         } else if (blurredFile) {
                             imageUrl = blurredFile.download_url;
                             isBlurred = true;
+                            debugLog(`🍓 [ПОДПИСКА] Фото ${f.name}: БЛЮР (нет подписки, есть блюр)`, 'error');
                         } else {
                             imageUrl = 'https://via.placeholder.com/600x800/333/fff?text=No+Access';
                             isBlurred = true;
+                            debugLog(`🍓 [ПОДПИСКА] Фото ${f.name}: НЕТ ДОСТУПА (нет подписки, нет блюра)`, 'critical');
                         }
 
                         files.push({
@@ -815,13 +947,19 @@
                             originalUrl: f.download_url,
                             type: 'strawberry',
                             isBlurred: isBlurred,
-                            isBanana: false
+                            isBanana: false,
+                            accessReason: accessReason
                         });
                     }
                 });
 
                 state.files = files;
                 debugLog(`✅ ЗАГРУЖЕНО ${files.length} фото`);
+
+                // Логируем итоговый доступ к клубничным фото
+                const strawberryFiles = files.filter(f => f.type === 'strawberry');
+                const accessibleStrawberry = strawberryFiles.filter(f => !f.isBlurred);
+                debugLog(`🍓 [ПОДПИСКА] ИТОГО клубничных фото: ${strawberryFiles.length}, доступно: ${accessibleStrawberry.length}`, accessibleStrawberry.length > 0 ? 'success' : 'error');
 
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('gallery').style.display = 'block';
@@ -846,7 +984,9 @@
             image.src = file.url + '?t=' + Date.now();
 
             document.getElementById('counter-text').innerText = `${state.index+1}/${state.files.length}`;
-            debugLog(`🖼 Показ ${state.index+1}/${state.files.length}: ${file.name}`);
+            
+            const accessIcon = file.isBlurred ? '🔒' : '✅';
+            debugLog(`🖼 Показ ${state.index+1}/${state.files.length}: ${file.name} (${file.type}) ${accessIcon} ${file.accessReason ? '('+file.accessReason+')' : ''}`);
         }
 
         function onImageError() {
@@ -901,7 +1041,6 @@
         });
 
         async function sendData(action, details = {}) {
-            // Не отправляем, если туннель недоступен
             if (!isTunnelOnline) {
                 debugLog(`📴 Оффлайн режим: ${action} не отправлено`, 'warning');
                 return;
@@ -918,7 +1057,6 @@
                 debugLog(`📤 Отправлено: ${action}`, 'success');
             } catch (e) {
                 debugLog(`⚠️ Не удалось отправить ${action}: ${e.message}`, 'warning');
-                // Если ошибка - переключаем в оффлайн
                 if (isTunnelOnline) {
                     isTunnelOnline = false;
                     const offlineBadge = document.getElementById('offline-badge');
@@ -930,13 +1068,24 @@
             }
         }
 
-        function handleStrawberry() {
+        async function handleStrawberry() {
+            debugLog('🍓 [ПОДПИСКА] НАЖАТА КНОПКА КЛУБНИЧКИ', 'info');
             sendData('strawberry_click');
-            if (!state.isSubscribed && tg) {
-                tg.openLink('https://t.me/neuroticababes_bot');
-                showToast('🍓 Подпишитесь на канал');
+            
+            // ПРОВЕРЯЕМ ПОДПИСКУ В РЕАЛЬНОМ ВРЕМЕНИ!
+            const isSubscribedNow = await checkSubscriptionRealtime();
+            
+            if (!isSubscribedNow) {
+                debugLog('❌ [ПОДПИСКА] Подписки нет, открываем канал', 'error');
+                if (tg) {
+                    tg.openLink('https://t.me/neuroticababes_bot');
+                    showToast('🍓 Подпишитесь на канал, чтобы видеть клубничные фото!');
+                } else {
+                    showToast('🍓 Подпишитесь на канал: https://t.me/neuroticababes_bot');
+                }
             } else {
-                showToast('✅ Вы уже подписаны!');
+                debugLog('✅ [ПОДПИСКА] Подписка подтверждена!', 'success');
+                showToast('✅ Вы уже подписаны! Клубничные фото доступны.');
             }
         }
 
@@ -988,6 +1137,8 @@
         }
 
         function updateUI() {
+            debugLog(`🔄 [UI] Обновление интерфейса: подписка=${state.isSubscribed}`, state.isSubscribed ? 'success' : 'error');
+            
             const bananaBadge = document.getElementById('banana-count-badge');
             if (bananaBadge) {
                 bananaBadge.textContent = state.bananasLeft;
@@ -1000,10 +1151,15 @@
             if (subStatus) {
                 subStatus.textContent = state.isSubscribed ? '(у вас она есть)' : '(у вас её пока нет)';
                 subStatus.style.color = state.isSubscribed ? '#ffd700' : '#ff6b6b';
+                debugLog(`   • sub-status текст: "${subStatus.textContent}"`, 'info');
             }
 
             const subBadge = document.getElementById('subscribed-badge');
-            if (subBadge) subBadge.style.display = state.isSubscribed ? 'block' : 'none';
+            if (subBadge) {
+                subBadge.style.display = state.isSubscribed ? 'block' : 'none';
+                debugLog(`   • subscribed-badge: ${state.isSubscribed ? 'ПОКАЗАН' : 'СКРЫТ'}`, 'info');
+            }
+            
             const purchasedBadge = document.getElementById('purchased-badge');
             if (purchasedBadge) purchasedBadge.style.display = state.hasPurchased ? 'block' : 'none';
 
@@ -1051,6 +1207,7 @@
             const infoBtn = document.getElementById('info-btn');
             const modalCloseBtn = document.getElementById('modal-close-btn');
             const forceReloadItem = document.getElementById('force-reload-item');
+            const refreshSubItem = document.getElementById('refresh-subscription-item');
             const saveBtn = document.getElementById('save-btn');
 
             if (strawberryBtn) strawberryBtn.onclick = handleStrawberry;
@@ -1060,6 +1217,7 @@
             if (infoBtn) infoBtn.onclick = showInfo;
             if (modalCloseBtn) modalCloseBtn.onclick = () => hideInfo();
             if (forceReloadItem) forceReloadItem.onclick = forceReload;
+            if (refreshSubItem) refreshSubItem.onclick = refreshSubscription;
             if (saveBtn) saveBtn.onclick = saveCurrentPhoto;
 
             updateMusicButton();
@@ -1081,6 +1239,7 @@
         window.showInfo = showInfo;
         window.hideInfo = hideInfo;
         window.forceReload = forceReload;
+        window.refreshSubscription = refreshSubscription;
         window.onImageError = onImageError;
         window.saveCurrentPhoto = saveCurrentPhoto;
 
