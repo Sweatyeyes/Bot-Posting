@@ -1,552 +1,381 @@
-# interface.py 10.6 - ИСПРАВЛЕНА ОШИБКА is_member
-import asyncio
-import os
-import logging
-import json
-from datetime import datetime
-from uuid import uuid4
-from urllib.parse import urlencode
-from dotenv import load_dotenv
-from aiohttp import web
-from aiogram import Bot, Dispatcher, types, F
-from aiogram.filters import Command, CommandStart, CommandObject
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.types import WebAppInfo, Message
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gallery</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #000; color: #fff; font-family: sans-serif; height: 100vh; overflow: hidden; }
+        #loading { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; gap: 20px; }
+        .spinner { width: 40px; height: 40px; border: 3px solid #333; border-top-color: #2ea6ff; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { color: #888; }
+        #gallery { display: none; height: 100vh; position: relative; background: #000; }
+        #image-container { position: absolute; top: 0; left: 0; right: 0; bottom: 80px; display: flex; align-items: center; justify-content: center; background: #000; z-index: 1; }
+        #image { max-width: 100%; max-height: 100%; object-fit: contain; opacity: 0; transition: opacity 0.2s; }
+        #image.loaded { opacity: 1; }
+        #nav-left, #nav-right { position: absolute; top: 0; bottom: 80px; width: 30%; z-index: 1000; cursor: pointer; background: transparent; }
+        #nav-left { left: 0; }
+        #nav-right { right: 0; }
+        #bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 80px; background: linear-gradient(to top, #000, transparent); display: flex; align-items: center; justify-content: space-around; padding: 0 10px; z-index: 500; }
+        .bottom-btn { background: transparent; border: none; color: white; font-size: 32px; cursor: pointer; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; padding: 0; position: relative; }
+        .bottom-btn:active { transform: scale(0.9); }
+        .banana-count-badge { position: absolute; top: -5px; right: -5px; background: #8B4513; color: white; font-size: 14px; font-weight: bold; min-width: 22px; height: 22px; border-radius: 12px; display: flex; align-items: center; justify-content: center; padding: 0 5px; border: 2px solid #ffd700; }
+        #counter { color: white; font-size: 16px; min-width: 70px; text-align: center; display: flex; align-items: center; gap: 10px; }
+        #save-btn { font-size: 24px; cursor: pointer; background: transparent; border: none; color: white; padding: 0 5px; }
+        #save-btn.disabled { opacity: 0.3; pointer-events: none; }
+        #badges { position: absolute; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 1500; }
+        .badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+        #subscribed-badge { background: #ffd700; color: #000; display: none; }
+        #purchased-badge { background: #2ea6ff; color: #fff; display: none; }
+        #offline-badge { background: #666; color: #fff; display: none; }
+        #info-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.95); backdrop-filter: blur(10px); z-index: 2000; display: none; align-items: center; justify-content: center; padding: 20px; }
+        #info-modal.active { display: flex; }
+        .modal-content { background: #2d2d2d; border-radius: 20px; padding: 25px; max-width: 350px; width: 100%; border: 1px solid #404040; max-height: 80vh; overflow-y: auto; }
+        .modal-title { color: #ffd700; font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 20px; }
+        .modal-item { display: flex; align-items: center; gap: 15px; padding: 12px 0; border-bottom: 1px solid #404040; cursor: pointer; }
+        .modal-item:last-child { border-bottom: none; }
+        .modal-icon { font-size: 32px; width: 50px; text-align: center; }
+        .modal-text-title { font-weight: bold; color: #2ea6ff; }
+        .modal-text-desc { font-size: 14px; color: #b1b1b1; }
+        .modal-close { background: #2ea6ff; color: white; border: none; padding: 12px; border-radius: 10px; font-size: 16px; font-weight: bold; width: 100%; margin-top: 20px; cursor: pointer; }
+        #toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(300px); background: rgba(0,0,0,0.9); color: white; padding: 10px 20px; border-radius: 30px; font-size: 14px; z-index: 3000; border: 1px solid #2ea6ff; transition: transform 0.3s; white-space: nowrap; opacity: 0; }
+        #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+        #error { display: none; text-align: center; padding: 20px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #ff6b6b; background: rgba(0,0,0,0.8); border-radius: 10px; width: 80%; z-index: 2000; }
+        #debug-panel { position: absolute; bottom: 90px; left: 10px; right: 10px; background: rgba(0,0,0,0.95); color: #0f0; font-size: 11px; padding: 10px; border-radius: 5px; display: block; z-index: 2000; max-height: 300px; overflow-y: auto; border: 2px solid #ffaa00; font-family: monospace; }
+        .debug-entry { border-bottom: 1px solid #333; padding: 3px 0; word-break: break-all; }
+        .debug-error { color: #ff6b6b; }
+        .debug-success { color: #6bff6b; }
+        .debug-warning { color: #ffaa00; }
+        .debug-info { color: #2ea6ff; }
+    </style>
+</head>
+<body>
+    <audio id="bg-music" loop preload="auto"><source src="song.mp3" type="audio/mpeg"></audio>
+    <div id="loading"><div class="spinner"></div><div class="loading-text">🔄 Проверка подписки...</div></div>
+    <div id="gallery">
+        <div id="debug-panel"><div class="debug-entry">🔍 v10.8 - АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПОДПИСКИ</div></div>
+        <div id="badges">
+            <div id="subscribed-badge" class="badge">🍓 Подписчик</div>
+            <div id="purchased-badge" class="badge">🪙 Куплено</div>
+            <div id="offline-badge" class="badge">📴 Оффлайн</div>
+        </div>
+        <div id="nav-left"></div><div id="nav-right"></div>
+        <div id="image-container"><img id="image" src="" onload="this.classList.add('loaded')" onerror="onImageError()"></div>
+        <div id="bottom-bar">
+            <button class="bottom-btn" id="strawberry-btn" title="Проверить подписку (🍓)">🍓</button>
+            <button class="bottom-btn" id="banana-btn" title="Потратить банан">🍌<span id="banana-count-badge" class="banana-count-badge">0</span></button>
+            <div id="counter"><button id="save-btn" title="Сохранить (только подписчики)">💾</button><span id="counter-text">1/1</span></div>
+            <button class="bottom-btn" id="coin-btn" title="Купить пост">🪙</button>
+            <button class="bottom-btn" id="music-btn" title="Музыка">🎵</button>
+            <button class="bottom-btn" id="info-btn" title="Помощь">❓</button>
+        </div>
+    </div>
+    <div id="info-modal" onclick="hideInfo(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-title">🍓 ИНФОРМАЦИЯ</div>
+            <div class="modal-item"><div class="modal-icon">🍓</div><div class="modal-text"><div class="modal-text-title">Клубничка</div><div class="modal-text-desc">Для подписчиков канала <span id="sub-status">(у вас её пока нет)</span></div></div></div>
+            <div class="modal-item"><div class="modal-icon">🍌</div><div class="modal-text"><div class="modal-text-title">Банан</div><div class="modal-text-desc">Трать на банановые фото (осталось <span id="banana-info-count">0</span>)</div></div></div>
+            <div class="modal-item"><div class="modal-icon">💾</div><div class="modal-text"><div class="modal-text-title">Сохранить</div><div class="modal-text-desc">Доступно только подписчикам</div></div></div>
+            <div class="modal-item"><div class="modal-icon">🪙</div><div class="modal-text"><div class="modal-text-title">Монета</div><div class="modal-text-desc">Купить весь пост (199₽)</div></div></div>
+            <div class="modal-item" id="force-reload-item"><div class="modal-icon">🔄</div><div class="modal-text"><div class="modal-text-title">Перезагрузить</div><div class="modal-text-desc">Обновить галерею</div></div></div>
+            <button class="modal-close" id="modal-close-btn">Закрыть</button>
+        </div>
+    </div>
+    <div id="toast"></div><div id="error"></div>
 
-from plategaio import PlategaAsyncClient, CreateTransactionRequest
-
-from database import Database
-
-load_dotenv()
-
-INTERFACE_TOKEN = os.getenv('INTERFACE_TOKEN')
-ADMIN_IDS = [337383733]
-
-VOLSHEBNY_GROUP_ID = -1001889343201
-
-WEBAPP_URL = "https://sweatyeyes.github.io/Bot-Posting/index.html"
-BOT_USERNAME = "k0tbezzabot"
-
-# НАСТРОЙКИ NGROK
-TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev'
-TUNNEL_PASS = None
-
-# НАСТРОЙКИ PLATEGA
-PLATEGA_MERCHANT_ID = os.getenv('PLATEGA_MERCHANT_ID')
-PLATEGA_SECRET = os.getenv('PLATEGA_SECRET')
-PLATEGA_RETURN_URL = os.getenv('PLATEGA_RETURN_URL', f'https://t.me/{BOT_USERNAME}?start=payment_success')
-PLATEGA_WEBHOOK_URL = os.getenv('PLATEGA_WEBHOOK_URL', f'{TUNNEL_URL}/api/platega-webhook')
-
-# Уменьшаем шум от библиотек
-logging.getLogger('aiogram').setLevel(logging.WARNING)
-logging.getLogger('aiohttp').setLevel(logging.WARNING)
-logging.getLogger('asyncio').setLevel(logging.WARNING)
-logging.getLogger('urllib3').setLevel(logging.WARNING)
-
-# Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('interface_bot.log'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
-
-# Инициализация бота и БД
-bot = Bot(token=INTERFACE_TOKEN)
-dp = Dispatcher()
-db = Database()
-db.init_tables()
-
-# Инициализация Platega клиента
-platega_client = PlategaAsyncClient(
-    merchant_id=PLATEGA_MERCHANT_ID,
-    secret=PLATEGA_SECRET,
-)
-
-
-async def check_channel_subscription(user_id: int) -> bool:
-    """ПРОВЕРКА ПОДПИСКИ - ИСПРАВЛЕННАЯ ВЕРСИЯ"""
-    print(f"\n{'=' * 80}")
-    print(f"🔍 [ПОДПИСКА] ПРОВЕРКА ДЛЯ USER {user_id}")
-    print(f"{'=' * 80}")
-    
-    try:
-        # Запрос к Telegram API
-        print(f"📡 Запрос к Telegram API...")
-        print(f"   • Канал ID: {VOLSHEBNY_GROUP_ID}")
-        print(f"   • Пользователь ID: {user_id}")
+    <script>
+        console.log('🚀 v10.8 - АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПОДПИСКИ');
         
-        member = await bot.get_chat_member(chat_id=VOLSHEBNY_GROUP_ID, user_id=user_id)
+        const CONFIG = { REPO: "Sweatyeyes/Bot-Posting", GITHUB_API: "https://api.github.com/repos" };
+        const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
+        const BOT_USERNAME = 'k0tbezzabot';
+        const tg = window.Telegram?.WebApp;
         
-        print(f"📥 Получен ответ:")
-        print(f"   • Статус: {member.status}")
-        print(f"   • Тип объекта: {type(member).__name__}")
+        // ==================== ПОЛУЧЕНИЕ ПАРАМЕТРОВ ====================
+        const urlParams = new URLSearchParams(window.location.search);
+        const rawPost = urlParams.get('post') || (tg?.initDataUnsafe?.start_param?.split(':')[0]);
+        const rawUser = urlParams.get('user') || (tg?.initDataUnsafe?.start_param?.split(':')[1]) || tg?.initDataUnsafe?.user?.id;
+        const rawPurchased = urlParams.get('purchased') === 'true';
+        const rawBananas = parseInt(urlParams.get('bananas')) || 3;
         
-        # Анализируем статус
-        result = False
-        status = member.status
+        let state = {
+            files: [], index: 0, postId: rawPost, userId: parseInt(rawUser),
+            isSubscribed: false, // временно false, обновится после проверки
+            hasPurchased: rawPurchased,
+            bananasLeft: rawBananas,
+            startTime: Date.now(),
+            loadingAttempts: 0,
+            subscriptionChecked: false
+        };
         
-        if status == 'creator':
-            result = True
-            print(f"✅ Статус 'creator' → подписка ЕСТЬ (создатель канала)")
-        elif status == 'administrator':
-            result = True
-            print(f"✅ Статус 'administrator' → подписка ЕСТЬ (администратор)")
-        elif status == 'member':
-            result = True
-            print(f"✅ Статус 'member' → подписка ЕСТЬ (участник)")
-        elif status == 'left':
-            result = False
-            print(f"❌ Статус 'left' → подписки НЕТ (вышел из канала)")
-        elif status == 'kicked':
-            result = False
-            print(f"❌ Статус 'kicked' → подписки НЕТ (забанен)")
-        elif status == 'restricted':
-            result = False
-            print(f"⚠️ Статус 'restricted' → подписки НЕТ (ограничен)")
-        else:
-            result = False
-            print(f"⚠️ Неизвестный статус: {status} → подписки НЕТ")
+        // ==================== ОТЛАДКА ====================
+        const debugPanel = document.getElementById('debug-panel');
+        function debugLog(msg, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = 'debug-entry';
+            if (type === 'error') entry.classList.add('debug-error');
+            if (type === 'success') entry.classList.add('debug-success');
+            if (type === 'warning') entry.classList.add('debug-warning');
+            if (type === 'info') entry.classList.add('debug-info');
+            entry.textContent = `[${new Date().toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit', second:'2-digit' })}] ${msg}`;
+            debugPanel.appendChild(entry);
+            debugPanel.scrollTop = debugPanel.scrollHeight;
+            while(debugPanel.children.length > 50) debugPanel.removeChild(debugPanel.firstChild);
+            console.log(msg);
+        }
         
-        print(f"📊 РЕЗУЛЬТАТ: {result}")
-        
-        # Сохраняем в БД
-        db.update_subscription_status(user_id, result)
-        print(f"💾 Статус сохранён в БД: {result}")
-        
-        # Проверяем, что сохранилось
-        user_stats = db.get_user_stats(user_id)
-        if user_stats:
-            db_status = user_stats.get('is_subscribed', False)
-            print(f"🔍 Проверка БД: is_subscribed = {db_status}")
-            if db_status != result:
-                print(f"⚠️ ВНИМАНИЕ! Статус в БД ({db_status}) отличается от проверенного ({result})!")
-        
-        print(f"{'=' * 80}\n")
-        return result
-        
-    except Exception as e:
-        print(f"\n❌ ОШИБКА проверки подписки для {user_id}:")
-        print(f"   • Ошибка: {e}")
-        print(f"   • Тип: {type(e).__name__}")
-        logger.error(f"❌ Ошибка проверки подписки для {user_id}: {e}", exc_info=True)
-        
-        # В случае ошибки пробуем получить из БД
-        try:
-            print(f"📦 Пытаемся получить кэшированный статус из БД...")
-            user_stats = db.get_user_stats(user_id)
-            if user_stats:
-                cached = user_stats.get('is_subscribed', False)
-                print(f"   • Кэшированный статус: {cached}")
-                return cached
-            else:
-                print(f"   • Пользователь не найден в БД, возвращаем False")
-                return False
-        except Exception as db_error:
-            print(f"   • Ошибка при получении из БД: {db_error}")
-            return False
-
-
-# ==================== HTTP-СЕРВЕР ====================
-async def handle_http(request):
-    """Обрабатывает POST запросы от ngrok (статистика из WebApp)"""
-    try:
-        data = await request.json()
-        print(f"\n📥 [HTTP] {data.get('action')} от user={data.get('user_id')}")
-        
-        user_id = data.get('user_id')
-        post_id = data.get('post_id')
-        action = data.get('action')
-        details = data.get('details', {})
-
-        if user_id:
-            db.save_stats(user_id, action, post_id, data)
-
-            if action == 'spend_banana':
-                photo_name = details.get('photo_name')
-                if photo_name:
-                    success = db.spend_banana(user_id, post_id, photo_name)
-                    bananas_left = db.get_user_bananas(user_id)
-                    return web.json_response({
-                        'success': success,
-                        'bananas_left': bananas_left
-                    }, headers={'Access-Control-Allow-Origin': '*'})
-
-        return web.json_response({'status': 'ok'}, headers={'Access-Control-Allow-Origin': '*'})
-
-    except Exception as e:
-        print(f"❌ [HTTP] Ошибка: {e}")
-        return web.json_response({'error': str(e)}, status=500, headers={'Access-Control-Allow-Origin': '*'})
-
-
-async def handle_platega_webhook(request):
-    """Принимает вебхуки от Platega"""
-    try:
-        merchant_id = request.headers.get('X-MerchantId')
-        secret = request.headers.get('X-Secret')
-
-        if merchant_id != PLATEGA_MERCHANT_ID or secret != PLATEGA_SECRET:
-            return web.Response(status=401, text="Unauthorized")
-
-        data = await request.json()
-        print(f"💰 [PLATEGA] {data.get('id')} - {data.get('status')}")
-
-        if data.get('status') == 'CONFIRMED':
-            payload = data.get('payload', '')
-            if payload and payload.startswith('user:'):
-                parts = payload.split(':')
-                user_id = int(parts[1])
-                post_id = parts[2] if len(parts) > 2 else None
-                if post_id:
-                    db.add_purchase(user_id, post_id, data.get('amount', 1), data.get('id'))
-                    logger.info(f"✅ Пользователь {user_id} купил пост {post_id}")
-
-        return web.Response(status=200, text="OK")
-    except Exception as e:
-        print(f"❌ [PLATEGA] Ошибка: {e}")
-        return web.Response(status=500, text="Internal Server Error")
-
-
-async def handle_check_subscription(request):
-    """ПРОВЕРКА ПОДПИСКИ В РЕАЛЬНОМ ВРЕМЕНИ"""
-    try:
-        data = await request.json()
-        user_id = data.get('user_id')
-        post_id = data.get('post_id')
-        
-        print(f"\n🍓 [WEBHOOK] Проверка подписки: user={user_id}, post={post_id}")
-        
-        if not user_id:
-            return web.json_response({'error': 'No user_id'}, status=400)
-        
-        is_subscribed = await check_channel_subscription(user_id)
-        
-        response_data = {
-            'is_subscribed': is_subscribed,
-            'user_id': user_id,
-            'post_id': post_id,
-            'timestamp': datetime.now().isoformat(),
-            'debug': {
-                'channel_id': VOLSHEBNY_GROUP_ID,
-                'check_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        // ==================== ПРОВЕРКА ПОДПИСКИ ====================
+        async function checkSubscription() {
+            debugLog('🍓🍓🍓 АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПОДПИСКИ 🍓🍓🍓', 'info');
+            
+            if (!state.userId) {
+                debugLog('❌ Нет user_id!', 'error');
+                return false;
+            }
+            
+            try {
+                const response = await fetch(`${TUNNEL_URL}/api/check-subscription`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId })
+                });
+                
+                const data = await response.json();
+                debugLog(`📥 Ответ: ${JSON.stringify(data)}`, 'info');
+                
+                const isSubscribed = data.is_subscribed === true;
+                debugLog(`🍓 Результат: ${isSubscribed ? 'ПОДПИСАН ✅' : 'НЕ ПОДПИСАН ❌'}`, isSubscribed ? 'success' : 'error');
+                
+                state.isSubscribed = isSubscribed;
+                state.subscriptionChecked = true;
+                updateUI();
+                
+                return isSubscribed;
+                
+            } catch(e) {
+                debugLog(`❌ Ошибка проверки: ${e.message}`, 'error');
+                state.subscriptionChecked = true;
+                return false;
             }
         }
         
-        return web.json_response(
-            response_data,
-            headers={'Access-Control-Allow-Origin': '*'}
-        )
-        
-    except Exception as e:
-        print(f"❌ [WEBHOOK] Ошибка: {e}")
-        return web.json_response({'error': str(e)}, status=500, headers={'Access-Control-Allow-Origin': '*'})
-
-
-async def handle_options(request):
-    """Обрабатывает CORS preflight запросы"""
-    return web.Response(
-        headers={
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
+        // ==================== ЗАГРУЗКА ГАЛЕРЕИ ====================
+        async function loadFolder(folder) {
+            const url = `${CONFIG.GITHUB_API}/${CONFIG.REPO}/contents/posts/${state.postId}/${folder}`;
+            try {
+                const res = await fetch(url, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
+                if (res.status === 404) return [];
+                const data = await res.json();
+                return data.filter(f => f.name.match(/\.(jpg|jpeg|png)$/i));
+            } catch(e) { return []; }
         }
-    )
-
-
-async def start_http_server():
-    """Запускает HTTP сервер на порту 8080"""
-    app = web.Application()
-    app.router.add_post('/api/webapp-data', handle_http)
-    app.router.add_post('/api/platega-webhook', handle_platega_webhook)
-    app.router.add_options('/api/webapp-data', handle_options)
-    app.router.add_options('/api/platega-webhook', handle_options)
-    app.router.add_post('/api/check-subscription', handle_check_subscription)
-    app.router.add_options('/api/check-subscription', handle_options)
-
-    runner = web.AppRunner(app)
-    await runner.setup()
-    await web.TCPSite(runner, 'localhost', 8080).start()
-
-    print("\n" + "=" * 60)
-    print("🌐 HTTP СЕРВЕР ЗАПУЩЕН НА ПОРТУ 8080")
-    print(f"   • Статистика: {TUNNEL_URL}/api/webapp-data")
-    print(f"   • Вебхук Platega: {PLATEGA_WEBHOOK_URL}")
-    print(f"   • Проверка подписки: {TUNNEL_URL}/api/check-subscription")
-    print("=" * 60 + "\n")
-    return runner
-
-
-@dp.message(CommandStart())
-async def cmd_start(message: types.Message, command: CommandObject):
-    user_id = message.from_user.id
-    args = command.args
-    
-    print(f"\n🚀 /start от {user_id} (@{message.from_user.username})")
-    print(f"📦 Аргумент: {args}")
-
-    db.save_user({
-        'id': user_id,
-        'first_name': message.from_user.first_name,
-        'last_name': message.from_user.last_name,
-        'username': message.from_user.username,
-        'language_code': message.from_user.language_code
-    })
-
-    if args and args.startswith('buy_vip_'):
-        post_id = args.replace('buy_vip_', '')
-        await show_post_purchase_menu(message, post_id)
-    elif args and ('-' in args) and ('_' in args):
-        await handle_gallery_open(message, args)
-    elif args:
-        await handle_gallery_open(message, args)
-    else:
-        kb = InlineKeyboardBuilder()
-        kb.button(text="◀️ Закрыть", callback_data="close")
-        await message.answer(
-            f"👋 Привет, {message.from_user.first_name}!\n\n"
-            f"Нажми на 🪙 в галерее, чтобы купить доступ к посту.",
-            reply_markup=kb.as_markup()
-        )
-
-
-async def handle_gallery_open(message: types.Message, post_id: str):
-    """Открывает галерею"""
-    user_id = message.from_user.id
-    
-    print(f"\n🖼 [GALLERY] Открытие галереи: user={user_id}, post={post_id}")
-    
-    # Проверяем подписку
-    is_subscribed = await check_channel_subscription(user_id)
-    has_purchased = db.has_purchased_post(user_id, post_id)
-    bananas = db.get_user_bananas(user_id)
-    
-    params = {
-        'post': post_id,
-        'user': str(user_id),
-        'subscribed': 'true' if is_subscribed else 'false',
-        'purchased': 'true' if has_purchased else 'false',
-        'bananas': str(bananas),
-        'v': '10.8',
-        't': str(int(datetime.now().timestamp()))
-    }
-    
-    webapp_url = f"{WEBAPP_URL}?{urlencode(params)}"
-    print(f"🔗 URL: {webapp_url}")
-    
-    status_msg = await message.answer("🔄 Загружаю галерею...")
-    
-    kb = InlineKeyboardBuilder()
-    kb.button(text="🖼 ОТКРЫТЬ ГАЛЕРЕЮ", web_app=WebAppInfo(url=webapp_url))
-    
-    status_text = (
-        f"🎨 Галерея готова!\n\n"
-        f"📁 Пост: {post_id}\n"
-        f"🍓 Подписка: {'✅' if is_subscribed else '❌'}\n"
-        f"🪙 Куплен: {'✅' if has_purchased else '❌'}\n"
-        f"🍌 Бананов: {bananas}"
-    )
-    
-    await status_msg.edit_text(status_text, reply_markup=kb.as_markup())
-    db.save_view(user_id, post_id)
-
-
-async def show_post_purchase_menu(message: Message, post_id: str):
-    """Показывает меню покупки"""
-    user_id = message.from_user.id
-    has_purchased = db.has_purchased_post(user_id, post_id)
-    
-    if has_purchased:
-        text = f"✅ Вы уже купили доступ к посту {post_id}!"
-    else:
-        text = f"📁 Пост: {post_id}\n\nНажмите кнопку \"Оплатить пост\" для доступа ко всем скрытым фото"
-    
-    kb = InlineKeyboardBuilder()
-    
-    if has_purchased:
-        kb.button(text="💳 Оплатить пост", callback_data="already_purchased")
-    else:
-        try:
-            transaction_id = str(uuid4())
-            transaction_request = CreateTransactionRequest(
-                paymentMethod=11,
-                id=transaction_id,
-                paymentDetails={"amount": 1.00, "currency": "RUB"},
-                description=f"Доступ к посту {post_id}",
-                returnUrl=f"https://t.me/{BOT_USERNAME}?start=payment_success_{post_id}",
-                payload=f"user:{user_id}:{post_id}"
-            )
-            tx_response = await platega_client.create_transaction(transaction_request)
-            if tx_response and hasattr(tx_response, 'redirect'):
-                kb.button(text="💳 Оплатить пост", url=tx_response.redirect)
-            else:
-                kb.button(text="💳 Оплатить пост", callback_data=f"pay_error:{post_id}")
-        except Exception as e:
-            print(f"❌ Ошибка создания ссылки: {e}")
-            kb.button(text="💳 Оплатить пост", callback_data=f"pay_error:{post_id}")
-    
-    kb.button(text="◀️ Закрыть", callback_data="close")
-    kb.adjust(1)
-    await message.answer(text, reply_markup=kb.as_markup())
-
-
-@dp.callback_query(F.data == "already_purchased")
-async def callback_already_purchased(callback: types.CallbackQuery):
-    await callback.answer("✅ Всё уже оплачено!", show_alert=True)
-
-
-@dp.callback_query(F.data.startswith("pay_error:"))
-async def callback_pay_error(callback: types.CallbackQuery):
-    await callback.answer("❌ Ошибка создания платежа", show_alert=True)
-
-
-@dp.callback_query(F.data == "close")
-async def callback_close(callback: types.CallbackQuery):
-    await callback.message.delete()
-    await callback.message.answer("👋 До свидания!")
-
-
-# ==================== ДИАГНОСТИЧЕСКИЕ КОМАНДЫ ====================
-@dp.message(Command("debug_purchase"))
-async def cmd_debug_purchase(message: types.Message, command: CommandObject):
-    if message.from_user.id not in ADMIN_IDS:
-        return
-    args = command.args
-    if not args:
-        await message.answer("❌ Укажите user_id и post_id")
-        return
-    try:
-        parts = args.split(maxsplit=1)
-        user_id = int(parts[0])
-        post_id = parts[1] if len(parts) > 1 else None
         
-        has_purchased = db.has_purchased_post(user_id, post_id)
-        user_stats = db.get_user_stats(user_id)
-        is_subscribed = await check_channel_subscription(user_id)
+        async function loadGallery() {
+            debugLog('🔄 Загрузка галереи...');
+            try {
+                const [general, banana, strawberry] = await Promise.all([
+                    loadFolder('general'), loadFolder('banana'), loadFolder('strawberry')
+                ]);
+                
+                debugLog(`📊 general=${general.length}, banana=${banana.length}, strawberry=${strawberry.length}`);
+                
+                let files = [];
+                general.forEach(f => files.push({ name: f.name, url: f.download_url, type: 'general', isBlurred: false, isBanana: false }));
+                
+                banana.forEach(f => {
+                    if (!f.name.startsWith('banana_banana_')) {
+                        const blurred = banana.find(b => b.name === `banana_banana_${f.name}`);
+                        files.push({
+                            name: f.name, originalName: f.name,
+                            url: state.hasPurchased ? f.download_url : (blurred ? blurred.download_url : f.download_url),
+                            originalUrl: f.download_url, type: 'banana',
+                            isBlurred: !state.hasPurchased && !!blurred, isBanana: true
+                        });
+                    }
+                });
+                
+                strawberry.forEach(f => {
+                    if (!f.name.startsWith('strawberry_strawberry_')) {
+                        const blurred = strawberry.find(b => b.name === `strawberry_strawberry_${f.name}`);
+                        const hasAccess = state.hasPurchased || state.isSubscribed;
+                        debugLog(`🍓 ${f.name}: доступ=${hasAccess} (purchased=${state.hasPurchased}, subscribed=${state.isSubscribed})`, hasAccess ? 'success' : 'error');
+                        files.push({
+                            name: f.name, originalName: f.name,
+                            url: hasAccess ? f.download_url : (blurred ? blurred.download_url : f.download_url),
+                            originalUrl: f.download_url, type: 'strawberry',
+                            isBlurred: !hasAccess, isBanana: false
+                        });
+                    }
+                });
+                
+                if (files.length === 0) { showError('Нет фото'); return; }
+                
+                state.files = files;
+                debugLog(`✅ Загружено ${files.length} фото`);
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('gallery').style.display = 'block';
+                updateUI();
+                showImage(0);
+                setupNavigation();
+                
+            } catch(e) {
+                debugLog(`❌ Ошибка: ${e.message}`, 'error');
+                showError('Ошибка загрузки');
+            }
+        }
         
-        text = (
-            f"📊 ДИАГНОСТИКА\n\n"
-            f"👤 User: {user_id}\n"
-            f"📁 Post: {post_id}\n\n"
-            f"🪙 Пост куплен: {'✅' if has_purchased else '❌'}\n"
-            f"🍓 Подписка (API): {'✅' if is_subscribed else '❌'}\n"
-            f"🍓 Подписка (БД): {'✅' if user_stats.get('is_subscribed') else '❌'}\n"
-            f"🍌 Бананов: {user_stats.get('bananas_count', 0)}"
-        )
-        await message.answer(text)
-    except Exception as e:
-        await message.answer(f"❌ Ошибка: {e}")
-
-
-@dp.message(Command("check_sub"))
-async def cmd_check_sub(message: types.Message):
-    if message.from_user.id not in ADMIN_IDS:
-        return
-    user_id = message.from_user.id
-    is_subscribed = await check_channel_subscription(user_id)
-    await message.answer(
-        f"🍓 Результат проверки подписки:\n\n"
-        f"👤 User ID: {user_id}\n"
-        f"📊 Статус: {'✅ ПОДПИСАН' if is_subscribed else '❌ НЕ ПОДПИСАН'}"
-    )
-
-
-@dp.message(Command("stats"))
-async def cmd_stats(message: types.Message):
-    if message.from_user.id not in ADMIN_IDS:
-        return
-    stats = db.get_stats()
-    text = (
-        f"📊 Статистика\n\n"
-        f"👥 Пользователей: {stats.get('total_users', 0)}\n"
-        f"🍓 Подписчиков: {stats.get('subscribed_users', 0)}\n"
-        f"🍌 Бананов: {stats.get('total_bananas', 0)}\n"
-        f"🪙 Покупок: {stats.get('total_purchases', 0)}\n"
-        f"💰 Выручка: {stats.get('total_revenue', 0)}₽"
-    )
-    await message.answer(text)
-
-
-@dp.message(Command("user"))
-async def cmd_user(message: types.Message, command: CommandObject):
-    if message.from_user.id not in ADMIN_IDS:
-        return
-    args = command.args
-    if not args:
-        await message.answer("❌ Укажите ID пользователя: /user 337383733")
-        return
-    try:
-        user_id = int(args.strip())
-        user_stats = db.get_user_stats(user_id)
-        if not user_stats:
-            await message.answer(f"❌ Пользователь {user_id} не найден")
-            return
-        text = (
-            f"👤 Пользователь {user_id}\n\n"
-            f"📝 Имя: {user_stats.get('first_name', 'Неизвестно')}\n"
-            f"📱 Username: @{user_stats.get('username', 'Не указан')}\n"
-            f"🍌 Бананов: {user_stats.get('bananas_count', 0)}\n"
-            f"🪙 Покупок: {user_stats.get('purchases_count', 0)}\n"
-            f"🍓 Подписка: {'✅' if user_stats.get('is_subscribed') else '❌'}"
-        )
-        await message.answer(text)
-    except Exception as e:
-        await message.answer(f"❌ Ошибка: {e}")
-
-
-@dp.message(Command("tunnel"))
-async def cmd_tunnel(message: types.Message):
-    if message.from_user.id not in ADMIN_IDS:
-        return
-    await message.answer(
-        f"🌐 Туннель: {TUNNEL_URL}\n"
-        f"🍓 Проверка подписки: {TUNNEL_URL}/api/check-subscription"
-    )
-
-
-@dp.message(Command("help"))
-async def cmd_help(message: types.Message):
-    await message.answer(
-        "📚 Команды\n\n"
-        "• /start - начать\n"
-        "• /check_sub - проверить подписку\n"
-        "• /stats - статистика\n"
-        "• /user <id> - инфо о пользователе\n"
-        "• /debug_purchase - диагностика покупки\n"
-        "• /tunnel - показать туннель"
-    )
-
-
-# ==================== ЗАПУСК ====================
-async def main():
-    http_runner = None
-    try:
-        http_runner = await start_http_server()
-        await bot.delete_webhook(drop_pending_updates=True)
+        function showImage(i) {
+            if (!state.files.length) return;
+            state.index = (i + state.files.length) % state.files.length;
+            const img = document.getElementById('image');
+            img.classList.remove('loaded');
+            img.src = state.files[state.index].url + '?t=' + Date.now();
+            document.getElementById('counter-text').innerText = `${state.index+1}/${state.files.length}`;
+            debugLog(`🖼 ${state.index+1}/${state.files.length}: ${state.files[state.index].name} ${state.files[state.index].isBlurred ? '🔒' : '✅'}`);
+        }
         
-        print("\n" + "=" * 60)
-        print("🤖 БОТ 2 (INTERFACE) V10.6 ЗАПУЩЕН!")
-        print("=" * 60)
-        print(f"📱 Бот: @{BOT_USERNAME}")
-        print(f"🌍 Туннель: {TUNNEL_URL}")
-        print(f"🍓 Проверка подписки: активна")
-        print(f"📢 Канал: {VOLSHEBNY_GROUP_ID}")
-        print("=" * 60 + "\n")
+        function next() { if (state.files.length) showImage(state.index + 1); }
+        function prev() { if (state.files.length) showImage(state.index - 1); }
+        function onImageError() { setTimeout(() => showImage(state.index), 1000); }
         
-        await dp.start_polling(bot)
-    finally:
-        if http_runner:
-            await http_runner.cleanup()
-        await platega_client.close()
-
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("\n❌ Бот остановлен")
-    except Exception as e:
-        print(f"\n❌ Ошибка: {e}")
-        logger.error(f"❌ Ошибка: {e}", exc_info=True)
+        function setupNavigation() {
+            const left = document.getElementById('nav-left');
+            const right = document.getElementById('nav-right');
+            if (left) { const newLeft = left.cloneNode(true); left.parentNode.replaceChild(newLeft, left); newLeft.addEventListener('click', () => prev()); }
+            if (right) { const newRight = right.cloneNode(true); right.parentNode.replaceChild(newRight, right); newRight.addEventListener('click', () => next()); }
+        }
+        
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') { prev(); e.preventDefault(); }
+            if (e.key === 'ArrowRight') { next(); e.preventDefault(); }
+        });
+        
+        function updateUI() {
+            const badge = document.getElementById('banana-count-badge');
+            if (badge) { badge.textContent = state.bananasLeft; badge.style.display = state.bananasLeft > 0 ? 'flex' : 'none'; }
+            document.getElementById('banana-info-count').textContent = state.bananasLeft;
+            const subStatus = document.getElementById('sub-status');
+            if (subStatus) {
+                subStatus.textContent = state.isSubscribed ? '(у вас она есть) ✅' : '(у вас её пока нет) ❌';
+                subStatus.style.color = state.isSubscribed ? '#ffd700' : '#ff6b6b';
+            }
+            document.getElementById('subscribed-badge').style.display = state.isSubscribed ? 'block' : 'none';
+            document.getElementById('purchased-badge').style.display = state.hasPurchased ? 'block' : 'none';
+            const saveBtn = document.getElementById('save-btn');
+            if (saveBtn) state.isSubscribed ? saveBtn.classList.remove('disabled') : saveBtn.classList.add('disabled');
+        }
+        
+        // ==================== КНОПКИ ====================
+        async function handleStrawberry() {
+            debugLog('🍓 РУЧНАЯ ПРОВЕРКА ПОДПИСКИ', 'info');
+            await checkSubscription();
+            loadGallery(); // перезагружаем галерею после проверки
+        }
+        
+        function handleBanana() {
+            const f = state.files[state.index];
+            if (!f?.isBanana) { showToast('🍌 Нельзя разблокировать бананом'); return; }
+            if (!f.isBlurred) { showToast('✅ Уже разблокировано'); return; }
+            if (state.bananasLeft <= 0) { showToast('❌ Нет бананов'); return; }
+            state.bananasLeft--;
+            f.isBlurred = false;
+            f.url = f.originalUrl;
+            showImage(state.index);
+            updateUI();
+            showToast('🍌 Банан потрачен!');
+        }
+        
+        function handleCoin() {
+            if (tg) tg.openLink(`https://t.me/${BOT_USERNAME}?start=buy_vip_${state.postId}`);
+            showToast('🪙 Переходим в бот...');
+        }
+        
+        async function saveCurrentPhoto() {
+            if (!state.isSubscribed) {
+                showToast('🍓 Сохранять могут только подписчики!');
+                if (tg) tg.openLink('https://t.me/neuroticababes_bot');
+                return;
+            }
+            const f = state.files[state.index];
+            if (!f) return;
+            try {
+                const res = await fetch(f.url);
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = f.name;
+                link.click();
+                URL.revokeObjectURL(url);
+                showToast('✅ Фото сохранено!');
+            } catch(e) { showToast('❌ Ошибка сохранения'); }
+        }
+        
+        let musicPlaying = false;
+        const audio = document.getElementById('bg-music');
+        function toggleMusic() {
+            if (musicPlaying) { audio.pause(); musicPlaying = false; showToast('🎵 Музыка выключена'); }
+            else { audio.play().catch(()=>{}); musicPlaying = true; showToast('🎵 Музыка включена'); }
+        }
+        setTimeout(() => { audio.play().catch(()=>{}); musicPlaying = true; }, 500);
+        
+        function showInfo() { document.getElementById('info-modal').classList.add('active'); }
+        function hideInfo() { document.getElementById('info-modal').classList.remove('active'); }
+        function forceReload() { localStorage.clear(); location.reload(); }
+        function showToast(text) {
+            const toast = document.getElementById('toast');
+            toast.textContent = text;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+        function showError(msg) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('error').innerHTML = msg;
+        }
+        
+        // ==================== ЗАПУСК ====================
+        async function init() {
+            if (!window.Telegram?.WebApp) {
+                showError('Откройте в Telegram');
+                return;
+            }
+            
+            if (tg) { tg.ready(); tg.expand(); }
+            
+            if (!state.postId) {
+                showError('Не указан ID поста');
+                return;
+            }
+            
+            // СНАЧАЛА ПРОВЕРЯЕМ ПОДПИСКУ
+            await checkSubscription();
+            // ПОТОМ ЗАГРУЖАЕМ ГАЛЕРЕЮ
+            await loadGallery();
+        }
+        
+        // ==================== ПРИВЯЗКА КНОПОК ====================
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('strawberry-btn')?.addEventListener('click', handleStrawberry);
+            document.getElementById('banana-btn')?.addEventListener('click', handleBanana);
+            document.getElementById('coin-btn')?.addEventListener('click', handleCoin);
+            document.getElementById('save-btn')?.addEventListener('click', saveCurrentPhoto);
+            document.getElementById('music-btn')?.addEventListener('click', toggleMusic);
+            document.getElementById('info-btn')?.addEventListener('click', showInfo);
+            document.getElementById('modal-close-btn')?.addEventListener('click', hideInfo);
+            document.getElementById('force-reload-item')?.addEventListener('click', forceReload);
+            debugLog('✅ Кнопки привязаны');
+        });
+        
+        // ЗАПУСКАЕМ
+        init();
+        
+        window.checkSubscription = checkSubscription;
+    </script>
+</body>
+</html>
