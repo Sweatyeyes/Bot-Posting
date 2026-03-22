@@ -299,7 +299,7 @@
 
     <div id="gallery">
         <div id="debug-panel">
-            <div class="debug-entry">🔍 ДИАГНОСТИКА v10.0 - СОХРАНЕНИЕ ФОТО</div>
+            <div class="debug-entry">🔍 ДИАГНОСТИКА v10.1 - ОТОБРАЖЕНИЕ ОФФЛАЙН</div>
         </div>
 
         <div id="badges">
@@ -393,7 +393,7 @@
 
     <script>
         // ==================== ГЛОБАЛЬНАЯ ДИАГНОСТИКА ====================
-        console.log('🚀 СКРИПТ НАЧАЛ ЗАГРУЗКУ v10.0');
+        console.log('🚀 СКРИПТ НАЧАЛ ЗАГРУЗКУ v10.1');
 
         const CONFIG = {
             REPO: "Sweatyeyes/Bot-Posting",
@@ -408,6 +408,55 @@
         console.log('🌐 TUNNEL_URL:', TUNNEL_URL);
 
         const tg = window.Telegram?.WebApp;
+
+        // ==================== ПРОВЕРКА СОЕДИНЕНИЯ С ТУННЕЛЕМ ====================
+        let isTunnelOnline = false;
+        let tunnelCheckDone = false;
+
+        async function checkTunnelConnection() {
+            debugLog('🔍 Проверка подключения к туннелю...');
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                
+                const response = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
+                    method: 'OPTIONS',
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (response.ok || response.status === 405 || response.status === 400) {
+                    // 405 Method Not Allowed - это нормально для OPTIONS запроса
+                    isTunnelOnline = true;
+                    debugLog('✅ Туннель доступен (онлайн)', 'success');
+                } else {
+                    isTunnelOnline = false;
+                    debugLog('⚠️ Туннель недоступен, статус: ' + response.status, 'warning');
+                }
+            } catch (e) {
+                isTunnelOnline = false;
+                debugLog(`❌ Туннель НЕДОСТУПЕН: ${e.message}`, 'error');
+            }
+            
+            tunnelCheckDone = true;
+            
+            // Обновляем отображение оффлайн бейджа
+            const offlineBadge = document.getElementById('offline-badge');
+            const offlineNote = document.getElementById('offline-note');
+            
+            if (!isTunnelOnline) {
+                if (offlineBadge) offlineBadge.style.display = 'block';
+                if (offlineNote) offlineNote.style.display = 'block';
+                debugLog('📴 Режим ОФФЛАЙН - статистика не будет отправляться', 'warning');
+            } else {
+                if (offlineBadge) offlineBadge.style.display = 'none';
+                if (offlineNote) offlineNote.style.display = 'none';
+                debugLog('🌐 Режим ОНЛАЙН - статистика отправляется', 'success');
+            }
+            
+            return isTunnelOnline;
+        }
 
         // ==================== МУЗЫКА С ЗАЧЕРКНУТОЙ КНОПКОЙ ====================
         let musicPlaying = false;
@@ -452,9 +501,11 @@
                 musicPlaying = false;
                 updateMusicButton();
                 showToast('🎵 Музыка выключена');
+                sendData('music_off');
             } else {
                 startMusic();
                 showToast('🎵 Музыка включена');
+                sendData('music_on');
             }
         }
 
@@ -486,11 +537,8 @@
             showToast('📥 Сохраняем фото...');
 
             try {
-                // Создаём ссылку на фото
                 const response = await fetch(currentFile.url);
                 const blob = await response.blob();
-
-                // Создаём объект URL для скачивания
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
@@ -502,13 +550,10 @@
 
                 debugLog('✅ Фото сохранено', 'success');
                 showToast('✅ Фото сохранено в галерею!');
-
-                // Отправляем статистику
                 sendData('save_photo', {
                     photo_name: currentFile.name,
                     photo_type: currentFile.type
                 });
-
             } catch (e) {
                 debugLog(`❌ Ошибка сохранения: ${e.message}`, 'error');
                 showToast('❌ Не удалось сохранить фото');
@@ -565,8 +610,6 @@
         console.log('=== ПОЛУЧЕННЫЕ ПАРАМЕТРЫ ===');
         console.log('post:', rawPost);
         console.log('user:', rawUser);
-        console.log('subscribed:', rawSubscribed);
-        console.log('purchased:', rawPurchased);
 
         const parsedSubscribed = rawSubscribed === 'true';
         const parsedPurchased = rawPurchased === 'true';
@@ -584,7 +627,7 @@
             startTime: Date.now(),
             touchStartX: 0,
             loadingAttempts: 0,
-            offlineMode: false
+            offlineMode: false  // будет обновлено после проверки туннеля
         };
 
         // ==================== ОТЛАДОЧНАЯ ПАНЕЛЬ ====================
@@ -655,7 +698,10 @@
             debugLog('❌ НЕТ ID ПОСТА', 'critical');
             showError('Не указан ID поста. Нажми на кнопку в канале.');
         } else {
-            loadGallery();
+            // Сначала проверяем туннель, потом грузим галерею
+            checkTunnelConnection().then(() => {
+                loadGallery();
+            });
         }
 
         // ==================== ЗАГРУЗКА ФОТО ====================
@@ -855,7 +901,13 @@
         });
 
         async function sendData(action, details = {}) {
+            // Не отправляем, если туннель недоступен
+            if (!isTunnelOnline) {
+                debugLog(`📴 Оффлайн режим: ${action} не отправлено`, 'warning');
+                return;
+            }
             if (!state.userId) return;
+            
             const data = { action, user_id: state.userId, post_id: state.postId, timestamp: Date.now(), details };
             try {
                 await fetch(`${TUNNEL_URL}/api/webapp-data`, {
@@ -863,8 +915,18 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
+                debugLog(`📤 Отправлено: ${action}`, 'success');
             } catch (e) {
-                debugLog(`⚠️ Не удалось отправить статистику: ${e.message}`, 'warning');
+                debugLog(`⚠️ Не удалось отправить ${action}: ${e.message}`, 'warning');
+                // Если ошибка - переключаем в оффлайн
+                if (isTunnelOnline) {
+                    isTunnelOnline = false;
+                    const offlineBadge = document.getElementById('offline-badge');
+                    const offlineNote = document.getElementById('offline-note');
+                    if (offlineBadge) offlineBadge.style.display = 'block';
+                    if (offlineNote) offlineNote.style.display = 'block';
+                    debugLog('📴 Переключен в оффлайн режим', 'warning');
+                }
             }
         }
 
@@ -945,7 +1007,6 @@
             const purchasedBadge = document.getElementById('purchased-badge');
             if (purchasedBadge) purchasedBadge.style.display = state.hasPurchased ? 'block' : 'none';
 
-            // Обновляем доступность кнопки сохранения
             const saveBtn = document.getElementById('save-btn');
             if (saveBtn) {
                 if (state.isSubscribed) {
