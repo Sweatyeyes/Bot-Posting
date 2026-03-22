@@ -9,9 +9,10 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #000; color: #fff; font-family: sans-serif; height: 100vh; overflow: hidden; }
-        #loading { position: fixed; inset: 0; background: #000; display: flex; align-items: center; justify-content: center; z-index: 100; flex-direction: column; gap: 20px; }
+        #loading { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; gap: 20px; }
         .spinner { width: 40px; height: 40px; border: 3px solid #333; border-top-color: #2ea6ff; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { color: #888; }
         #gallery { display: none; height: 100vh; position: relative; background: #000; }
         #image-container { position: absolute; top: 0; left: 0; right: 0; bottom: 80px; display: flex; align-items: center; justify-content: center; background: #000; z-index: 1; }
         #image { max-width: 100%; max-height: 100%; object-fit: contain; opacity: 0; transition: opacity 0.2s; }
@@ -20,10 +21,10 @@
         #nav-left { left: 0; }
         #nav-right { right: 0; }
         #bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 80px; background: linear-gradient(to top, #000, transparent); display: flex; align-items: center; justify-content: space-around; padding: 0 10px; z-index: 500; }
-        .bottom-btn { background: transparent; border: none; color: white; font-size: 32px; cursor: pointer; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; text-shadow: 0 2px 10px rgba(255,255,255,0.3); padding: 0; position: relative; }
+        .bottom-btn { background: transparent; border: none; color: white; font-size: 32px; cursor: pointer; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; padding: 0; position: relative; }
         .bottom-btn:active { transform: scale(0.9); }
         .banana-count-badge { position: absolute; top: -5px; right: -5px; background: #8B4513; color: white; font-size: 14px; font-weight: bold; min-width: 22px; height: 22px; border-radius: 12px; display: flex; align-items: center; justify-content: center; padding: 0 5px; border: 2px solid #ffd700; }
-        #counter { color: white; font-size: 16px; font-weight: 500; min-width: 70px; text-align: center; display: flex; align-items: center; gap: 10px; }
+        #counter { color: white; font-size: 16px; min-width: 70px; text-align: center; display: flex; align-items: center; gap: 10px; }
         #save-btn { font-size: 24px; cursor: pointer; background: transparent; border: none; color: white; padding: 0 5px; }
         #save-btn.disabled { opacity: 0.3; pointer-events: none; }
         #badges { position: absolute; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 1500; }
@@ -54,9 +55,9 @@
 </head>
 <body>
     <audio id="bg-music" loop preload="auto"><source src="song.mp3" type="audio/mpeg"></audio>
-    <div id="loading"><div class="spinner"></div><div class="loading-text">🔄 Загрузка...</div></div>
+    <div id="loading"><div class="spinner"></div><div class="loading-text">🔄 Проверка подписки...</div></div>
     <div id="gallery">
-        <div id="debug-panel"><div class="debug-entry">🔍 v10.7 - ПРИНУДИТЕЛЬНАЯ ПРОВЕРКА ПОДПИСКИ</div></div>
+        <div id="debug-panel"><div class="debug-entry">🔍 v10.8 - АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПОДПИСКИ</div></div>
         <div id="badges">
             <div id="subscribed-badge" class="badge">🍓 Подписчик</div>
             <div id="purchased-badge" class="badge">🪙 Куплено</div>
@@ -75,26 +76,19 @@
     </div>
     <div id="info-modal" onclick="hideInfo(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
-            <div class="modal-title">🍓 ПРОВЕРКА ПОДПИСКИ</div>
-            <div class="modal-item" id="check-sub-btn" style="background: #2ea6ff20; border-radius: 10px; margin-bottom: 10px;">
-                <div class="modal-icon">🍓🔄</div>
-                <div class="modal-text">
-                    <div class="modal-text-title">ПРОВЕРИТЬ ПОДПИСКУ СЕЙЧАС</div>
-                    <div class="modal-text-desc">Нажми, чтобы проверить статус подписки в реальном времени</div>
-                </div>
-            </div>
+            <div class="modal-title">🍓 ИНФОРМАЦИЯ</div>
             <div class="modal-item"><div class="modal-icon">🍓</div><div class="modal-text"><div class="modal-text-title">Клубничка</div><div class="modal-text-desc">Для подписчиков канала <span id="sub-status">(у вас её пока нет)</span></div></div></div>
             <div class="modal-item"><div class="modal-icon">🍌</div><div class="modal-text"><div class="modal-text-title">Банан</div><div class="modal-text-desc">Трать на банановые фото (осталось <span id="banana-info-count">0</span>)</div></div></div>
             <div class="modal-item"><div class="modal-icon">💾</div><div class="modal-text"><div class="modal-text-title">Сохранить</div><div class="modal-text-desc">Доступно только подписчикам</div></div></div>
+            <div class="modal-item"><div class="modal-icon">🪙</div><div class="modal-text"><div class="modal-text-title">Монета</div><div class="modal-text-desc">Купить весь пост (199₽)</div></div></div>
             <div class="modal-item" id="force-reload-item"><div class="modal-icon">🔄</div><div class="modal-text"><div class="modal-text-title">Перезагрузить</div><div class="modal-text-desc">Обновить галерею</div></div></div>
-            <div class="modal-item" id="test-api-item"><div class="modal-icon">🔧</div><div class="modal-text"><div class="modal-text-title">Тест API</div><div class="modal-text-desc">Проверить доступность сервера</div></div></div>
             <button class="modal-close" id="modal-close-btn">Закрыть</button>
         </div>
     </div>
     <div id="toast"></div><div id="error"></div>
 
     <script>
-        console.log('🚀 v10.7 - ПРИНУДИТЕЛЬНАЯ ПРОВЕРКА ПОДПИСКИ');
+        console.log('🚀 v10.8 - АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПОДПИСКИ');
         
         const CONFIG = { REPO: "Sweatyeyes/Bot-Posting", GITHUB_API: "https://api.github.com/repos" };
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
@@ -105,17 +99,18 @@
         const urlParams = new URLSearchParams(window.location.search);
         const rawPost = urlParams.get('post') || (tg?.initDataUnsafe?.start_param?.split(':')[0]);
         const rawUser = urlParams.get('user') || (tg?.initDataUnsafe?.start_param?.split(':')[1]) || tg?.initDataUnsafe?.user?.id;
-        const rawSubscribed = urlParams.get('subscribed') === 'true';
         const rawPurchased = urlParams.get('purchased') === 'true';
         const rawBananas = parseInt(urlParams.get('bananas')) || 3;
         
         let state = {
             files: [], index: 0, postId: rawPost, userId: parseInt(rawUser),
-            isSubscribed: rawSubscribed, hasPurchased: rawPurchased,
-            bananasLeft: rawBananas, startTime: Date.now(), loadingAttempts: 0
+            isSubscribed: false, // временно false, обновится после проверки
+            hasPurchased: rawPurchased,
+            bananasLeft: rawBananas,
+            startTime: Date.now(),
+            loadingAttempts: 0,
+            subscriptionChecked: false
         };
-        
-        console.log('📊 Начальное состояние:', state);
         
         // ==================== ОТЛАДКА ====================
         const debugPanel = document.getElementById('debug-panel');
@@ -133,100 +128,38 @@
             console.log(msg);
         }
         
-        // ==================== ГЛАВНАЯ ФУНКЦИЯ ПРОВЕРКИ ПОДПИСКИ ====================
+        // ==================== ПРОВЕРКА ПОДПИСКИ ====================
         async function checkSubscription() {
-            debugLog('🍓🍓🍓 ПРОВЕРКА ПОДПИСКИ НАЧАТА 🍓🍓🍓', 'info');
+            debugLog('🍓🍓🍓 АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПОДПИСКИ 🍓🍓🍓', 'info');
             
             if (!state.userId) {
                 debugLog('❌ Нет user_id!', 'error');
-                showToast('❌ Ошибка: нет ID пользователя');
                 return false;
             }
             
-            const url = `${TUNNEL_URL}/api/check-subscription`;
-            debugLog(`📡 Запрос к: ${url}`, 'info');
-            debugLog(`📦 Данные: user_id=${state.userId}, post_id=${state.postId}`, 'info');
-            
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000);
-                
-                const response = await fetch(url, {
+                const response = await fetch(`${TUNNEL_URL}/api/check-subscription`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        user_id: state.userId, 
-                        post_id: state.postId,
-                        _t: Date.now()
-                    }),
-                    signal: controller.signal
+                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId })
                 });
                 
-                clearTimeout(timeoutId);
-                
-                debugLog(`📥 Статус ответа: ${response.status}`, response.ok ? 'success' : 'error');
-                
                 const data = await response.json();
-                debugLog(`📦 Ответ сервера: ${JSON.stringify(data, null, 2)}`, 'info');
+                debugLog(`📥 Ответ: ${JSON.stringify(data)}`, 'info');
                 
                 const isSubscribed = data.is_subscribed === true;
-                debugLog(`🍓 Результат проверки: ${isSubscribed ? 'ПОДПИСАН ✅' : 'НЕ ПОДПИСАН ❌'}`, isSubscribed ? 'success' : 'error');
+                debugLog(`🍓 Результат: ${isSubscribed ? 'ПОДПИСАН ✅' : 'НЕ ПОДПИСАН ❌'}`, isSubscribed ? 'success' : 'error');
                 
-                if (data.debug) {
-                    debugLog(`🔍 Отладочная информация: канал=${data.debug.channel_id}`, 'info');
-                }
-                
-                if (isSubscribed !== state.isSubscribed) {
-                    debugLog(`🔄 Обновляем статус: ${state.isSubscribed} → ${isSubscribed}`, 'success');
-                    state.isSubscribed = isSubscribed;
-                    updateUI();
-                    
-                    if (isSubscribed) {
-                        showToast('🍓 ПОДПИСКА ПОДТВЕРЖДЕНА! Обновляем галерею...');
-                        setTimeout(() => loadGallery(), 1000);
-                    } else {
-                        showToast('❌ Вы НЕ подписаны на канал');
-                    }
-                } else {
-                    debugLog(`✅ Статус актуален: подписка = ${isSubscribed}`, isSubscribed ? 'success' : 'warning');
-                    showToast(isSubscribed ? '✅ Вы подписаны на канал!' : '❌ Вы не подписаны на канал');
-                }
+                state.isSubscribed = isSubscribed;
+                state.subscriptionChecked = true;
+                updateUI();
                 
                 return isSubscribed;
                 
             } catch(e) {
-                debugLog(`❌ ОШИБКА проверки: ${e.message}`, 'error');
-                if (e.name === 'AbortError') {
-                    debugLog('⏰ Таймаут запроса (10 сек)', 'error');
-                    showToast('⏰ Сервер не отвечает. Проверьте туннель.');
-                } else {
-                    showToast('❌ Ошибка проверки подписки');
-                }
+                debugLog(`❌ Ошибка проверки: ${e.message}`, 'error');
+                state.subscriptionChecked = true;
                 return false;
-            }
-        }
-        
-        // ==================== ТЕСТ API ====================
-        async function testAPI() {
-            debugLog('🔧 ТЕСТ API: проверка доступности сервера...', 'info');
-            showToast('🔧 Проверка сервера...');
-            
-            try {
-                const response = await fetch(`${TUNNEL_URL}/api/check-subscription`, {
-                    method: 'OPTIONS',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                
-                if (response.ok || response.status === 405) {
-                    debugLog('✅ Сервер доступен!', 'success');
-                    showToast('✅ Сервер доступен!');
-                } else {
-                    debugLog(`⚠️ Сервер ответил с кодом: ${response.status}`, 'warning');
-                    showToast(`⚠️ Сервер: ${response.status}`);
-                }
-            } catch(e) {
-                debugLog(`❌ Сервер НЕДОСТУПЕН: ${e.message}`, 'error');
-                showToast('❌ Сервер недоступен!');
             }
         }
         
@@ -291,8 +224,8 @@
                 setupNavigation();
                 
             } catch(e) {
-                debugLog(`❌ Ошибка загрузки: ${e.message}`, 'error');
-                showError('Ошибка загрузки галереи');
+                debugLog(`❌ Ошибка: ${e.message}`, 'error');
+                showError('Ошибка загрузки');
             }
         }
         
@@ -339,13 +272,14 @@
         
         // ==================== КНОПКИ ====================
         async function handleStrawberry() {
-            debugLog('🍓 НАЖАТА КНОПКА КЛУБНИЧКИ', 'info');
+            debugLog('🍓 РУЧНАЯ ПРОВЕРКА ПОДПИСКИ', 'info');
             await checkSubscription();
+            loadGallery(); // перезагружаем галерею после проверки
         }
         
         function handleBanana() {
             const f = state.files[state.index];
-            if (!f?.isBanana) { showToast('🍌 Это фото нельзя разблокировать бананом'); return; }
+            if (!f?.isBanana) { showToast('🍌 Нельзя разблокировать бананом'); return; }
             if (!f.isBlurred) { showToast('✅ Уже разблокировано'); return; }
             if (state.bananasLeft <= 0) { showToast('❌ Нет бананов'); return; }
             state.bananasLeft--;
@@ -358,12 +292,12 @@
         
         function handleCoin() {
             if (tg) tg.openLink(`https://t.me/${BOT_USERNAME}?start=buy_vip_${state.postId}`);
-            showToast('🪙 Переходим в бот для оплаты...');
+            showToast('🪙 Переходим в бот...');
         }
         
         async function saveCurrentPhoto() {
             if (!state.isSubscribed) {
-                showToast('🍓 Сохранять фото могут только подписчики канала!');
+                showToast('🍓 Сохранять могут только подписчики!');
                 if (tg) tg.openLink('https://t.me/neuroticababes_bot');
                 return;
             }
@@ -405,16 +339,24 @@
             document.getElementById('error').innerHTML = msg;
         }
         
-        // ==================== ПРОВЕРКА TELEGRAM ====================
-        if (!window.Telegram?.WebApp) {
-            showError('Откройте в Telegram');
-        } else {
+        // ==================== ЗАПУСК ====================
+        async function init() {
+            if (!window.Telegram?.WebApp) {
+                showError('Откройте в Telegram');
+                return;
+            }
+            
             if (tg) { tg.ready(); tg.expand(); }
+            
             if (!state.postId) {
                 showError('Не указан ID поста');
-            } else {
-                loadGallery();
+                return;
             }
+            
+            // СНАЧАЛА ПРОВЕРЯЕМ ПОДПИСКУ
+            await checkSubscription();
+            // ПОТОМ ЗАГРУЖАЕМ ГАЛЕРЕЮ
+            await loadGallery();
         }
         
         // ==================== ПРИВЯЗКА КНОПОК ====================
@@ -427,14 +369,13 @@
             document.getElementById('info-btn')?.addEventListener('click', showInfo);
             document.getElementById('modal-close-btn')?.addEventListener('click', hideInfo);
             document.getElementById('force-reload-item')?.addEventListener('click', forceReload);
-            document.getElementById('check-sub-btn')?.addEventListener('click', checkSubscription);
-            document.getElementById('test-api-item')?.addEventListener('click', testAPI);
-            debugLog('✅ Все кнопки привязаны');
+            debugLog('✅ Кнопки привязаны');
         });
         
+        // ЗАПУСКАЕМ
+        init();
+        
         window.checkSubscription = checkSubscription;
-        window.handleStrawberry = handleStrawberry;
-        window.testAPI = testAPI;
     </script>
 </body>
 </html>
