@@ -11,36 +11,36 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #000; color: #fff; font-family: sans-serif; height: 100vh; overflow: hidden; }
-        
-        #loading { 
-            position: fixed; 
-            inset: 0; 
-            background: #000; 
-            display: flex; 
+
+        #loading {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            display: flex;
             flex-direction: column;
-            align-items: center; 
-            justify-content: center; 
-            z-index: 100; 
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
             gap: 20px;
         }
-        .spinner { 
-            width: 40px; 
-            height: 40px; 
-            border: 3px solid #333; 
-            border-top-color: #2ea6ff; 
-            border-radius: 50%; 
-            animation: spin 1s linear infinite; 
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #333;
+            border-top-color: #2ea6ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
         .loading-text { color: #888; font-size: 14px; }
-        
-        #gallery { 
-            display: none; 
-            height: 100vh; 
-            position: relative; 
+
+        #gallery {
+            display: none;
+            height: 100vh;
+            position: relative;
             background: #000;
         }
-        
+
         #image-container {
             position: absolute;
             top: 0;
@@ -53,42 +53,42 @@
             background: #000;
             z-index: 1;
         }
-        
-        #image { 
-            max-width: 100%; 
-            max-height: 100%; 
-            object-fit: contain; 
-            opacity: 0; 
-            transition: opacity 0.2s; 
+
+        #image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            opacity: 0;
+            transition: opacity 0.2s;
         }
         #image.loaded { opacity: 1; }
-        
-        #nav-left, #nav-right { 
-            position: absolute; 
-            top: 0; 
+
+        #nav-left, #nav-right {
+            position: absolute;
+            top: 0;
             bottom: 80px;
-            width: 30%; 
+            width: 30%;
             z-index: 1000;
-            cursor: pointer; 
+            cursor: pointer;
             background: transparent;
         }
         #nav-left { left: 0; }
         #nav-right { right: 0; }
-        
-        #bottom-bar { 
-            position: absolute; 
-            bottom: 0; 
+
+        #bottom-bar {
+            position: absolute;
+            bottom: 0;
             left: 0;
             right: 0;
-            height: 80px; 
-            background: linear-gradient(to top, #000, transparent); 
-            display: flex; 
-            align-items: center; 
-            justify-content: space-around; 
-            padding: 0 10px; 
+            height: 80px;
+            background: linear-gradient(to top, #000, transparent);
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            padding: 0 10px;
             z-index: 500;
         }
-        
+
         .bottom-btn {
             background: transparent;
             border: none;
@@ -105,16 +105,16 @@
             padding: 0;
             position: relative;
         }
-        
+
         .bottom-btn:active { transform: scale(0.9); }
         .bottom-btn.disabled { opacity: 0.3; pointer-events: none; }
         .bottom-btn.offline { opacity: 0.7; filter: grayscale(50%); }
-        
+
         .music-btn-off {
             filter: grayscale(100%);
             opacity: 0.5;
         }
-        
+
         .music-btn-playing { animation: pulse 1s infinite; }
         @keyframes pulse {
             0% { text-shadow: 0 0 5px #2ea6ff; }
@@ -161,7 +161,7 @@
             transition: all 0.2s ease;
             padding: 0 5px;
         }
-        
+
         #save-btn:active { transform: scale(0.9); }
         #save-btn.disabled { opacity: 0.3; pointer-events: none; }
 
@@ -430,7 +430,7 @@
 
         function startMusic() {
             if (musicPlaying) return;
-            
+
             const playPromise = audio.play();
             if (playPromise !== undefined) {
                 playPromise.then(() => {
@@ -463,33 +463,33 @@
         // ==================== СОХРАНЕНИЕ ФОТО ====================
         async function saveCurrentPhoto() {
             debugLog('💾 Попытка сохранить фото...');
-            
+
             // Проверяем подписку
             if (!state.isSubscribed) {
                 debugLog('❌ Сохранение доступно только подписчикам', 'warning');
                 showToast('🍓 Сохранять фото могут только подписчики канала!');
-                
+
                 if (tg) {
                     tg.openLink('https://t.me/neuroticababes_bot');
                 }
                 return;
             }
-            
+
             const currentFile = state.files[state.index];
             if (!currentFile) {
                 debugLog('❌ Нет текущего фото', 'error');
                 showToast('❌ Не удалось сохранить фото');
                 return;
             }
-            
+
             debugLog(`💾 Сохраняем: ${currentFile.name}`);
             showToast('📥 Сохраняем фото...');
-            
+
             try {
                 // Создаём ссылку на фото
                 const response = await fetch(currentFile.url);
                 const blob = await response.blob();
-                
+
                 // Создаём объект URL для скачивания
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
@@ -499,16 +499,16 @@
                 link.click();
                 document.body.removeChild(link);
                 URL.revokeObjectURL(url);
-                
+
                 debugLog('✅ Фото сохранено', 'success');
                 showToast('✅ Фото сохранено в галерею!');
-                
+
                 // Отправляем статистику
                 sendData('save_photo', {
                     photo_name: currentFile.name,
                     photo_type: currentFile.type
                 });
-                
+
             } catch (e) {
                 debugLog(`❌ Ошибка сохранения: ${e.message}`, 'error');
                 showToast('❌ Не удалось сохранить фото');
@@ -520,12 +520,12 @@
             const urlParams = new URLSearchParams(window.location.search);
             let postId = urlParams.get('post');
             if (postId) return postId;
-            
+
             const tgStartParam = tg?.initDataUnsafe?.start_param;
             if (tgStartParam && tgStartParam.includes('-') && tgStartParam.includes('_')) {
                 return tgStartParam;
             }
-            
+
             if (tgStartParam && tgStartParam.includes(':')) {
                 const parts = tgStartParam.split(':');
                 if (parts.length >= 1 && parts[0].includes('-') && parts[0].includes('_')) {
@@ -539,7 +539,7 @@
             const urlParams = new URLSearchParams(window.location.search);
             let userId = urlParams.get('user');
             if (userId) return parseInt(userId);
-            
+
             const tgStartParam = tg?.initDataUnsafe?.start_param;
             if (tgStartParam && tgStartParam.includes(':')) {
                 const parts = tgStartParam.split(':');
@@ -547,7 +547,7 @@
                     return parseInt(parts[1]);
                 }
             }
-            
+
             const user = tg?.initDataUnsafe?.user;
             if (user && user.id) return user.id;
             return null;
@@ -556,7 +556,7 @@
         // ==================== ПОЛУЧЕНИЕ ПАРАМЕТРОВ ====================
         const rawPost = getPostId();
         const rawUser = getUserId();
-        
+
         const urlParams = new URLSearchParams(window.location.search);
         const rawSubscribed = urlParams.get('subscribed');
         const rawPurchased = urlParams.get('purchased');
@@ -830,17 +830,17 @@
 
         function setupNavigation() {
             debugLog('🔧 НАСТРОЙКА НАВИГАЦИИ...');
-            
+
             const navLeft = document.getElementById('nav-left');
             const navRight = document.getElementById('nav-right');
-            
+
             if (navLeft) {
                 const newNavLeft = navLeft.cloneNode(true);
                 navLeft.parentNode.replaceChild(newNavLeft, navLeft);
                 newNavLeft.addEventListener('click', (e) => { e.stopPropagation(); prev(); });
                 debugLog('✅ Левая область навигации привязана');
             }
-            
+
             if (navRight) {
                 const newNavRight = navRight.cloneNode(true);
                 navRight.parentNode.replaceChild(newNavRight, navRight);
@@ -933,18 +933,18 @@
             }
             const bananaInfo = document.getElementById('banana-info-count');
             if (bananaInfo) bananaInfo.textContent = state.bananasLeft;
-            
+
             const subStatus = document.getElementById('sub-status');
             if (subStatus) {
                 subStatus.textContent = state.isSubscribed ? '(у вас она есть)' : '(у вас её пока нет)';
                 subStatus.style.color = state.isSubscribed ? '#ffd700' : '#ff6b6b';
             }
-            
+
             const subBadge = document.getElementById('subscribed-badge');
             if (subBadge) subBadge.style.display = state.isSubscribed ? 'block' : 'none';
             const purchasedBadge = document.getElementById('purchased-badge');
             if (purchasedBadge) purchasedBadge.style.display = state.hasPurchased ? 'block' : 'none';
-            
+
             // Обновляем доступность кнопки сохранения
             const saveBtn = document.getElementById('save-btn');
             if (saveBtn) {
@@ -982,7 +982,7 @@
         // ==================== ПРИВЯЗКА КНОПОК ====================
         document.addEventListener('DOMContentLoaded', () => {
             debugLog('🔧 Привязываем кнопки...');
-            
+
             const strawberryBtn = document.getElementById('strawberry-btn');
             const bananaBtn = document.getElementById('banana-btn');
             const coinBtn = document.getElementById('coin-btn');
@@ -991,7 +991,7 @@
             const modalCloseBtn = document.getElementById('modal-close-btn');
             const forceReloadItem = document.getElementById('force-reload-item');
             const saveBtn = document.getElementById('save-btn');
-            
+
             if (strawberryBtn) strawberryBtn.onclick = handleStrawberry;
             if (bananaBtn) bananaBtn.onclick = handleBanana;
             if (coinBtn) coinBtn.onclick = handleCoin;
@@ -1000,7 +1000,7 @@
             if (modalCloseBtn) modalCloseBtn.onclick = () => hideInfo();
             if (forceReloadItem) forceReloadItem.onclick = forceReload;
             if (saveBtn) saveBtn.onclick = saveCurrentPhoto;
-            
+
             updateMusicButton();
             debugLog('✅ Все кнопки привязаны');
         });
@@ -1022,7 +1022,7 @@
         window.forceReload = forceReload;
         window.onImageError = onImageError;
         window.saveCurrentPhoto = saveCurrentPhoto;
-        
+
         debugLog('✅ Скрипт загружен');
     </script>
 </body>
