@@ -57,7 +57,7 @@
     <audio id="bg-music" loop preload="auto"><source src="song.mp3" type="audio/mpeg"></audio>
     <div id="loading"><div class="spinner"></div><div class="loading-text">🔄 Проверка подписки...</div></div>
     <div id="gallery">
-        <div id="debug-panel"><div class="debug-entry">🔍 v11.1 - ИСПРАВЛЕНА ЗАГРУЗКА ФОТО</div></div>
+        <div id="debug-panel"><div class="debug-entry">🔍 v11.2 - ФИКС БАНАНОВ</div></div>
         <div id="badges">
             <div id="subscribed-badge" class="badge">🍓 Подписчик</div>
             <div id="purchased-badge" class="badge">🪙 Куплено</div>
@@ -88,7 +88,7 @@
     <div id="toast"></div><div id="error"></div>
 
     <script>
-        console.log('🚀 v11.1 - ИСПРАВЛЕНА ЗАГРУЗКА ФОТО');
+        console.log('🚀 v11.2 - ФИКС БАНАНОВ');
         
         const CONFIG = { REPO: "Sweatyeyes/Bot-Posting", GITHUB_API: "https://api.github.com/repos" };
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
@@ -107,7 +107,8 @@
             files: [], index: 0, postId: rawPost, userId: parseInt(rawUser),
             isSubscribed: rawSubscribed, hasPurchased: rawPurchased,
             bananasLeft: rawBananas, startTime: Date.now(),
-            offlineMode: false, loadingAttempts: 0
+            offlineMode: false, loadingAttempts: 0,
+            spentPhotos: []  // Будем хранить список разблокированных фото
         };
         
         console.log('📊 Начальное состояние:', state);
@@ -191,6 +192,7 @@
                 ]);
                 
                 debugLog(`📊 general=${general.length}, banana=${banana.length}, strawberry=${strawberry.length}`);
+                debugLog(`🍌 Доступно бананов: ${state.bananasLeft}`);
                 
                 let files = [];
                 
@@ -208,14 +210,30 @@
                 // Банановые фото
                 banana.forEach(f => {
                     if (!f.name.startsWith('banana_banana_')) {
-                        const blurred = banana.find(b => b.name === `banana_banana_${f.name}`);
+                        const photoName = f.name;
+                        const blurred = banana.find(b => b.name === `banana_banana_${photoName}`);
+                        
+                        // Проверяем, было ли это фото разблокировано ранее
+                        const isUnlocked = state.spentPhotos.includes(photoName);
+                        
+                        let imageUrl, isBlurred;
+                        if (state.hasPurchased || isUnlocked) {
+                            imageUrl = f.download_url;
+                            isBlurred = false;
+                            debugLog(`🍌 ${photoName}: РАЗБЛОКИРОВАНО (${isUnlocked ? 'банан' : 'покупка'})`, 'success');
+                        } else {
+                            imageUrl = blurred ? blurred.download_url : f.download_url;
+                            isBlurred = true;
+                            debugLog(`🍌 ${photoName}: ЗАБЛЮРЕНО`, 'warning');
+                        }
+                        
                         files.push({
-                            name: f.name, 
-                            originalName: f.name,
-                            url: state.hasPurchased ? f.download_url : (blurred ? blurred.download_url : f.download_url),
+                            name: photoName, 
+                            originalName: photoName,
+                            url: imageUrl,
                             originalUrl: f.download_url, 
                             type: 'banana',
-                            isBlurred: !state.hasPurchased && !!blurred, 
+                            isBlurred: isBlurred, 
                             isBanana: true
                         });
                     }
@@ -355,9 +373,12 @@
                 });
                 
                 const data = await res.json();
+                debugLog(`🍌 Ответ сервера: ${JSON.stringify(data)}`);
                 
                 if (data.success) {
                     state.bananasLeft = data.available;
+                    // Добавляем фото в список разблокированных
+                    state.spentPhotos.push(currentFile.originalName || currentFile.name);
                     currentFile.isBlurred = false;
                     currentFile.url = currentFile.originalUrl;
                     showImage(state.index);
@@ -369,6 +390,7 @@
                     showToast('❌ Не удалось потратить банан');
                 }
             } catch(e) {
+                debugLog(`Ошибка: ${e.message}`, 'error');
                 showToast('❌ Ошибка соединения');
             }
         }
