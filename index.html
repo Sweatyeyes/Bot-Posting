@@ -23,6 +23,7 @@
         #bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 80px; background: linear-gradient(to top, #000, transparent); display: flex; align-items: center; justify-content: space-around; padding: 0 10px; z-index: 500; }
         .bottom-btn { background: transparent; border: none; color: white; font-size: 32px; cursor: pointer; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; padding: 0; position: relative; }
         .bottom-btn:active { transform: scale(0.9); }
+        .bottom-btn.disabled { opacity: 0.3; pointer-events: none; }
         .banana-count-badge { position: absolute; top: -5px; right: -5px; background: #8B4513; color: white; font-size: 14px; font-weight: bold; min-width: 22px; height: 22px; border-radius: 12px; display: flex; align-items: center; justify-content: center; padding: 0 5px; border: 2px solid #ffd700; }
         #counter { color: white; font-size: 16px; min-width: 70px; text-align: center; display: flex; align-items: center; gap: 10px; }
         #save-btn { font-size: 24px; cursor: pointer; background: transparent; border: none; color: white; padding: 0 5px; }
@@ -34,8 +35,8 @@
         #offline-badge { background: #666; color: #fff; display: none; }
         #info-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.95); backdrop-filter: blur(10px); z-index: 2000; display: none; align-items: center; justify-content: center; padding: 20px; }
         #info-modal.active { display: flex; }
-        .modal-content { background: #2d2d2d; border-radius: 20px; padding: 25px; max-width: 350px; width: 100%; border: 1px solid #404040; max-height: 80vh; overflow-y: auto; }
-        .modal-title { color: #ffd700; font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 20px; }
+        .modal-content { background: #2d2d2d; border-radius: 20px; padding: 25px; max-width: 350px; width: 100%; border: 1px solid #404040; }
+        .modal-title { color: #ffd700; font-size: 22px; text-align: center; margin-bottom: 20px; }
         .modal-item { display: flex; align-items: center; gap: 15px; padding: 12px 0; border-bottom: 1px solid #404040; cursor: pointer; }
         .modal-item:last-child { border-bottom: none; }
         .modal-icon { font-size: 32px; width: 50px; text-align: center; }
@@ -44,20 +45,19 @@
         .modal-close { background: #2ea6ff; color: white; border: none; padding: 12px; border-radius: 10px; font-size: 16px; font-weight: bold; width: 100%; margin-top: 20px; cursor: pointer; }
         #toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(300px); background: rgba(0,0,0,0.9); color: white; padding: 10px 20px; border-radius: 30px; font-size: 14px; z-index: 3000; border: 1px solid #2ea6ff; transition: transform 0.3s; white-space: nowrap; opacity: 0; }
         #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-        #error { display: none; text-align: center; padding: 20px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #ff6b6b; background: rgba(0,0,0,0.8); border-radius: 10px; width: 80%; z-index: 2000; }
+        #error { display: none; text-align: center; padding: 20px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #ff6b6b; background: rgba(0,0,0,0.8); border-radius: 10px; width: 80%; }
         #debug-panel { position: absolute; bottom: 90px; left: 10px; right: 10px; background: rgba(0,0,0,0.95); color: #0f0; font-size: 11px; padding: 10px; border-radius: 5px; display: block; z-index: 2000; max-height: 300px; overflow-y: auto; border: 2px solid #ffaa00; font-family: monospace; }
         .debug-entry { border-bottom: 1px solid #333; padding: 3px 0; word-break: break-all; }
         .debug-error { color: #ff6b6b; }
         .debug-success { color: #6bff6b; }
         .debug-warning { color: #ffaa00; }
-        .debug-info { color: #2ea6ff; }
     </style>
 </head>
 <body>
     <audio id="bg-music" loop preload="auto"><source src="song.mp3" type="audio/mpeg"></audio>
     <div id="loading"><div class="spinner"></div><div class="loading-text">🔄 Проверка подписки...</div></div>
     <div id="gallery">
-        <div id="debug-panel"><div class="debug-entry">🔍 v10.8 - АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПОДПИСКИ</div></div>
+        <div id="debug-panel"><div class="debug-entry">🔍 v11.0 - НОВАЯ СИСТЕМА БАНАНОВ</div></div>
         <div id="badges">
             <div id="subscribed-badge" class="badge">🍓 Подписчик</div>
             <div id="purchased-badge" class="badge">🪙 Куплено</div>
@@ -66,7 +66,7 @@
         <div id="nav-left"></div><div id="nav-right"></div>
         <div id="image-container"><img id="image" src="" onload="this.classList.add('loaded')" onerror="onImageError()"></div>
         <div id="bottom-bar">
-            <button class="bottom-btn" id="strawberry-btn" title="Проверить подписку (🍓)">🍓</button>
+            <button class="bottom-btn" id="strawberry-btn" title="Проверить подписку">🍓</button>
             <button class="bottom-btn" id="banana-btn" title="Потратить банан">🍌<span id="banana-count-badge" class="banana-count-badge">0</span></button>
             <div id="counter"><button id="save-btn" title="Сохранить (только подписчики)">💾</button><span id="counter-text">1/1</span></div>
             <button class="bottom-btn" id="coin-btn" title="Купить пост">🪙</button>
@@ -78,7 +78,7 @@
         <div class="modal-content" onclick="event.stopPropagation()">
             <div class="modal-title">🍓 ИНФОРМАЦИЯ</div>
             <div class="modal-item"><div class="modal-icon">🍓</div><div class="modal-text"><div class="modal-text-title">Клубничка</div><div class="modal-text-desc">Для подписчиков канала <span id="sub-status">(у вас её пока нет)</span></div></div></div>
-            <div class="modal-item"><div class="modal-icon">🍌</div><div class="modal-text"><div class="modal-text-title">Банан</div><div class="modal-text-desc">Трать на банановые фото (осталось <span id="banana-info-count">0</span>)</div></div></div>
+            <div class="modal-item"><div class="modal-icon">🍌</div><div class="modal-text"><div class="modal-text-title">Банан</div><div class="modal-text-desc">3 банана на пост. Потраченные бананы сохраняются</div></div></div>
             <div class="modal-item"><div class="modal-icon">💾</div><div class="modal-text"><div class="modal-text-title">Сохранить</div><div class="modal-text-desc">Доступно только подписчикам</div></div></div>
             <div class="modal-item"><div class="modal-icon">🪙</div><div class="modal-text"><div class="modal-text-title">Монета</div><div class="modal-text-desc">Купить весь пост (199₽)</div></div></div>
             <div class="modal-item" id="force-reload-item"><div class="modal-icon">🔄</div><div class="modal-text"><div class="modal-text-title">Перезагрузить</div><div class="modal-text-desc">Обновить галерею</div></div></div>
@@ -88,31 +88,29 @@
     <div id="toast"></div><div id="error"></div>
 
     <script>
-        console.log('🚀 v10.8 - АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПОДПИСКИ');
+        console.log('🚀 v11.0 - НОВАЯ СИСТЕМА БАНАНОВ');
         
         const CONFIG = { REPO: "Sweatyeyes/Bot-Posting", GITHUB_API: "https://api.github.com/repos" };
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const BOT_USERNAME = 'k0tbezzabot';
         const tg = window.Telegram?.WebApp;
         
-        // ==================== ПОЛУЧЕНИЕ ПАРАМЕТРОВ ====================
+        // Параметры из URL
         const urlParams = new URLSearchParams(window.location.search);
         const rawPost = urlParams.get('post') || (tg?.initDataUnsafe?.start_param?.split(':')[0]);
         const rawUser = urlParams.get('user') || (tg?.initDataUnsafe?.start_param?.split(':')[1]) || tg?.initDataUnsafe?.user?.id;
+        const rawSubscribed = urlParams.get('subscribed') === 'true';
         const rawPurchased = urlParams.get('purchased') === 'true';
         const rawBananas = parseInt(urlParams.get('bananas')) || 3;
         
         let state = {
             files: [], index: 0, postId: rawPost, userId: parseInt(rawUser),
-            isSubscribed: false, // временно false, обновится после проверки
-            hasPurchased: rawPurchased,
-            bananasLeft: rawBananas,
-            startTime: Date.now(),
-            loadingAttempts: 0,
-            subscriptionChecked: false
+            isSubscribed: rawSubscribed, hasPurchased: rawPurchased,
+            bananasLeft: rawBananas, startTime: Date.now(),
+            offlineMode: false, loadingAttempts: 0
         };
         
-        // ==================== ОТЛАДКА ====================
+        // Отладка
         const debugPanel = document.getElementById('debug-panel');
         function debugLog(msg, type = 'info') {
             const entry = document.createElement('div');
@@ -120,50 +118,56 @@
             if (type === 'error') entry.classList.add('debug-error');
             if (type === 'success') entry.classList.add('debug-success');
             if (type === 'warning') entry.classList.add('debug-warning');
-            if (type === 'info') entry.classList.add('debug-info');
-            entry.textContent = `[${new Date().toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit', second:'2-digit' })}] ${msg}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
             debugPanel.appendChild(entry);
             debugPanel.scrollTop = debugPanel.scrollHeight;
             while(debugPanel.children.length > 50) debugPanel.removeChild(debugPanel.firstChild);
             console.log(msg);
         }
         
-        // ==================== ПРОВЕРКА ПОДПИСКИ ====================
+        // Проверка подписки
         async function checkSubscription() {
-            debugLog('🍓🍓🍓 АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПОДПИСКИ 🍓🍓🍓', 'info');
-            
-            if (!state.userId) {
-                debugLog('❌ Нет user_id!', 'error');
-                return false;
-            }
-            
+            if (!state.userId) return false;
             try {
-                const response = await fetch(`${TUNNEL_URL}/api/check-subscription`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                const res = await fetch(`${TUNNEL_URL}/api/check-subscription`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ user_id: state.userId, post_id: state.postId })
                 });
-                
-                const data = await response.json();
-                debugLog(`📥 Ответ: ${JSON.stringify(data)}`, 'info');
-                
+                const data = await res.json();
                 const isSubscribed = data.is_subscribed === true;
-                debugLog(`🍓 Результат: ${isSubscribed ? 'ПОДПИСАН ✅' : 'НЕ ПОДПИСАН ❌'}`, isSubscribed ? 'success' : 'error');
-                
-                state.isSubscribed = isSubscribed;
-                state.subscriptionChecked = true;
-                updateUI();
-                
+                if (isSubscribed !== state.isSubscribed) {
+                    state.isSubscribed = isSubscribed;
+                    updateUI();
+                    if (isSubscribed) {
+                        showToast('🍓 Подписка подтверждена!');
+                        loadGallery();
+                    }
+                }
                 return isSubscribed;
-                
+            } catch(e) { return state.isSubscribed; }
+        }
+        
+        // Проверка туннеля
+        async function checkTunnel() {
+            try {
+                const res = await fetch(`${TUNNEL_URL}/api/webapp-data`, { method: 'OPTIONS' });
+                state.offlineMode = !(res.ok || res.status === 405);
+                document.getElementById('offline-badge').style.display = state.offlineMode ? 'block' : 'none';
+                if (state.offlineMode) {
+                    const bananaBtn = document.getElementById('banana-btn');
+                    if (bananaBtn) bananaBtn.classList.add('disabled');
+                }
+                return !state.offlineMode;
             } catch(e) {
-                debugLog(`❌ Ошибка проверки: ${e.message}`, 'error');
-                state.subscriptionChecked = true;
+                state.offlineMode = true;
+                document.getElementById('offline-badge').style.display = 'block';
+                const bananaBtn = document.getElementById('banana-btn');
+                if (bananaBtn) bananaBtn.classList.add('disabled');
                 return false;
             }
         }
         
-        // ==================== ЗАГРУЗКА ГАЛЕРЕИ ====================
+        // Загрузка фото с GitHub
         async function loadFolder(folder) {
             const url = `${CONFIG.GITHUB_API}/${CONFIG.REPO}/contents/posts/${state.postId}/${folder}`;
             try {
@@ -186,6 +190,7 @@
                 let files = [];
                 general.forEach(f => files.push({ name: f.name, url: f.download_url, type: 'general', isBlurred: false, isBanana: false }));
                 
+                // Банановые фото
                 banana.forEach(f => {
                     if (!f.name.startsWith('banana_banana_')) {
                         const blurred = banana.find(b => b.name === `banana_banana_${f.name}`);
@@ -198,11 +203,11 @@
                     }
                 });
                 
+                // Клубничные фото
                 strawberry.forEach(f => {
                     if (!f.name.startsWith('strawberry_strawberry_')) {
                         const blurred = strawberry.find(b => b.name === `strawberry_strawberry_${f.name}`);
                         const hasAccess = state.hasPurchased || state.isSubscribed;
-                        debugLog(`🍓 ${f.name}: доступ=${hasAccess} (purchased=${state.hasPurchased}, subscribed=${state.isSubscribed})`, hasAccess ? 'success' : 'error');
                         files.push({
                             name: f.name, originalName: f.name,
                             url: hasAccess ? f.download_url : (blurred ? blurred.download_url : f.download_url),
@@ -236,7 +241,8 @@
             img.classList.remove('loaded');
             img.src = state.files[state.index].url + '?t=' + Date.now();
             document.getElementById('counter-text').innerText = `${state.index+1}/${state.files.length}`;
-            debugLog(`🖼 ${state.index+1}/${state.files.length}: ${state.files[state.index].name} ${state.files[state.index].isBlurred ? '🔒' : '✅'}`);
+            const f = state.files[state.index];
+            debugLog(`🖼 ${state.index+1}/${state.files.length}: ${f.name} ${f.isBlurred ? '🔒' : '✅'}`);
         }
         
         function next() { if (state.files.length) showImage(state.index + 1); }
@@ -255,46 +261,61 @@
             if (e.key === 'ArrowRight') { next(); e.preventDefault(); }
         });
         
-        function updateUI() {
-            const badge = document.getElementById('banana-count-badge');
-            if (badge) { badge.textContent = state.bananasLeft; badge.style.display = state.bananasLeft > 0 ? 'flex' : 'none'; }
-            document.getElementById('banana-info-count').textContent = state.bananasLeft;
-            const subStatus = document.getElementById('sub-status');
-            if (subStatus) {
-                subStatus.textContent = state.isSubscribed ? '(у вас она есть) ✅' : '(у вас её пока нет) ❌';
-                subStatus.style.color = state.isSubscribed ? '#ffd700' : '#ff6b6b';
+        // Трата банана
+        async function spendBanana() {
+            if (state.offlineMode) {
+                showToast('📴 Нет соединения, бананы нельзя тратить');
+                return;
             }
-            document.getElementById('subscribed-badge').style.display = state.isSubscribed ? 'block' : 'none';
-            document.getElementById('purchased-badge').style.display = state.hasPurchased ? 'block' : 'none';
-            const saveBtn = document.getElementById('save-btn');
-            if (saveBtn) state.isSubscribed ? saveBtn.classList.remove('disabled') : saveBtn.classList.add('disabled');
+            
+            const currentFile = state.files[state.index];
+            if (!currentFile || !currentFile.isBanana) {
+                showToast('🍌 Это фото нельзя разблокировать бананом');
+                return;
+            }
+            if (!currentFile.isBlurred) {
+                showToast('✅ Это фото уже разблокировано');
+                return;
+            }
+            if (state.bananasLeft <= 0) {
+                showToast('❌ У вас нет бананов на этот пост');
+                return;
+            }
+            
+            showToast('🍌 Трачу банан...');
+            
+            try {
+                const res = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'spend_banana',
+                        user_id: state.userId,
+                        post_id: state.postId,
+                        details: { photo_name: currentFile.originalName || currentFile.name }
+                    })
+                });
+                
+                const data = await res.json();
+                
+                if (data.success) {
+                    state.bananasLeft = data.available;
+                    currentFile.isBlurred = false;
+                    currentFile.url = currentFile.originalUrl;
+                    showImage(state.index);
+                    updateUI();
+                    showToast(`🍌 Банан потрачен! Осталось ${state.bananasLeft}/3`);
+                } else if (data.already_spent) {
+                    showToast('🍌 Вы уже тратили банан на это фото');
+                } else {
+                    showToast('❌ Не удалось потратить банан');
+                }
+            } catch(e) {
+                showToast('❌ Ошибка соединения');
+            }
         }
         
-        // ==================== КНОПКИ ====================
-        async function handleStrawberry() {
-            debugLog('🍓 РУЧНАЯ ПРОВЕРКА ПОДПИСКИ', 'info');
-            await checkSubscription();
-            loadGallery(); // перезагружаем галерею после проверки
-        }
-        
-        function handleBanana() {
-            const f = state.files[state.index];
-            if (!f?.isBanana) { showToast('🍌 Нельзя разблокировать бананом'); return; }
-            if (!f.isBlurred) { showToast('✅ Уже разблокировано'); return; }
-            if (state.bananasLeft <= 0) { showToast('❌ Нет бананов'); return; }
-            state.bananasLeft--;
-            f.isBlurred = false;
-            f.url = f.originalUrl;
-            showImage(state.index);
-            updateUI();
-            showToast('🍌 Банан потрачен!');
-        }
-        
-        function handleCoin() {
-            if (tg) tg.openLink(`https://t.me/${BOT_USERNAME}?start=buy_vip_${state.postId}`);
-            showToast('🪙 Переходим в бот...');
-        }
-        
+        // Сохранение фото
         async function saveCurrentPhoto() {
             if (!state.isSubscribed) {
                 showToast('🍓 Сохранять могут только подписчики!');
@@ -314,6 +335,47 @@
                 URL.revokeObjectURL(url);
                 showToast('✅ Фото сохранено!');
             } catch(e) { showToast('❌ Ошибка сохранения'); }
+        }
+        
+        function updateUI() {
+            const badge = document.getElementById('banana-count-badge');
+            if (badge) {
+                badge.textContent = state.bananasLeft;
+                badge.style.display = state.bananasLeft > 0 ? 'flex' : 'none';
+            }
+            document.getElementById('banana-info-count').textContent = state.bananasLeft;
+            
+            const subStatus = document.getElementById('sub-status');
+            if (subStatus) {
+                subStatus.textContent = state.isSubscribed ? '(у вас она есть) ✅' : '(у вас её пока нет) ❌';
+                subStatus.style.color = state.isSubscribed ? '#ffd700' : '#ff6b6b';
+            }
+            
+            document.getElementById('subscribed-badge').style.display = state.isSubscribed ? 'block' : 'none';
+            document.getElementById('purchased-badge').style.display = state.hasPurchased ? 'block' : 'none';
+            
+            const saveBtn = document.getElementById('save-btn');
+            if (saveBtn) state.isSubscribed ? saveBtn.classList.remove('disabled') : saveBtn.classList.add('disabled');
+            
+            const bananaBtn = document.getElementById('banana-btn');
+            if (bananaBtn) {
+                if (state.offlineMode || state.bananasLeft <= 0) {
+                    bananaBtn.classList.add('disabled');
+                } else {
+                    bananaBtn.classList.remove('disabled');
+                }
+            }
+        }
+        
+        // Кнопки
+        async function handleStrawberry() {
+            debugLog('🍓 Проверка подписки...');
+            await checkSubscription();
+        }
+        
+        function handleCoin() {
+            if (tg) tg.openLink(`https://t.me/${BOT_USERNAME}?start=buy_vip_${state.postId}`);
+            showToast('🪙 Переходим в бот...');
         }
         
         let musicPlaying = false;
@@ -339,30 +401,21 @@
             document.getElementById('error').innerHTML = msg;
         }
         
-        // ==================== ЗАПУСК ====================
+        // Запуск
         async function init() {
-            if (!window.Telegram?.WebApp) {
-                showError('Откройте в Telegram');
-                return;
-            }
-            
+            if (!window.Telegram?.WebApp) { showError('Откройте в Telegram'); return; }
             if (tg) { tg.ready(); tg.expand(); }
+            if (!state.postId) { showError('Не указан ID поста'); return; }
             
-            if (!state.postId) {
-                showError('Не указан ID поста');
-                return;
-            }
-            
-            // СНАЧАЛА ПРОВЕРЯЕМ ПОДПИСКУ
+            await checkTunnel();
             await checkSubscription();
-            // ПОТОМ ЗАГРУЖАЕМ ГАЛЕРЕЮ
             await loadGallery();
         }
         
-        // ==================== ПРИВЯЗКА КНОПОК ====================
+        // Привязка кнопок
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('strawberry-btn')?.addEventListener('click', handleStrawberry);
-            document.getElementById('banana-btn')?.addEventListener('click', handleBanana);
+            document.getElementById('banana-btn')?.addEventListener('click', spendBanana);
             document.getElementById('coin-btn')?.addEventListener('click', handleCoin);
             document.getElementById('save-btn')?.addEventListener('click', saveCurrentPhoto);
             document.getElementById('music-btn')?.addEventListener('click', toggleMusic);
@@ -372,10 +425,7 @@
             debugLog('✅ Кнопки привязаны');
         });
         
-        // ЗАПУСКАЕМ
         init();
-        
-        window.checkSubscription = checkSubscription;
     </script>
 </body>
 </html>
