@@ -57,7 +57,7 @@
     <audio id="bg-music" loop preload="auto"><source src="song.mp3" type="audio/mpeg"></audio>
     <div id="loading"><div class="spinner"></div><div class="loading-text">🔄 Загрузка галереи...</div></div>
     <div id="gallery">
-        <div id="debug-panel"><div class="debug-entry">🔍 v12.0 - GitHub PROXY</div></div>
+        <div id="debug-panel"><div class="debug-entry">🔍 v12.1 - ФИКС БЛЮРА</div></div>
         <div id="badges">
             <div id="subscribed-badge" class="badge">🍓 Подписчик</div>
             <div id="purchased-badge" class="badge">🪙 Куплено</div>
@@ -92,7 +92,7 @@
     <div id="toast"></div><div id="error"></div>
 
     <script>
-        console.log('🚀 v12.0 - GitHub PROXY (токен на сервере)');
+        console.log('🚀 v12.1 - ФИКС БЛЮРА');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const BOT_USERNAME = 'k0tbezzabot';
@@ -244,15 +244,29 @@
                     });
                 });
                 
+                // Банановые фото — ИСПРАВЛЕНО!
                 banana.forEach(f => {
                     if (!f.name.startsWith('banana_banana_')) {
                         const photoName = f.name;
+                        const blurred = banana.find(b => b.name === `banana_banana_${photoName}`);
                         const isUnlocked = state.unlockedPhotos.includes(photoName) || state.hasPurchased;
+                        
+                        let imageUrl;
+                        if (isUnlocked) {
+                            imageUrl = f.download_url;
+                            debugLog(`🍌 ${photoName}: РАЗБЛОКИРОВАНО`, 'success');
+                        } else if (blurred) {
+                            imageUrl = blurred.download_url;
+                            debugLog(`🍌 ${photoName}: БЛЮР`, 'warning');
+                        } else {
+                            imageUrl = f.download_url;
+                            debugLog(`🍌 ${photoName}: НЕТ БЛЮРА, показываем оригинал`, 'warning');
+                        }
                         
                         files.push({
                             name: photoName, 
                             originalName: photoName,
-                            url: isUnlocked ? f.download_url : f.download_url, // blur будет на GitHub
+                            url: imageUrl,
                             originalUrl: f.download_url, 
                             type: 'banana',
                             isBlurred: !isUnlocked, 
@@ -263,11 +277,25 @@
                 
                 strawberry.forEach(f => {
                     if (!f.name.startsWith('strawberry_strawberry_')) {
+                        const blurred = strawberry.find(b => b.name === `strawberry_strawberry_${f.name}`);
                         const hasAccess = state.hasPurchased || state.isSubscribed;
+                        
+                        let imageUrl;
+                        if (hasAccess) {
+                            imageUrl = f.download_url;
+                            debugLog(`🍓 ${f.name}: ДОСТУП ЕСТЬ`, 'success');
+                        } else if (blurred) {
+                            imageUrl = blurred.download_url;
+                            debugLog(`🍓 ${f.name}: БЛЮР (нет доступа)`, 'error');
+                        } else {
+                            imageUrl = f.download_url;
+                            debugLog(`🍓 ${f.name}: НЕТ БЛЮРА, показываем оригинал`, 'warning');
+                        }
+                        
                         files.push({
                             name: f.name, 
                             originalName: f.name,
-                            url: f.download_url,
+                            url: imageUrl,
                             originalUrl: f.download_url, 
                             type: 'strawberry',
                             isBlurred: !hasAccess, 
