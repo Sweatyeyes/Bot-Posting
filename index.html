@@ -57,7 +57,7 @@
     <audio id="bg-music" loop preload="auto"><source src="song.mp3" type="audio/mpeg"></audio>
     <div id="loading"><div class="spinner"></div><div class="loading-text">🔄 Загрузка галереи...</div></div>
     <div id="gallery">
-        <div id="debug-panel"><div class="debug-entry">🔍 v12.1 - ФИКС БЛЮРА</div></div>
+        <div id="debug-panel"><div class="debug-entry">🔍 v12.2 - ИСПРАВЛЕНА ЗАГРУЗКА</div></div>
         <div id="badges">
             <div id="subscribed-badge" class="badge">🍓 Подписчик</div>
             <div id="purchased-badge" class="badge">🪙 Куплено</div>
@@ -92,7 +92,7 @@
     <div id="toast"></div><div id="error"></div>
 
     <script>
-        console.log('🚀 v12.1 - ФИКС БЛЮРА');
+        console.log('🚀 v12.2 - ИСПРАВЛЕНА ЗАГРУЗКА');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const BOT_USERNAME = 'k0tbezzabot';
@@ -229,56 +229,61 @@
             
             try {
                 const [general, banana, strawberry] = await Promise.all([
-                    loadFolder('general'), loadFolder('banana'), loadFolder('strawberry')
+                    loadFolder('general'),
+                    loadFolder('banana'),
+                    loadFolder('strawberry')
                 ]);
+                
+                debugLog(`📊 general=${general.length}, banana=${banana.length}, strawberry=${strawberry.length}`);
                 
                 let files = [];
                 
-                general.forEach(f => {
-                    files.push({ 
-                        name: f.name, 
-                        url: f.download_url, 
-                        type: 'general', 
-                        isBlurred: false, 
-                        isBanana: false 
+                // Общие фото
+                for (const f of general) {
+                    files.push({
+                        name: f.name,
+                        url: f.download_url,
+                        type: 'general',
+                        isBlurred: false,
+                        isBanana: false
                     });
-                });
+                }
                 
-                // Банановые фото — ИСПРАВЛЕНО!
-                banana.forEach(f => {
+                // Банановые фото
+                for (const f of banana) {
                     if (!f.name.startsWith('banana_banana_')) {
-                        const photoName = f.name;
-                        const blurred = banana.find(b => b.name === `banana_banana_${photoName}`);
-                        const isUnlocked = state.unlockedPhotos.includes(photoName) || state.hasPurchased;
+                        const isUnlocked = state.unlockedPhotos.includes(f.name) || state.hasPurchased;
+                        const blurred = banana.find(b => b.name === `banana_banana_${f.name}`);
                         
                         let imageUrl;
                         if (isUnlocked) {
                             imageUrl = f.download_url;
-                            debugLog(`🍌 ${photoName}: РАЗБЛОКИРОВАНО`, 'success');
+                            debugLog(`🍌 ${f.name}: РАЗБЛОКИРОВАНО`, 'success');
                         } else if (blurred) {
                             imageUrl = blurred.download_url;
-                            debugLog(`🍌 ${photoName}: БЛЮР`, 'warning');
+                            debugLog(`🍌 ${f.name}: БЛЮР`, 'warning');
                         } else {
                             imageUrl = f.download_url;
-                            debugLog(`🍌 ${photoName}: НЕТ БЛЮРА, показываем оригинал`, 'warning');
+                            debugLog(`🍌 ${f.name}: НЕТ БЛЮРА`, 'warning');
                         }
                         
                         files.push({
-                            name: photoName, 
-                            originalName: photoName,
+                            name: f.name,
+                            originalName: f.name,
                             url: imageUrl,
-                            originalUrl: f.download_url, 
+                            originalUrl: f.download_url,
                             type: 'banana',
-                            isBlurred: !isUnlocked, 
+                            isBlurred: !isUnlocked,
                             isBanana: true
                         });
                     }
-                });
+                }
                 
-                strawberry.forEach(f => {
+                // Клубничные фото
+                for (const f of strawberry) {
                     if (!f.name.startsWith('strawberry_strawberry_')) {
-                        const blurred = strawberry.find(b => b.name === `strawberry_strawberry_${f.name}`);
                         const hasAccess = state.hasPurchased || state.isSubscribed;
+                        const blurred = strawberry.find(b => b.name === `strawberry_strawberry_${f.name}`);
                         
                         let imageUrl;
                         if (hasAccess) {
@@ -286,31 +291,32 @@
                             debugLog(`🍓 ${f.name}: ДОСТУП ЕСТЬ`, 'success');
                         } else if (blurred) {
                             imageUrl = blurred.download_url;
-                            debugLog(`🍓 ${f.name}: БЛЮР (нет доступа)`, 'error');
+                            debugLog(`🍓 ${f.name}: БЛЮР`, 'error');
                         } else {
                             imageUrl = f.download_url;
-                            debugLog(`🍓 ${f.name}: НЕТ БЛЮРА, показываем оригинал`, 'warning');
+                            debugLog(`🍓 ${f.name}: НЕТ БЛЮРА`, 'warning');
                         }
                         
                         files.push({
-                            name: f.name, 
+                            name: f.name,
                             originalName: f.name,
                             url: imageUrl,
-                            originalUrl: f.download_url, 
+                            originalUrl: f.download_url,
                             type: 'strawberry',
-                            isBlurred: !hasAccess, 
+                            isBlurred: !hasAccess,
                             isBanana: false
                         });
                     }
-                });
+                }
                 
-                if (files.length === 0) { 
-                    showError('В этом посте нет фото'); 
-                    return; 
+                debugLog(`✅ ВСЕГО ФАЙЛОВ: ${files.length}`);
+                
+                if (files.length === 0) {
+                    showError('В этом посте нет фото');
+                    return;
                 }
                 
                 state.files = files;
-                debugLog(`✅ Загружено ${files.length} фото`);
                 
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('gallery').style.display = 'block';
