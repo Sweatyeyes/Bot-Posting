@@ -35,8 +35,8 @@
         #offline-badge { background: #666; color: #fff; display: none; }
         #info-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.95); backdrop-filter: blur(10px); z-index: 2000; display: none; align-items: center; justify-content: center; padding: 20px; }
         #info-modal.active { display: flex; }
-        .modal-content { background: #2d2d2d; border-radius: 20px; padding: 25px; max-width: 350px; width: 100%; border: 1px solid #404040; }
-        .modal-title { color: #ffd700; font-size: 22px; text-align: center; margin-bottom: 20px; }
+        .modal-content { background: #2d2d2d; border-radius: 20px; padding: 25px; max-width: 350px; width: 100%; border: 1px solid #404040; max-height: 80vh; overflow-y: auto; }
+        .modal-title { color: #ffd700; font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 20px; }
         .modal-item { display: flex; align-items: center; gap: 15px; padding: 12px 0; border-bottom: 1px solid #404040; cursor: pointer; }
         .modal-item:last-child { border-bottom: none; }
         .modal-icon { font-size: 32px; width: 50px; text-align: center; }
@@ -45,7 +45,7 @@
         .modal-close { background: #2ea6ff; color: white; border: none; padding: 12px; border-radius: 10px; font-size: 16px; font-weight: bold; width: 100%; margin-top: 20px; cursor: pointer; }
         #toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(300px); background: rgba(0,0,0,0.9); color: white; padding: 10px 20px; border-radius: 30px; font-size: 14px; z-index: 3000; border: 1px solid #2ea6ff; transition: transform 0.3s; white-space: nowrap; opacity: 0; }
         #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-        #error { display: none; text-align: center; padding: 20px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #ff6b6b; background: rgba(0,0,0,0.8); border-radius: 10px; width: 80%; }
+        #error { display: none; text-align: center; padding: 20px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #ff6b6b; background: rgba(0,0,0,0.8); border-radius: 10px; width: 80%; z-index: 2000; }
         #debug-panel { position: absolute; bottom: 90px; left: 10px; right: 10px; background: rgba(0,0,0,0.95); color: #0f0; font-size: 11px; padding: 10px; border-radius: 5px; display: block; z-index: 2000; max-height: 300px; overflow-y: auto; border: 2px solid #ffaa00; font-family: monospace; }
         .debug-entry { border-bottom: 1px solid #333; padding: 3px 0; word-break: break-all; }
         .debug-error { color: #ff6b6b; }
@@ -57,7 +57,7 @@
     <audio id="bg-music" loop preload="auto"><source src="song.mp3" type="audio/mpeg"></audio>
     <div id="loading"><div class="spinner"></div><div class="loading-text">🔄 Проверка подписки...</div></div>
     <div id="gallery">
-        <div id="debug-panel"><div class="debug-entry">🔍 v11.0 - НОВАЯ СИСТЕМА БАНАНОВ</div></div>
+        <div id="debug-panel"><div class="debug-entry">🔍 v11.1 - ИСПРАВЛЕНА ЗАГРУЗКА ФОТО</div></div>
         <div id="badges">
             <div id="subscribed-badge" class="badge">🍓 Подписчик</div>
             <div id="purchased-badge" class="badge">🪙 Куплено</div>
@@ -88,7 +88,7 @@
     <div id="toast"></div><div id="error"></div>
 
     <script>
-        console.log('🚀 v11.0 - НОВАЯ СИСТЕМА БАНАНОВ');
+        console.log('🚀 v11.1 - ИСПРАВЛЕНА ЗАГРУЗКА ФОТО');
         
         const CONFIG = { REPO: "Sweatyeyes/Bot-Posting", GITHUB_API: "https://api.github.com/repos" };
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
@@ -109,6 +109,8 @@
             bananasLeft: rawBananas, startTime: Date.now(),
             offlineMode: false, loadingAttempts: 0
         };
+        
+        console.log('📊 Начальное состояние:', state);
         
         // Отладка
         const debugPanel = document.getElementById('debug-panel');
@@ -152,15 +154,15 @@
             try {
                 const res = await fetch(`${TUNNEL_URL}/api/webapp-data`, { method: 'OPTIONS' });
                 state.offlineMode = !(res.ok || res.status === 405);
-                document.getElementById('offline-badge').style.display = state.offlineMode ? 'block' : 'none';
-                if (state.offlineMode) {
-                    const bananaBtn = document.getElementById('banana-btn');
-                    if (bananaBtn) bananaBtn.classList.add('disabled');
-                }
+                const offlineBadge = document.getElementById('offline-badge');
+                if (offlineBadge) offlineBadge.style.display = state.offlineMode ? 'block' : 'none';
+                const bananaBtn = document.getElementById('banana-btn');
+                if (bananaBtn && state.offlineMode) bananaBtn.classList.add('disabled');
                 return !state.offlineMode;
             } catch(e) {
                 state.offlineMode = true;
-                document.getElementById('offline-badge').style.display = 'block';
+                const offlineBadge = document.getElementById('offline-badge');
+                if (offlineBadge) offlineBadge.style.display = 'block';
                 const bananaBtn = document.getElementById('banana-btn');
                 if (bananaBtn) bananaBtn.classList.add('disabled');
                 return false;
@@ -175,7 +177,10 @@
                 if (res.status === 404) return [];
                 const data = await res.json();
                 return data.filter(f => f.name.match(/\.(jpg|jpeg|png)$/i));
-            } catch(e) { return []; }
+            } catch(e) { 
+                debugLog(`Ошибка загрузки ${folder}: ${e.message}`, 'error');
+                return []; 
+            }
         }
         
         async function loadGallery() {
@@ -188,17 +193,30 @@
                 debugLog(`📊 general=${general.length}, banana=${banana.length}, strawberry=${strawberry.length}`);
                 
                 let files = [];
-                general.forEach(f => files.push({ name: f.name, url: f.download_url, type: 'general', isBlurred: false, isBanana: false }));
+                
+                // Общие фото
+                general.forEach(f => {
+                    files.push({ 
+                        name: f.name, 
+                        url: f.download_url, 
+                        type: 'general', 
+                        isBlurred: false, 
+                        isBanana: false 
+                    });
+                });
                 
                 // Банановые фото
                 banana.forEach(f => {
                     if (!f.name.startsWith('banana_banana_')) {
                         const blurred = banana.find(b => b.name === `banana_banana_${f.name}`);
                         files.push({
-                            name: f.name, originalName: f.name,
+                            name: f.name, 
+                            originalName: f.name,
                             url: state.hasPurchased ? f.download_url : (blurred ? blurred.download_url : f.download_url),
-                            originalUrl: f.download_url, type: 'banana',
-                            isBlurred: !state.hasPurchased && !!blurred, isBanana: true
+                            originalUrl: f.download_url, 
+                            type: 'banana',
+                            isBlurred: !state.hasPurchased && !!blurred, 
+                            isBanana: true
                         });
                     }
                 });
@@ -208,52 +226,92 @@
                     if (!f.name.startsWith('strawberry_strawberry_')) {
                         const blurred = strawberry.find(b => b.name === `strawberry_strawberry_${f.name}`);
                         const hasAccess = state.hasPurchased || state.isSubscribed;
+                        debugLog(`🍓 ${f.name}: доступ=${hasAccess}`, hasAccess ? 'success' : 'error');
                         files.push({
-                            name: f.name, originalName: f.name,
+                            name: f.name, 
+                            originalName: f.name,
                             url: hasAccess ? f.download_url : (blurred ? blurred.download_url : f.download_url),
-                            originalUrl: f.download_url, type: 'strawberry',
-                            isBlurred: !hasAccess, isBanana: false
+                            originalUrl: f.download_url, 
+                            type: 'strawberry',
+                            isBlurred: !hasAccess, 
+                            isBanana: false
                         });
                     }
                 });
                 
-                if (files.length === 0) { showError('Нет фото'); return; }
+                if (files.length === 0) { 
+                    debugLog('❌ Нет фото в посте', 'error');
+                    showError('В этом посте нет фото'); 
+                    return; 
+                }
                 
                 state.files = files;
                 debugLog(`✅ Загружено ${files.length} фото`);
                 
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('gallery').style.display = 'block';
+                // Скрываем загрузку, показываем галерею
+                const loadingDiv = document.getElementById('loading');
+                const galleryDiv = document.getElementById('gallery');
+                if (loadingDiv) loadingDiv.style.display = 'none';
+                if (galleryDiv) galleryDiv.style.display = 'block';
+                
                 updateUI();
                 showImage(0);
                 setupNavigation();
                 
             } catch(e) {
-                debugLog(`❌ Ошибка: ${e.message}`, 'error');
-                showError('Ошибка загрузки');
+                debugLog(`❌ Ошибка загрузки: ${e.message}`, 'error');
+                showError('Ошибка загрузки галереи: ' + e.message);
             }
         }
         
         function showImage(i) {
-            if (!state.files.length) return;
+            if (!state.files || state.files.length === 0) {
+                debugLog('❌ Нет фото для отображения', 'error');
+                return;
+            }
+            
             state.index = (i + state.files.length) % state.files.length;
             const img = document.getElementById('image');
+            const file = state.files[state.index];
+            
+            if (!img || !file) return;
+            
             img.classList.remove('loaded');
-            img.src = state.files[state.index].url + '?t=' + Date.now();
-            document.getElementById('counter-text').innerText = `${state.index+1}/${state.files.length}`;
-            const f = state.files[state.index];
-            debugLog(`🖼 ${state.index+1}/${state.files.length}: ${f.name} ${f.isBlurred ? '🔒' : '✅'}`);
+            img.src = file.url + '?t=' + Date.now();
+            
+            const counterText = document.getElementById('counter-text');
+            if (counterText) {
+                counterText.innerText = `${state.index+1}/${state.files.length}`;
+            }
+            
+            debugLog(`🖼 ${state.index+1}/${state.files.length}: ${file.name} ${file.isBlurred ? '🔒' : '✅'}`);
         }
         
-        function next() { if (state.files.length) showImage(state.index + 1); }
-        function prev() { if (state.files.length) showImage(state.index - 1); }
-        function onImageError() { setTimeout(() => showImage(state.index), 1000); }
+        function next() { 
+            if (state.files && state.files.length) showImage(state.index + 1); 
+        }
+        function prev() { 
+            if (state.files && state.files.length) showImage(state.index - 1); 
+        }
+        function onImageError() { 
+            debugLog('Ошибка загрузки изображения', 'error');
+            setTimeout(() => showImage(state.index), 1000); 
+        }
         
         function setupNavigation() {
             const left = document.getElementById('nav-left');
             const right = document.getElementById('nav-right');
-            if (left) { const newLeft = left.cloneNode(true); left.parentNode.replaceChild(newLeft, left); newLeft.addEventListener('click', () => prev()); }
-            if (right) { const newRight = right.cloneNode(true); right.parentNode.replaceChild(newRight, right); newRight.addEventListener('click', () => next()); }
+            if (left) { 
+                const newLeft = left.cloneNode(true); 
+                left.parentNode.replaceChild(newLeft, left); 
+                newLeft.addEventListener('click', () => prev()); 
+            }
+            if (right) { 
+                const newRight = right.cloneNode(true); 
+                right.parentNode.replaceChild(newRight, right); 
+                newRight.addEventListener('click', () => next()); 
+            }
+            debugLog('✅ Навигация настроена');
         }
         
         document.addEventListener('keydown', (e) => {
@@ -334,29 +392,44 @@
                 link.click();
                 URL.revokeObjectURL(url);
                 showToast('✅ Фото сохранено!');
-            } catch(e) { showToast('❌ Ошибка сохранения'); }
+            } catch(e) { 
+                showToast('❌ Ошибка сохранения'); 
+            }
         }
         
         function updateUI() {
-            const badge = document.getElementById('banana-count-badge');
-            if (badge) {
-                badge.textContent = state.bananasLeft;
-                badge.style.display = state.bananasLeft > 0 ? 'flex' : 'none';
+            // Обновляем бейдж бананов на кнопке
+            const bananaBadge = document.getElementById('banana-count-badge');
+            if (bananaBadge) {
+                bananaBadge.textContent = state.bananasLeft;
+                bananaBadge.style.display = state.bananasLeft > 0 ? 'flex' : 'none';
             }
-            document.getElementById('banana-info-count').textContent = state.bananasLeft;
             
+            // Обновляем статус подписки
             const subStatus = document.getElementById('sub-status');
             if (subStatus) {
                 subStatus.textContent = state.isSubscribed ? '(у вас она есть) ✅' : '(у вас её пока нет) ❌';
                 subStatus.style.color = state.isSubscribed ? '#ffd700' : '#ff6b6b';
             }
             
-            document.getElementById('subscribed-badge').style.display = state.isSubscribed ? 'block' : 'none';
-            document.getElementById('purchased-badge').style.display = state.hasPurchased ? 'block' : 'none';
+            // Обновляем бейджи
+            const subBadge = document.getElementById('subscribed-badge');
+            if (subBadge) subBadge.style.display = state.isSubscribed ? 'block' : 'none';
             
+            const purchasedBadge = document.getElementById('purchased-badge');
+            if (purchasedBadge) purchasedBadge.style.display = state.hasPurchased ? 'block' : 'none';
+            
+            // Обновляем кнопку сохранения
             const saveBtn = document.getElementById('save-btn');
-            if (saveBtn) state.isSubscribed ? saveBtn.classList.remove('disabled') : saveBtn.classList.add('disabled');
+            if (saveBtn) {
+                if (state.isSubscribed) {
+                    saveBtn.classList.remove('disabled');
+                } else {
+                    saveBtn.classList.add('disabled');
+                }
+            }
             
+            // Обновляем кнопку банана
             const bananaBtn = document.getElementById('banana-btn');
             if (bananaBtn) {
                 if (state.offlineMode || state.bananasLeft <= 0) {
@@ -365,6 +438,8 @@
                     bananaBtn.classList.remove('disabled');
                 }
             }
+            
+            debugLog(`🔄 UI обновлён: бананов=${state.bananasLeft}, подписка=${state.isSubscribed}`);
         }
         
         // Кнопки
@@ -381,31 +456,64 @@
         let musicPlaying = false;
         const audio = document.getElementById('bg-music');
         function toggleMusic() {
-            if (musicPlaying) { audio.pause(); musicPlaying = false; showToast('🎵 Музыка выключена'); }
-            else { audio.play().catch(()=>{}); musicPlaying = true; showToast('🎵 Музыка включена'); }
+            if (musicPlaying) { 
+                audio.pause(); 
+                musicPlaying = false; 
+                showToast('🎵 Музыка выключена'); 
+            } else { 
+                audio.play().catch(()=>{}); 
+                musicPlaying = true; 
+                showToast('🎵 Музыка включена'); 
+            }
         }
-        setTimeout(() => { audio.play().catch(()=>{}); musicPlaying = true; }, 500);
+        setTimeout(() => { 
+            audio.play().catch(()=>{}); 
+            musicPlaying = true; 
+        }, 500);
         
-        function showInfo() { document.getElementById('info-modal').classList.add('active'); }
-        function hideInfo() { document.getElementById('info-modal').classList.remove('active'); }
-        function forceReload() { localStorage.clear(); location.reload(); }
+        function showInfo() { 
+            const modal = document.getElementById('info-modal');
+            if (modal) modal.classList.add('active'); 
+        }
+        function hideInfo() { 
+            const modal = document.getElementById('info-modal');
+            if (modal) modal.classList.remove('active'); 
+        }
+        function forceReload() { 
+            localStorage.clear(); 
+            location.reload(); 
+        }
         function showToast(text) {
             const toast = document.getElementById('toast');
+            if (!toast) return;
             toast.textContent = text;
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), 2500);
         }
         function showError(msg) {
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('error').style.display = 'block';
-            document.getElementById('error').innerHTML = msg;
+            const loadingDiv = document.getElementById('loading');
+            const errorDiv = document.getElementById('error');
+            if (loadingDiv) loadingDiv.style.display = 'none';
+            if (errorDiv) {
+                errorDiv.style.display = 'block';
+                errorDiv.innerHTML = msg;
+            }
         }
         
         // Запуск
         async function init() {
-            if (!window.Telegram?.WebApp) { showError('Откройте в Telegram'); return; }
-            if (tg) { tg.ready(); tg.expand(); }
-            if (!state.postId) { showError('Не указан ID поста'); return; }
+            if (!window.Telegram?.WebApp) { 
+                showError('Откройте в Telegram'); 
+                return; 
+            }
+            if (tg) { 
+                tg.ready(); 
+                tg.expand(); 
+            }
+            if (!state.postId) { 
+                showError('Не указан ID поста'); 
+                return; 
+            }
             
             await checkTunnel();
             await checkSubscription();
@@ -414,14 +522,24 @@
         
         // Привязка кнопок
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('strawberry-btn')?.addEventListener('click', handleStrawberry);
-            document.getElementById('banana-btn')?.addEventListener('click', spendBanana);
-            document.getElementById('coin-btn')?.addEventListener('click', handleCoin);
-            document.getElementById('save-btn')?.addEventListener('click', saveCurrentPhoto);
-            document.getElementById('music-btn')?.addEventListener('click', toggleMusic);
-            document.getElementById('info-btn')?.addEventListener('click', showInfo);
-            document.getElementById('modal-close-btn')?.addEventListener('click', hideInfo);
-            document.getElementById('force-reload-item')?.addEventListener('click', forceReload);
+            const strawberryBtn = document.getElementById('strawberry-btn');
+            const bananaBtn = document.getElementById('banana-btn');
+            const coinBtn = document.getElementById('coin-btn');
+            const saveBtn = document.getElementById('save-btn');
+            const musicBtn = document.getElementById('music-btn');
+            const infoBtn = document.getElementById('info-btn');
+            const modalCloseBtn = document.getElementById('modal-close-btn');
+            const forceReloadItem = document.getElementById('force-reload-item');
+            
+            if (strawberryBtn) strawberryBtn.addEventListener('click', handleStrawberry);
+            if (bananaBtn) bananaBtn.addEventListener('click', spendBanana);
+            if (coinBtn) coinBtn.addEventListener('click', handleCoin);
+            if (saveBtn) saveBtn.addEventListener('click', saveCurrentPhoto);
+            if (musicBtn) musicBtn.addEventListener('click', toggleMusic);
+            if (infoBtn) infoBtn.addEventListener('click', showInfo);
+            if (modalCloseBtn) modalCloseBtn.addEventListener('click', hideInfo);
+            if (forceReloadItem) forceReloadItem.addEventListener('click', forceReload);
+            
             debugLog('✅ Кнопки привязаны');
         });
         
