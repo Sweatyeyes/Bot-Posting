@@ -55,9 +55,9 @@
 </head>
 <body>
     <audio id="bg-music" loop preload="auto"><source src="song.mp3" type="audio/mpeg"></audio>
-    <div id="loading"><div class="spinner"></div><div class="loading-text">🔄 Проверка подписки...</div></div>
+    <div id="loading"><div class="spinner"></div><div class="loading-text">🔄 Загрузка галереи...</div></div>
     <div id="gallery">
-        <div id="debug-panel"><div class="debug-entry">🔍 v11.3 - РАЗБЛОКИРОВАННЫЕ ФОТО</div></div>
+        <div id="debug-panel"><div class="debug-entry">🔍 v11.4 - ДИНАМИЧЕСКАЯ ПРОВЕРКА РАЗБЛОКИРОВАННЫХ ФОТО</div></div>
         <div id="badges">
             <div id="subscribed-badge" class="badge">🍓 Подписчик</div>
             <div id="purchased-badge" class="badge">🪙 Куплено</div>
@@ -88,7 +88,7 @@
     <div id="toast"></div><div id="error"></div>
 
     <script>
-        console.log('🚀 v11.3 - РАЗБЛОКИРОВАННЫЕ ФОТО');
+        console.log('🚀 v11.4 - ДИНАМИЧЕСКАЯ ПРОВЕРКА РАЗБЛОКИРОВАННЫХ ФОТО');
         
         const CONFIG = { REPO: "Sweatyeyes/Bot-Posting", GITHUB_API: "https://api.github.com/repos" };
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
@@ -103,22 +103,16 @@
         const rawPurchased = urlParams.get('purchased') === 'true';
         const rawBananas = parseInt(urlParams.get('bananas')) || 3;
         
-        // ПАРСИМ СПИСОК РАЗБЛОКИРОВАННЫХ ФОТО
+        // Парсим список разблокированных из URL (как fallback)
         const unlockedParam = urlParams.get('unlocked') || '';
-        const unlockedPhotos = unlockedParam ? unlockedParam.split(',') : [];
-        
-        console.log('📊 Параметры:');
-        console.log('  post:', rawPost);
-        console.log('  user:', rawUser);
-        console.log('  bananas:', rawBananas);
-        console.log('  unlocked:', unlockedPhotos);
+        const urlUnlockedPhotos = unlockedParam ? unlockedParam.split(',') : [];
         
         let state = {
             files: [], index: 0, postId: rawPost, userId: parseInt(rawUser),
             isSubscribed: rawSubscribed, hasPurchased: rawPurchased,
             bananasLeft: rawBananas, startTime: Date.now(),
             offlineMode: false, loadingAttempts: 0,
-            unlockedPhotos: unlockedPhotos  // ← СПИСОК РАЗБЛОКИРОВАННЫХ ФОТО
+            unlockedPhotos: urlUnlockedPhotos  // начальное значение из URL
         };
         
         // Отладка
@@ -134,6 +128,30 @@
             debugPanel.scrollTop = debugPanel.scrollHeight;
             while(debugPanel.children.length > 50) debugPanel.removeChild(debugPanel.firstChild);
             console.log(msg);
+        }
+        
+        // ==================== ПОЛУЧЕНИЕ РАЗБЛОКИРОВАННЫХ ФОТО ИЗ БД ====================
+        async function fetchUnlockedPhotos() {
+            if (!state.userId || !state.postId) return;
+            debugLog('🍌 Запрос актуального списка разблокированных фото...');
+            try {
+                const res = await fetch(`${TUNNEL_URL}/api/get-unlocked-photos`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId })
+                });
+                const data = await res.json();
+                if (data.unlocked_photos) {
+                    state.unlockedPhotos = data.unlocked_photos;
+                    state.bananasLeft = data.available_bananas;
+                    debugLog(`🍌 Получены разблокированные фото: ${state.unlockedPhotos.length}, бананов: ${state.bananasLeft}`, 'success');
+                    updateUI();
+                    // Перезагружаем галерею, чтобы применить обновления
+                    loadGallery();
+                }
+            } catch(e) {
+                debugLog(`❌ Ошибка получения разблокированных фото: ${e.message}`, 'error');
+            }
         }
         
         // Проверка подписки
@@ -194,7 +212,7 @@
         
         async function loadGallery() {
             debugLog('🔄 Загрузка галереи...');
-            debugLog(`🍌 Разблокировано фото: ${state.unlockedPhotos.length}`);
+            debugLog(`🍌 Разблокировано фото из БД: ${state.unlockedPhotos.length}`);
             
             try {
                 const [general, banana, strawberry] = await Promise.all([
@@ -230,7 +248,7 @@
                         if (isUnlocked) {
                             imageUrl = f.download_url;
                             isBlurred = false;
-                            debugLog(`🍌 ${photoName}: РАЗБЛОКИРОВАНО (было в списке или куплено)`, 'success');
+                            debugLog(`🍌 ${photoName}: РАЗБЛОКИРОВАНО`, 'success');
                         } else {
                             imageUrl = blurred ? blurred.download_url : f.download_url;
                             isBlurred = true;
@@ -538,6 +556,7 @@
             
             await checkTunnel();
             await checkSubscription();
+            await fetchUnlockedPhotos();  // ← ПОЛУЧАЕМ АКТУАЛЬНЫЙ СПИСОК ИЗ БД
             await loadGallery();
         }
         
