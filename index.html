@@ -57,7 +57,7 @@
     <audio id="bg-music" loop preload="auto"><source src="song.mp3" type="audio/mpeg"></audio>
     <div id="loading"><div class="spinner"></div><div class="loading-text">🔄 Загрузка галереи...</div></div>
     <div id="gallery">
-        <div id="debug-panel"><div class="debug-entry">🔍 v11.5 - ФИНАЛЬНАЯ ВЕРСИЯ</div></div>
+        <div id="debug-panel"><div class="debug-entry">🔍 v11.6 - GitHub AUTH</div></div>
         <div id="badges">
             <div id="subscribed-badge" class="badge">🍓 Подписчик</div>
             <div id="purchased-badge" class="badge">🪙 Куплено</div>
@@ -92,12 +92,17 @@
     <div id="toast"></div><div id="error"></div>
 
     <script>
-        console.log('🚀 v11.5 - ФИНАЛЬНАЯ ВЕРСИЯ');
+        console.log('🚀 v11.6 - GitHub AUTH');
         
         const CONFIG = { REPO: "Sweatyeyes/Bot-Posting", GITHUB_API: "https://api.github.com/repos" };
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const BOT_USERNAME = 'k0tbezzabot';
         const tg = window.Telegram?.WebApp;
+        
+        // GitHub токен (публичный, только для чтения)
+        // Создай токен в настройках GitHub: Settings → Developer settings → Personal access tokens → Tokens (classic)
+        // Права: только public_repo
+        const GITHUB_TOKEN = ''; // ← ВСТАВЬ СВОЙ ТОКЕН!
         
         // Параметры из URL
         const urlParams = new URLSearchParams(window.location.search);
@@ -107,7 +112,6 @@
         const rawPurchased = urlParams.get('purchased') === 'true';
         const rawBananas = parseInt(urlParams.get('bananas')) || 3;
         
-        // Парсим список разблокированных из URL (как fallback)
         const unlockedParam = urlParams.get('unlocked') || '';
         const urlUnlockedPhotos = unlockedParam ? unlockedParam.split(',') : [];
         
@@ -134,7 +138,48 @@
             console.log(msg);
         }
         
-        // ==================== ПОЛУЧЕНИЕ РАЗБЛОКИРОВАННЫХ ФОТО ИЗ БД ====================
+        // ==================== ЗАГРУЗКА ФОТО С GITHUB С ТОКЕНОМ ====================
+        async function loadFolder(folder) {
+            const url = `${CONFIG.GITHUB_API}/${CONFIG.REPO}/contents/posts/${state.postId}/${folder}`;
+            debugLog(`📁 Запрос: ${folder}...`);
+            
+            try {
+                const headers = {
+                    'Accept': 'application/vnd.github.v3+json'
+                };
+                // Добавляем токен, если он есть
+                if (GITHUB_TOKEN && GITHUB_TOKEN !== 'ghp_xxxxxxxxxxxxxxxxxxxxx') {
+                    headers['Authorization'] = `token ${GITHUB_TOKEN}`;
+                    debugLog(`🔑 Использую GitHub токен для аутентификации`);
+                } else {
+                    debugLog(`⚠️ GitHub токен не настроен, лимит 60 запросов/час`, 'warning');
+                }
+                
+                const res = await fetch(url, { headers });
+                
+                if (res.status === 403) {
+                    const data = await res.json();
+                    if (data.message && data.message.includes('rate limit')) {
+                        debugLog(`❌ Лимит GitHub API! Добавь токен в GITHUB_TOKEN`, 'error');
+                        showToast('⚠️ Лимит GitHub API, добавьте токен');
+                    }
+                    return [];
+                }
+                
+                if (res.status === 404) return [];
+                if (!res.ok) return [];
+                
+                const data = await res.json();
+                const images = data.filter(f => f.name.match(/\.(jpg|jpeg|png)$/i));
+                debugLog(`✅ ${folder}: найдено ${images.length} фото`);
+                return images;
+            } catch(e) { 
+                debugLog(`❌ Ошибка загрузки ${folder}: ${e.message}`, 'error');
+                return []; 
+            }
+        }
+        
+        // ==================== ПОЛУЧЕНИЕ РАЗБЛОКИРОВАННЫХ ФОТО ====================
         async function fetchUnlockedPhotos() {
             if (!state.userId || !state.postId) return;
             debugLog('🍌 Запрос списка разблокированных фото...');
@@ -157,7 +202,7 @@
             }
         }
         
-        // Проверка подписки (автоматическая, не показываем тост)
+        // Проверка подписки
         async function checkSubscription() {
             if (!state.userId) return false;
             try {
@@ -170,9 +215,7 @@
                 if (isSubscribed !== state.isSubscribed) {
                     state.isSubscribed = isSubscribed;
                     updateUI();
-                    if (isSubscribed) {
-                        loadGallery();
-                    }
+                    if (isSubscribed) loadGallery();
                 }
                 return isSubscribed;
             } catch(e) { return state.isSubscribed; }
@@ -195,19 +238,6 @@
                 const bananaBtn = document.getElementById('banana-btn');
                 if (bananaBtn) bananaBtn.classList.add('disabled');
                 return false;
-            }
-        }
-        
-        // Загрузка фото с GitHub
-        async function loadFolder(folder) {
-            const url = `${CONFIG.GITHUB_API}/${CONFIG.REPO}/contents/posts/${state.postId}/${folder}`;
-            try {
-                const res = await fetch(url, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
-                if (res.status === 404) return [];
-                const data = await res.json();
-                return data.filter(f => f.name.match(/\.(jpg|jpeg|png)$/i));
-            } catch(e) { 
-                return []; 
             }
         }
         
@@ -382,7 +412,6 @@
             }
         }
         
-        // Сохранение фото
         async function saveCurrentPhoto() {
             if (!state.isSubscribed) {
                 showToast('🍓 Только для подписчиков!');
@@ -406,19 +435,16 @@
             }
         }
         
-        // Покупка поста
         function handleCoin() {
             if (tg) tg.openLink(`https://t.me/${BOT_USERNAME}?start=buy_vip_${state.postId}`);
             showToast('🪙 Переход в бот...');
         }
         
-        // Клубничка — просто ссылка на канал
         function handleStrawberry() {
             if (tg) tg.openLink('https://t.me/neuroticababes_bot');
             showToast('🍓 Подпишитесь на канал');
         }
         
-        // Музыка (не автозапуск)
         let musicPlaying = false;
         const audio = document.getElementById('bg-music');
         let musicBtn = null;
