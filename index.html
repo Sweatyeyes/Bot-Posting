@@ -57,7 +57,7 @@
     <audio id="bg-music" loop preload="auto"><source src="song.mp3" type="audio/mpeg"></audio>
     <div id="loading"><div class="spinner"></div><div class="loading-text">🔄 Загрузка галереи...</div></div>
     <div id="gallery">
-        <div id="debug-panel"><div class="debug-entry">🔍 v11.5 - ФИНАЛЬНАЯ ВЕРСИЯ</div></div>
+        <div id="debug-panel"><div class="debug-entry">🔍 v11.6 - GitHub PROXY (токен на сервере)</div></div>
         <div id="badges">
             <div id="subscribed-badge" class="badge">🍓 Подписчик</div>
             <div id="purchased-badge" class="badge">🪙 Куплено</div>
@@ -92,13 +92,12 @@
     <div id="toast"></div><div id="error"></div>
 
     <script>
-        console.log('🚀 v11.5 - ФИНАЛЬНАЯ ВЕРСИЯ');
-        
-        const CONFIG = { REPO: "Sweatyeyes/Bot-Posting", GITHUB_API: "https://api.github.com/repos" };
+        console.log('🚀 v11.6 - GitHub PROXY (токен на сервере)');
+
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const BOT_USERNAME = 'k0tbezzabot';
         const tg = window.Telegram?.WebApp;
-        
+
         // Параметры из URL
         const urlParams = new URLSearchParams(window.location.search);
         const rawPost = urlParams.get('post') || (tg?.initDataUnsafe?.start_param?.split(':')[0]);
@@ -106,11 +105,10 @@
         const rawSubscribed = urlParams.get('subscribed') === 'true';
         const rawPurchased = urlParams.get('purchased') === 'true';
         const rawBananas = parseInt(urlParams.get('bananas')) || 3;
-        
-        // Парсим список разблокированных из URL (как fallback)
+
         const unlockedParam = urlParams.get('unlocked') || '';
         const urlUnlockedPhotos = unlockedParam ? unlockedParam.split(',') : [];
-        
+
         let state = {
             files: [], index: 0, postId: rawPost, userId: parseInt(rawUser),
             isSubscribed: rawSubscribed, hasPurchased: rawPurchased,
@@ -118,7 +116,7 @@
             offlineMode: false, loadingAttempts: 0,
             unlockedPhotos: urlUnlockedPhotos
         };
-        
+
         // Отладка
         const debugPanel = document.getElementById('debug-panel');
         function debugLog(msg, type = 'info') {
@@ -133,8 +131,38 @@
             while(debugPanel.children.length > 50) debugPanel.removeChild(debugPanel.firstChild);
             console.log(msg);
         }
-        
-        // ==================== ПОЛУЧЕНИЕ РАЗБЛОКИРОВАННЫХ ФОТО ИЗ БД ====================
+
+        // ==================== ЗАГРУЗКА ФОТО ЧЕРЕЗ ПРОКСИ БОТА ====================
+        async function loadFolder(folder) {
+            debugLog(`📁 Запрос через прокси: ${folder}...`);
+
+            try {
+                const res = await fetch(`${TUNNEL_URL}/api/github-proxy`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        post_id: state.postId,
+                        folder: folder
+                    })
+                });
+
+                const data = await res.json();
+
+                if (data.error) {
+                    debugLog(`❌ Ошибка прокси: ${data.error}`, 'error');
+                    return [];
+                }
+
+                debugLog(`✅ ${folder}: найдено ${data.files?.length || 0} фото`);
+                return data.files || [];
+
+            } catch(e) {
+                debugLog(`❌ Ошибка загрузки ${folder}: ${e.message}`, 'error');
+                return [];
+            }
+        }
+
+        // ==================== ПОЛУЧЕНИЕ РАЗБЛОКИРОВАННЫХ ФОТО ====================
         async function fetchUnlockedPhotos() {
             if (!state.userId || !state.postId) return;
             debugLog('🍌 Запрос списка разблокированных фото...');
@@ -156,8 +184,8 @@
                 debugLog(`❌ Ошибка: ${e.message}`, 'error');
             }
         }
-        
-        // Проверка подписки (автоматическая, не показываем тост)
+
+        // Проверка подписки
         async function checkSubscription() {
             if (!state.userId) return false;
             try {
@@ -170,14 +198,12 @@
                 if (isSubscribed !== state.isSubscribed) {
                     state.isSubscribed = isSubscribed;
                     updateUI();
-                    if (isSubscribed) {
-                        loadGallery();
-                    }
+                    if (isSubscribed) loadGallery();
                 }
                 return isSubscribed;
             } catch(e) { return state.isSubscribed; }
         }
-        
+
         // Проверка туннеля
         async function checkTunnel() {
             try {
@@ -197,143 +223,130 @@
                 return false;
             }
         }
-        
-        // Загрузка фото с GitHub
-        async function loadFolder(folder) {
-            const url = `${CONFIG.GITHUB_API}/${CONFIG.REPO}/contents/posts/${state.postId}/${folder}`;
-            try {
-                const res = await fetch(url, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
-                if (res.status === 404) return [];
-                const data = await res.json();
-                return data.filter(f => f.name.match(/\.(jpg|jpeg|png)$/i));
-            } catch(e) { 
-                return []; 
-            }
-        }
-        
+
         async function loadGallery() {
             debugLog('🔄 Загрузка галереи...');
-            
+
             try {
                 const [general, banana, strawberry] = await Promise.all([
-                    loadFolder('general'), loadFolder('banana'), loadFolder('strawberry')
+                    loadFolder('general'),
+                    loadFolder('banana'),
+                    loadFolder('strawberry')
                 ]);
-                
+
                 let files = [];
-                
+
                 general.forEach(f => {
-                    files.push({ 
-                        name: f.name, 
-                        url: f.download_url, 
-                        type: 'general', 
-                        isBlurred: false, 
-                        isBanana: false 
+                    files.push({
+                        name: f.name,
+                        url: f.download_url,
+                        type: 'general',
+                        isBlurred: false,
+                        isBanana: false
                     });
                 });
-                
+
                 banana.forEach(f => {
                     if (!f.name.startsWith('banana_banana_')) {
                         const photoName = f.name;
-                        const blurred = banana.find(b => b.name === `banana_banana_${photoName}`);
                         const isUnlocked = state.unlockedPhotos.includes(photoName) || state.hasPurchased;
-                        
+
                         files.push({
-                            name: photoName, 
+                            name: photoName,
                             originalName: photoName,
-                            url: isUnlocked ? f.download_url : (blurred ? blurred.download_url : f.download_url),
-                            originalUrl: f.download_url, 
+                            url: f.download_url,
+                            originalUrl: f.download_url,
                             type: 'banana',
-                            isBlurred: !isUnlocked, 
+                            isBlurred: !isUnlocked,
                             isBanana: true
                         });
                     }
                 });
-                
+
                 strawberry.forEach(f => {
                     if (!f.name.startsWith('strawberry_strawberry_')) {
-                        const blurred = strawberry.find(b => b.name === `strawberry_strawberry_${f.name}`);
                         const hasAccess = state.hasPurchased || state.isSubscribed;
                         files.push({
-                            name: f.name, 
+                            name: f.name,
                             originalName: f.name,
-                            url: hasAccess ? f.download_url : (blurred ? blurred.download_url : f.download_url),
-                            originalUrl: f.download_url, 
+                            url: f.download_url,
+                            originalUrl: f.download_url,
                             type: 'strawberry',
-                            isBlurred: !hasAccess, 
+                            isBlurred: !hasAccess,
                             isBanana: false
                         });
                     }
                 });
-                
-                if (files.length === 0) { 
-                    showError('В этом посте нет фото'); 
-                    return; 
+
+                if (files.length === 0) {
+                    showError('В этом посте нет фото');
+                    return;
                 }
-                
+
                 state.files = files;
                 debugLog(`✅ Загружено ${files.length} фото`);
-                
+
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('gallery').style.display = 'block';
                 updateUI();
                 showImage(0);
                 setupNavigation();
-                
+
             } catch(e) {
                 debugLog(`❌ Ошибка: ${e.message}`, 'error');
                 showError('Ошибка загрузки галереи');
             }
         }
-        
+
         function showImage(i) {
             if (!state.files || state.files.length === 0) return;
-            
+
             state.index = (i + state.files.length) % state.files.length;
             const img = document.getElementById('image');
             const file = state.files[state.index];
-            
+
             if (!img || !file) return;
-            
+
             img.classList.remove('loaded');
             img.src = file.url + '?t=' + Date.now();
-            
+
             const counterText = document.getElementById('counter-text');
             if (counterText) {
                 counterText.innerText = `${state.index+1}/${state.files.length}`;
             }
         }
-        
+
         function next() { if (state.files && state.files.length) showImage(state.index + 1); }
         function prev() { if (state.files && state.files.length) showImage(state.index - 1); }
         function onImageError() { setTimeout(() => showImage(state.index), 1000); }
-        
+
         function setupNavigation() {
             const left = document.getElementById('nav-left');
             const right = document.getElementById('nav-right');
-            if (left) { 
-                const newLeft = left.cloneNode(true); 
-                left.parentNode.replaceChild(newLeft, left); 
-                newLeft.addEventListener('click', () => prev()); 
+            if (left) {
+                const newLeft = left.cloneNode(true);
+                left.parentNode.replaceChild(newLeft, left);
+                newLeft.addEventListener('click', () => prev());
             }
-            if (right) { 
-                const newRight = right.cloneNode(true); 
-                right.parentNode.replaceChild(newRight, right); 
-                newRight.addEventListener('click', () => next()); 
+            if (right) {
+                const newRight = right.cloneNode(true);
+                right.parentNode.replaceChild(newRight, right);
+                newRight.addEventListener('click', () => next());
             }
         }
-        
+
         document.addEventListener('keydown', (e) => {
             if (e.key === 'ArrowLeft') { prev(); e.preventDefault(); }
             if (e.key === 'ArrowRight') { next(); e.preventDefault(); }
         });
-        
+
         // Трата банана
         async function spendBanana() {
             if (state.offlineMode) {
                 showToast('📴 Нет соединения');
                 return;
             }
-            
+
             const currentFile = state.files[state.index];
             if (!currentFile || !currentFile.isBanana) {
                 showToast('🍌 Это фото нельзя разблокировать бананом');
@@ -347,7 +360,7 @@
                 showToast('❌ Нет бананов');
                 return;
             }
-            
+
             try {
                 const res = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
                     method: 'POST',
@@ -359,9 +372,9 @@
                         details: { photo_name: currentFile.originalName || currentFile.name }
                     })
                 });
-                
+
                 const data = await res.json();
-                
+
                 if (data.success) {
                     state.bananasLeft = data.available;
                     if (!state.unlockedPhotos.includes(currentFile.originalName || currentFile.name)) {
@@ -381,8 +394,7 @@
                 showToast('❌ Ошибка соединения');
             }
         }
-        
-        // Сохранение фото
+
         async function saveCurrentPhoto() {
             if (!state.isSubscribed) {
                 showToast('🍓 Только для подписчиков!');
@@ -401,63 +413,60 @@
                 link.click();
                 URL.revokeObjectURL(url);
                 showToast('✅ Фото сохранено!');
-            } catch(e) { 
-                showToast('❌ Ошибка'); 
+            } catch(e) {
+                showToast('❌ Ошибка');
             }
         }
-        
-        // Покупка поста
+
         function handleCoin() {
             if (tg) tg.openLink(`https://t.me/${BOT_USERNAME}?start=buy_vip_${state.postId}`);
             showToast('🪙 Переход в бот...');
         }
-        
-        // Клубничка — просто ссылка на канал
+
         function handleStrawberry() {
             if (tg) tg.openLink('https://t.me/neuroticababes_bot');
             showToast('🍓 Подпишитесь на канал');
         }
-        
-        // Музыка (не автозапуск)
+
         let musicPlaying = false;
         const audio = document.getElementById('bg-music');
         let musicBtn = null;
-        
+
         function toggleMusic() {
-            if (musicPlaying) { 
-                audio.pause(); 
-                musicPlaying = false; 
+            if (musicPlaying) {
+                audio.pause();
+                musicPlaying = false;
                 if (musicBtn) musicBtn.style.opacity = '0.5';
-                showToast('🎵 Музыка выключена'); 
-            } else { 
+                showToast('🎵 Музыка выключена');
+            } else {
                 audio.play().catch(() => {
                     showToast('🎵 Нажмите ещё раз');
                 });
-                musicPlaying = true; 
+                musicPlaying = true;
                 if (musicBtn) musicBtn.style.opacity = '1';
-                showToast('🎵 Музыка включена'); 
+                showToast('🎵 Музыка включена');
             }
         }
-        
+
         function updateUI() {
             const bananaBadge = document.getElementById('banana-count-badge');
             if (bananaBadge) {
                 bananaBadge.textContent = state.bananasLeft;
                 bananaBadge.style.display = state.bananasLeft > 0 ? 'flex' : 'none';
             }
-            
+
             const subStatus = document.getElementById('sub-status');
             if (subStatus) {
                 subStatus.textContent = state.isSubscribed ? '(есть) ✅' : '(нет) ❌';
                 subStatus.style.color = state.isSubscribed ? '#ffd700' : '#ff6b6b';
             }
-            
+
             const subBadge = document.getElementById('subscribed-badge');
             if (subBadge) subBadge.style.display = state.isSubscribed ? 'block' : 'none';
-            
+
             const purchasedBadge = document.getElementById('purchased-badge');
             if (purchasedBadge) purchasedBadge.style.display = state.hasPurchased ? 'block' : 'none';
-            
+
             const saveBtn = document.getElementById('save-btn');
             if (saveBtn) {
                 if (state.isSubscribed) {
@@ -466,7 +475,7 @@
                     saveBtn.classList.add('disabled');
                 }
             }
-            
+
             const bananaBtn = document.getElementById('banana-btn');
             if (bananaBtn) {
                 if (state.offlineMode || state.bananasLeft <= 0) {
@@ -476,18 +485,18 @@
                 }
             }
         }
-        
-        function showInfo() { 
+
+        function showInfo() {
             const modal = document.getElementById('info-modal');
-            if (modal) modal.classList.add('active'); 
+            if (modal) modal.classList.add('active');
         }
-        function hideInfo() { 
+        function hideInfo() {
             const modal = document.getElementById('info-modal');
-            if (modal) modal.classList.remove('active'); 
+            if (modal) modal.classList.remove('active');
         }
-        function forceReload() { 
-            localStorage.clear(); 
-            location.reload(); 
+        function forceReload() {
+            localStorage.clear();
+            location.reload();
         }
         function showToast(text) {
             const toast = document.getElementById('toast');
@@ -501,28 +510,28 @@
             document.getElementById('error').style.display = 'block';
             document.getElementById('error').innerHTML = msg;
         }
-        
+
         // Запуск
         async function init() {
-            if (!window.Telegram?.WebApp) { 
-                showError('Откройте в Telegram'); 
-                return; 
+            if (!window.Telegram?.WebApp) {
+                showError('Откройте в Telegram');
+                return;
             }
-            if (tg) { 
-                tg.ready(); 
-                tg.expand(); 
+            if (tg) {
+                tg.ready();
+                tg.expand();
             }
-            if (!state.postId) { 
-                showError('Не указан ID поста'); 
-                return; 
+            if (!state.postId) {
+                showError('Не указан ID поста');
+                return;
             }
-            
+
             await checkTunnel();
             await checkSubscription();
             await fetchUnlockedPhotos();
             await loadGallery();
         }
-        
+
         // Привязка кнопок
         document.addEventListener('DOMContentLoaded', () => {
             const strawberryBtn = document.getElementById('strawberry-btn');
@@ -533,7 +542,7 @@
             const infoBtn = document.getElementById('info-btn');
             const modalCloseBtn = document.getElementById('modal-close-btn');
             const forceReloadItem = document.getElementById('force-reload-item');
-            
+
             if (strawberryBtn) strawberryBtn.addEventListener('click', handleStrawberry);
             if (bananaBtn) bananaBtn.addEventListener('click', spendBanana);
             if (coinBtn) coinBtn.addEventListener('click', handleCoin);
@@ -542,11 +551,11 @@
             if (infoBtn) infoBtn.addEventListener('click', showInfo);
             if (modalCloseBtn) modalCloseBtn.addEventListener('click', hideInfo);
             if (forceReloadItem) forceReloadItem.addEventListener('click', forceReload);
-            
+
             if (musicBtn) musicBtn.style.opacity = '0.5';
             debugLog('✅ Кнопки привязаны');
         });
-        
+
         init();
     </script>
 </body>
