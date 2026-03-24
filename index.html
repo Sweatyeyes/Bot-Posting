@@ -58,7 +58,7 @@
     <audio id="bg-music" loop preload="auto"><source src="song.mp3" type="audio/mpeg"></audio>
     <div id="loading"><div class="spinner"></div><div class="loading-text">🔄 Загрузка галереи...</div></div>
     <div id="gallery">
-        <div id="debug-panel"><div class="debug-entry">🔍 v13.3 - ИСПРАВЛЕНА ЛОГИКА ДОСТУПА</div></div>
+        <div id="debug-panel"><div class="debug-entry">🔍 v13.4 - ФИНАЛЬНАЯ (логика из v11.5)</div></div>
         <div id="badges">
             <div id="subscribed-badge" class="badge">🍓 Подписчик</div>
             <div id="purchased-badge" class="badge">🪙 Куплено</div>
@@ -93,7 +93,7 @@
     <div id="toast"></div><div id="error"></div>
 
     <script>
-        console.log('🚀 v13.3 - ИСПРАВЛЕНА ЛОГИКА ДОСТУПА');
+        console.log('🚀 v13.4 - ФИНАЛЬНАЯ (логика из v11.5)');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const BOT_USERNAME = 'k0tbezzabot';
@@ -109,14 +109,6 @@
         
         const unlockedParam = urlParams.get('unlocked') || '';
         const urlUnlockedPhotos = unlockedParam ? unlockedParam.split(',') : [];
-        
-        console.log('🔍 ПАРАМЕТРЫ ИЗ URL:');
-        console.log('  post:', rawPost);
-        console.log('  user:', rawUser);
-        console.log('  subscribed:', rawSubscribed, 'тип:', typeof rawSubscribed);
-        console.log('  purchased:', rawPurchased);
-        console.log('  bananas:', rawBananas);
-        console.log('  unlocked:', urlUnlockedPhotos);
         
         let state = {
             files: [], index: 0, postId: rawPost, userId: parseInt(rawUser),
@@ -143,12 +135,10 @@
             console.log(msg);
         }
         
-        debugLog(`📊 ИНИЦИАЛИЗАЦИЯ: подписка=${state.isSubscribed}, куплен=${state.hasPurchased}, бананов=${state.bananasLeft}, разблокировано=${state.unlockedPhotos.length}`);
-        
         // ==================== ЗАГРУЗКА СПИСКА ФАЙЛОВ С БОТА ====================
         async function fetchFiles() {
             if (!state.postId) return null;
-            debugLog('📁 Загрузка списка файлов с бота...');
+            debugLog('📁 Загрузка списка файлов...');
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -173,86 +163,22 @@
                 debugLog(`✅ Файлы: general=${data.general?.length || 0}, banana=${data.banana?.length || 0}, strawberry=${data.strawberry?.length || 0}`, 'success');
                 return data;
             } catch(e) {
-                if (e.name === 'AbortError') {
-                    debugLog('⚠️ Таймаут загрузки файлов, включаем офлайн-режим', 'warning');
-                } else {
-                    debugLog(`❌ Ошибка загрузки файлов: ${e.message}`, 'error');
-                }
+                debugLog(`⚠️ Не удалось загрузить файлы: ${e.message}`, 'warning');
                 return null;
             }
         }
         
-        // ==================== ПОСТРОЕНИЕ СПИСКА ФАЙЛОВ ИЗ RAW ССЫЛОК ====================
-        function buildFileList(filesData) {
-            if (!filesData) return [];
-            const baseUrl = `https://raw.githubusercontent.com/Sweatyeyes/Bot-Posting/main/posts/${state.postId}`;
-            const files = [];
-            
-            debugLog(`🔐 ЛОГИКА ДОСТУПА: подписка=${state.isSubscribed}, куплен=${state.hasPurchased}`);
-            
-            // Общие фото — всегда без блюра
-            for (const fileName of filesData.general || []) {
-                if (fileName.match(/\.(jpg|jpeg|png)$/i)) {
-                    files.push({
-                        name: fileName,
-                        url: `${baseUrl}/general/${fileName}`,
-                        type: 'general',
-                        isBlurred: false,
-                        isBanana: false
-                    });
-                }
-            }
-            
-            // Банановые фото — только для неподписчиков (подписчикам всё открыто)
-            for (const fileName of filesData.banana || []) {
-                if (fileName.match(/\.(jpg|jpeg|png)$/i) && !fileName.startsWith('banana_banana_')) {
-                    // Для подписчиков — всегда открыто
-                    // Для неподписчиков — открыто только если потрачен банан или куплен пост
-                    const isUnlocked = state.isSubscribed || state.hasPurchased || state.unlockedPhotos.includes(fileName);
-                    debugLog(`🍌 ${fileName}: isUnlocked=${isUnlocked} (sub=${state.isSubscribed}, purchased=${state.hasPurchased}, inUnlocked=${state.unlockedPhotos.includes(fileName)})`);
-                    
-                    files.push({
-                        name: fileName,
-                        originalName: fileName,
-                        url: `${baseUrl}/banana/${fileName}`,
-                        originalUrl: `${baseUrl}/banana/${fileName}`,
-                        type: 'banana',
-                        isBlurred: !isUnlocked,
-                        isBanana: true
-                    });
-                }
-            }
-            
-            // Клубничные фото — ТОЛЬКО для подписчиков или купивших пост
-            for (const fileName of filesData.strawberry || []) {
-                if (fileName.match(/\.(jpg|jpeg|png)$/i) && !fileName.startsWith('strawberry_strawberry_')) {
-                    const hasAccess = state.isSubscribed || state.hasPurchased;
-                    debugLog(`🍓 ${fileName}: hasAccess=${hasAccess} (sub=${state.isSubscribed}, purchased=${state.hasPurchased})`);
-                    
-                    files.push({
-                        name: fileName,
-                        originalName: fileName,
-                        url: `${baseUrl}/strawberry/${fileName}`,
-                        originalUrl: `${baseUrl}/strawberry/${fileName}`,
-                        type: 'strawberry',
-                        isBlurred: !hasAccess,
-                        isBanana: false
-                    });
-                }
-            }
-            
-            return files;
-        }
-        
-        // ==================== ЗАГРУЗКА ГАЛЕРЕИ ====================
+        // ==================== ЗАГРУЗКА ГАЛЕРЕИ (ЛОГИКА ИЗ v11.5) ====================
         async function loadGallery() {
             debugLog('🔄 Загрузка галереи...');
             debugLog(`📁 Пост: ${state.postId}`);
+            debugLog(`🍓 Подписка: ${state.isSubscribed}`);
+            debugLog(`🍌 Разблокировано бананами: ${state.unlockedPhotos.length}`);
             
             let filesData = await fetchFiles();
             
             if (!filesData) {
-                debugLog('📴 Переход в офлайн-режим', 'warning');
+                debugLog('📴 Офлайн-режим: показываем все фото с блюром', 'warning');
                 state.offlineMode = true;
                 document.getElementById('offline-badge').style.display = 'block';
                 filesData = { general: [], banana: [], strawberry: [] };
@@ -271,16 +197,68 @@
             }
             
             state.filesData = filesData;
-            const files = buildFileList(filesData);
+            
+            // Строим список файлов — логика как в v11.5
+            const baseUrl = `https://raw.githubusercontent.com/Sweatyeyes/Bot-Posting/main/posts/${state.postId}`;
+            let files = [];
+            
+            // Общие фото
+            for (const f of filesData.general || []) {
+                if (f.match(/\.(jpg|jpeg|png)$/i)) {
+                    files.push({
+                        name: f,
+                        url: `${baseUrl}/general/${f}`,
+                        type: 'general',
+                        isBlurred: false,
+                        isBanana: false
+                    });
+                }
+            }
+            
+            // Банановые фото
+            for (const f of filesData.banana || []) {
+                if (!f.startsWith('banana_banana_') && f.match(/\.(jpg|jpeg|png)$/i)) {
+                    // Ищем блюр-версию (но для raw ссылок её нет, поэтому просто проверяем доступ)
+                    const isUnlocked = state.hasPurchased || state.unlockedPhotos.includes(f);
+                    debugLog(`🍌 ${f}: доступ=${isUnlocked} (purchased=${state.hasPurchased}, unlocked=${state.unlockedPhotos.includes(f)})`);
+                    
+                    files.push({
+                        name: f,
+                        originalName: f,
+                        url: `${baseUrl}/banana/${f}`,
+                        originalUrl: `${baseUrl}/banana/${f}`,
+                        type: 'banana',
+                        isBlurred: !isUnlocked,
+                        isBanana: true
+                    });
+                }
+            }
+            
+            // Клубничные фото
+            for (const f of filesData.strawberry || []) {
+                if (!f.startsWith('strawberry_strawberry_') && f.match(/\.(jpg|jpeg|png)$/i)) {
+                    const hasAccess = state.hasPurchased || state.isSubscribed;
+                    debugLog(`🍓 ${f}: доступ=${hasAccess} (purchased=${state.hasPurchased}, subscribed=${state.isSubscribed})`);
+                    
+                    files.push({
+                        name: f,
+                        originalName: f,
+                        url: `${baseUrl}/strawberry/${f}`,
+                        originalUrl: `${baseUrl}/strawberry/${f}`,
+                        type: 'strawberry',
+                        isBlurred: !hasAccess,
+                        isBanana: false
+                    });
+                }
+            }
             
             if (files.length === 0) {
-                debugLog('❌ Нет файлов для отображения', 'error');
                 showError('В этом посте нет фото');
                 return;
             }
             
             state.files = files;
-            debugLog(`✅ Загружено ${files.length} фото`, 'success');
+            debugLog(`✅ Загружено ${files.length} фото`);
             
             document.getElementById('loading').style.display = 'none';
             document.getElementById('gallery').style.display = 'block';
@@ -306,8 +284,7 @@
                 counterText.innerText = `${state.index+1}/${state.files.length}`;
             }
             
-            const statusIcon = file.isBlurred ? '🔒' : '✅';
-            debugLog(`🖼 ${state.index+1}/${state.files.length}: ${file.name} ${statusIcon}`);
+            debugLog(`🖼 ${state.index+1}/${state.files.length}: ${file.name} ${file.isBlurred ? '🔒' : '✅'}`);
         }
         
         function next() { if (state.files && state.files.length) showImage(state.index + 1); }
@@ -327,7 +304,6 @@
                 right.parentNode.replaceChild(newRight, right); 
                 newRight.addEventListener('click', () => next()); 
             }
-            debugLog('✅ Навигация настроена');
         }
         
         document.addEventListener('keydown', (e) => {
@@ -338,11 +314,8 @@
         // ==================== ПОЛУЧЕНИЕ РАЗБЛОКИРОВАННЫХ ФОТО ====================
         async function fetchUnlockedPhotos() {
             if (!state.userId || !state.postId) return;
-            if (state.offlineMode) {
-                debugLog('📴 Офлайн-режим: пропускаем запрос разблокированных фото', 'warning');
-                return;
-            }
-            debugLog('🍌 Запрос списка разблокированных фото...');
+            if (state.offlineMode) return;
+            debugLog('🍌 Запрос разблокированных фото...');
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -364,17 +337,14 @@
                     updateUI();
                 }
             } catch(e) {
-                debugLog(`⚠️ Не удалось получить разблокированные фото: ${e.message}`, 'warning');
+                debugLog(`⚠️ Не удалось получить разблокированные: ${e.message}`, 'warning');
             }
         }
         
         // Проверка подписки
         async function checkSubscription() {
             if (!state.userId) return false;
-            if (state.offlineMode) {
-                debugLog('📴 Офлайн-режим: подписка не проверяется', 'warning');
-                return state.isSubscribed;
-            }
+            if (state.offlineMode) return state.isSubscribed;
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -390,15 +360,11 @@
                 const data = await res.json();
                 const isSubscribed = data.is_subscribed === true;
                 if (isSubscribed !== state.isSubscribed) {
-                    debugLog(`🔄 Статус подписки изменён: ${state.isSubscribed} → ${isSubscribed}`, 'success');
                     state.isSubscribed = isSubscribed;
                     updateUI();
-                    // Перезагружаем галерею, чтобы применить изменения
-                    loadGallery();
                 }
                 return isSubscribed;
             } catch(e) {
-                debugLog(`⚠️ Не удалось проверить подписку: ${e.message}`, 'warning');
                 return state.isSubscribed;
             }
         }
@@ -428,7 +394,6 @@
                 if (offlineBadge) offlineBadge.style.display = 'block';
                 const bananaBtn = document.getElementById('banana-btn');
                 if (bananaBtn) bananaBtn.classList.add('disabled');
-                debugLog('📴 Режим ОФФЛАЙН', 'warning');
                 return false;
             }
         }
@@ -436,7 +401,7 @@
         // Трата банана
         async function spendBanana() {
             if (state.offlineMode) {
-                showToast('📴 Нет соединения, бананы нельзя тратить');
+                showToast('📴 Нет соединения');
                 return;
             }
             
@@ -467,7 +432,6 @@
                 });
                 
                 const data = await res.json();
-                debugLog(`🍌 Ответ: ${JSON.stringify(data)}`);
                 
                 if (data.success) {
                     state.bananasLeft = data.available;
@@ -489,7 +453,6 @@
             }
         }
         
-        // Сохранение фото
         async function saveCurrentPhoto() {
             if (!state.isSubscribed) {
                 showToast('🍓 Только для подписчиков!');
@@ -534,9 +497,7 @@
                 if (musicBtn) musicBtn.style.opacity = '0.5';
                 showToast('🎵 Музыка выключена'); 
             } else { 
-                audio.play().catch(() => {
-                    showToast('🎵 Нажмите ещё раз');
-                });
+                audio.play().catch(() => {});
                 musicPlaying = true; 
                 if (musicBtn) musicBtn.style.opacity = '1';
                 showToast('🎵 Музыка включена'); 
@@ -558,7 +519,6 @@
             
             const subBadge = document.getElementById('subscribed-badge');
             if (subBadge) subBadge.style.display = state.isSubscribed ? 'block' : 'none';
-            
             const purchasedBadge = document.getElementById('purchased-badge');
             if (purchasedBadge) purchasedBadge.style.display = state.hasPurchased ? 'block' : 'none';
             
@@ -579,8 +539,6 @@
                     bananaBtn.classList.remove('disabled');
                 }
             }
-            
-            debugLog(`🔄 UI обновлён: бананов=${state.bananasLeft}, разблокировано=${state.unlockedPhotos.length}, подписка=${state.isSubscribed}, оффлайн=${state.offlineMode}`);
         }
         
         function showInfo() { 
