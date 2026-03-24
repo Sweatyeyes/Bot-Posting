@@ -58,7 +58,7 @@
     <audio id="bg-music" loop preload="auto"><source src="song.mp3" type="audio/mpeg"></audio>
     <div id="loading"><div class="spinner"></div><div class="loading-text">🔄 Загрузка галереи...</div></div>
     <div id="gallery">
-        <div id="debug-panel"><div class="debug-entry">🔍 v13.5 - ПРАВИЛЬНАЯ ФИЛЬТРАЦИЯ</div></div>
+        <div id="debug-panel"><div class="debug-entry">🔍 v13.6 - ИСПРАВЛЕН ПОИСК БЛЮРОВ</div></div>
         <div id="badges">
             <div id="subscribed-badge" class="badge">🍓 Подписчик</div>
             <div id="purchased-badge" class="badge">🪙 Куплено</div>
@@ -93,7 +93,7 @@
     <div id="toast"></div><div id="error"></div>
 
     <script>
-        console.log('🚀 v13.5 - ПРАВИЛЬНАЯ ФИЛЬТРАЦИЯ ОРИГИНАЛОВ И БЛЮРОВ');
+        console.log('🚀 v13.6 - ИСПРАВЛЕН ПОИСК БЛЮРОВ');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const BOT_USERNAME = 'k0tbezzabot';
@@ -170,7 +170,24 @@
             }
         }
         
-        // ==================== ЗАГРУЗКА ГАЛЕРЕИ С ПРАВИЛЬНОЙ ФИЛЬТРАЦИЕЙ ====================
+        // ==================== ПОЛУЧЕНИЕ БЛЮР-ИМЕНИ (правильное) ====================
+        function findBlurName(originalName, fileList, type) {
+            // Для банана: оригинал banana_xxx.jpg, блюр banana_banana_banana_xxx.jpg
+            // Нужно убрать префикс "banana_" из оригинала, чтобы получить базовое имя
+            let baseName = originalName;
+            if (type === 'banana') {
+                baseName = originalName.replace(/^banana_/, '');
+                const blurPattern = `banana_banana_banana_${baseName}`;
+                return fileList.find(f => f === blurPattern);
+            } else if (type === 'strawberry') {
+                baseName = originalName.replace(/^strawberry_/, '');
+                const blurPattern = `strawberry_strawberry_strawberry_${baseName}`;
+                return fileList.find(f => f === blurPattern);
+            }
+            return null;
+        }
+        
+        // ==================== ЗАГРУЗКА ГАЛЕРЕИ ====================
         async function loadGallery() {
             debugLog('🔄 Загрузка галереи...');
             debugLog(`📁 Пост: ${state.postId}`);
@@ -217,8 +234,8 @@
             
             for (const originalName of bananaOriginals) {
                 const isUnlocked = state.hasPurchased || state.unlockedPhotos.includes(originalName);
-                const blurName = `banana_banana_banana_${originalName}`;
-                const hasBlur = (filesData.banana || []).includes(blurName);
+                const blurName = findBlurName(originalName, filesData.banana, 'banana');
+                const hasBlur = !!blurName;
                 
                 let imageUrl;
                 if (isUnlocked) {
@@ -226,10 +243,11 @@
                     debugLog(`🍌 ${originalName}: РАЗБЛОКИРОВАНО → оригинал`);
                 } else if (hasBlur) {
                     imageUrl = `${baseUrl}/banana/${blurName}`;
-                    debugLog(`🍌 ${originalName}: БЛЮР (есть блюр-версия)`);
+                    debugLog(`🍌 ${originalName}: БЛЮР (найден)`);
                 } else {
-                    imageUrl = `${baseUrl}/banana/${originalName}`;
-                    debugLog(`🍌 ${originalName}: НЕТ БЛЮРА → показываем оригинал (⚠️ косяк!)`, 'warning');
+                    // Если нет блюра — показываем заглушку, а не оригинал!
+                    imageUrl = 'https://via.placeholder.com/600x800/333/fff?text=No+Access';
+                    debugLog(`🍌 ${originalName}: НЕТ БЛЮРА → заглушка`, 'warning');
                 }
                 
                 files.push({
@@ -251,8 +269,8 @@
             
             for (const originalName of strawberryOriginals) {
                 const hasAccess = state.hasPurchased || state.isSubscribed;
-                const blurName = `strawberry_strawberry_strawberry_${originalName}`;
-                const hasBlur = (filesData.strawberry || []).includes(blurName);
+                const blurName = findBlurName(originalName, filesData.strawberry, 'strawberry');
+                const hasBlur = !!blurName;
                 
                 let imageUrl;
                 if (hasAccess) {
@@ -262,8 +280,9 @@
                     imageUrl = `${baseUrl}/strawberry/${blurName}`;
                     debugLog(`🍓 ${originalName}: БЛЮР (нет доступа)`);
                 } else {
-                    imageUrl = `${baseUrl}/strawberry/${originalName}`;
-                    debugLog(`🍓 ${originalName}: НЕТ БЛЮРА → показываем оригинал (⚠️ косяк!)`, 'warning');
+                    // Если нет блюра — показываем заглушку
+                    imageUrl = 'https://via.placeholder.com/600x800/333/fff?text=No+Access';
+                    debugLog(`🍓 ${originalName}: НЕТ БЛЮРА → заглушка`, 'warning');
                 }
                 
                 files.push({
