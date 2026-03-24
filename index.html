@@ -58,7 +58,7 @@
     <audio id="bg-music" loop preload="auto"><source src="song.mp3" type="audio/mpeg"></audio>
     <div id="loading"><div class="spinner"></div><div class="loading-text">🔄 Загрузка галереи...</div></div>
     <div id="gallery">
-        <div id="debug-panel"><div class="debug-entry">🔍 v13.0 - Загрузка через API</div></div>
+        <div id="debug-panel"><div class="debug-entry">🔍 v13.2 - ОФЛАЙН-РЕЖИМ</div></div>
         <div id="badges">
             <div id="subscribed-badge" class="badge">🍓 Подписчик</div>
             <div id="purchased-badge" class="badge">🪙 Куплено</div>
@@ -93,7 +93,7 @@
     <div id="toast"></div><div id="error"></div>
 
     <script>
-        console.log('🚀 v13.0 - Загрузка через API');
+        console.log('🚀 v13.2 - ОФЛАЙН-РЕЖИМ');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const BOT_USERNAME = 'k0tbezzabot';
@@ -140,20 +140,34 @@
             if (!state.postId) return null;
             debugLog('📁 Загрузка списка файлов с бота...');
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                
                 const res = await fetch(`${TUNNEL_URL}/api/get-files`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ post_id: state.postId })
+                    body: JSON.stringify({ post_id: state.postId }),
+                    signal: controller.signal
                 });
+                
+                clearTimeout(timeoutId);
+                
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}`);
+                }
+                
                 const data = await res.json();
                 if (data.error) {
-                    debugLog(`❌ Ошибка: ${data.error}`, 'error');
-                    return null;
+                    throw new Error(data.error);
                 }
                 debugLog(`✅ Файлы: general=${data.general?.length || 0}, banana=${data.banana?.length || 0}, strawberry=${data.strawberry?.length || 0}`, 'success');
                 return data;
             } catch(e) {
-                debugLog(`❌ Ошибка загрузки файлов: ${e.message}`, 'error');
+                if (e.name === 'AbortError') {
+                    debugLog('⚠️ Таймаут загрузки файлов, включаем офлайн-режим', 'warning');
+                } else {
+                    debugLog(`❌ Ошибка загрузки файлов: ${e.message}`, 'error');
+                }
                 return null;
             }
         }
@@ -164,7 +178,7 @@
             const baseUrl = `https://raw.githubusercontent.com/Sweatyeyes/Bot-Posting/main/posts/${state.postId}`;
             const files = [];
             
-            // Общие фото
+            // Общие фото — всегда без блюра
             for (const fileName of filesData.general || []) {
                 if (fileName.match(/\.(jpg|jpeg|png)$/i)) {
                     files.push({
@@ -180,7 +194,11 @@
             // Банановые фото
             for (const fileName of filesData.banana || []) {
                 if (fileName.match(/\.(jpg|jpeg|png)$/i) && !fileName.startsWith('banana_banana_')) {
-                    const isUnlocked = state.unlockedPhotos.includes(fileName) || state.hasPurchased;
+                    // Логика доступа:
+                    // - Если подписчик → всегда разблокировано
+                    // - Если не подписчик → разблокировано только если есть в unlockedPhotos или куплен пост
+                    const isUnlocked = state.isSubscribed || state.hasPurchased || state.unlockedPhotos.includes(fileName);
+                    
                     files.push({
                         name: fileName,
                         originalName: fileName,
@@ -196,7 +214,11 @@
             // Клубничные фото
             for (const fileName of filesData.strawberry || []) {
                 if (fileName.match(/\.(jpg|jpeg|png)$/i) && !fileName.startsWith('strawberry_strawberry_')) {
-                    const hasAccess = state.hasPurchased || state.isSubscribed;
+                    // Логика доступа:
+                    // - Если подписчик → всегда разблокировано
+                    // - Если не подписчик → всегда заблюрено
+                    const hasAccess = state.isSubscribed || state.hasPurchased;
+                    
                     files.push({
                         name: fileName,
                         originalName: fileName,
@@ -212,19 +234,40 @@
             return files;
         }
         
-        // ==================== ЗАГРУЗКА ГАЛЕРЕИ ====================
+        // ==================== ЗАГРУЗКА ГАЛЕРЕИ С ПОДДЕРЖКОЙ ОФЛАЙН-РЕЖИМА ====================
         async function loadGallery() {
             debugLog('🔄 Загрузка галереи...');
             debugLog(`📁 Пост: ${state.postId}`);
+            debugLog(`🍓 Подписка: ${state.isSubscribed}`);
             
-            // Загружаем список файлов
-            const filesData = await fetchFiles();
+            // Пытаемся загрузить список файлов с бота
+            let filesData = await fetchFiles();
+            
             if (!filesData) {
-                showError('Не удалось загрузить список фото');
-                return;
+                // Офлайн-режим: показываем все фото как заблюренные
+                debugLog('📴 Переход в офлайн-режим (все фото заблюрены)', 'warning');
+                state.offlineMode = true;
+                document.getElementById('offline-badge').style.display = 'block';
+                
+                // В офлайн-режиме используем заглушку: создаём пустые списки
+                filesData = { general: [], banana: [], strawberry: [] };
+                
+                // Пытаемся определить список файлов по имени поста (если есть кэш в localStorage)
+                const cachedFiles = localStorage.getItem(`files_${state.postId}`);
+                if (cachedFiles) {
+                    try {
+                        filesData = JSON.parse(cachedFiles);
+                        debugLog(`📦 Загружено из кэша: general=${filesData.general?.length || 0}`, 'success');
+                    } catch(e) {}
+                }
+            } else {
+                // Сохраняем в кэш для офлайн-режима
+                localStorage.setItem(`files_${state.postId}`, JSON.stringify(filesData));
+                state.offlineMode = false;
+                document.getElementById('offline-badge').style.display = 'none';
             }
-            state.filesData = filesData;
             
+            state.filesData = filesData;
             const files = buildFileList(filesData);
             
             if (files.length === 0) {
@@ -292,13 +335,24 @@
         // ==================== ПОЛУЧЕНИЕ РАЗБЛОКИРОВАННЫХ ФОТО ====================
         async function fetchUnlockedPhotos() {
             if (!state.userId || !state.postId) return;
+            if (state.offlineMode) {
+                debugLog('📴 Офлайн-режим: пропускаем запрос разблокированных фото', 'warning');
+                return;
+            }
             debugLog('🍌 Запрос списка разблокированных фото...');
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                
                 const res = await fetch(`${TUNNEL_URL}/api/get-unlocked-photos`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId })
+                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId }),
+                    signal: controller.signal
                 });
+                
+                clearTimeout(timeoutId);
+                
                 const data = await res.json();
                 if (data.unlocked_photos) {
                     state.unlockedPhotos = data.unlocked_photos;
@@ -307,18 +361,29 @@
                     updateUI();
                 }
             } catch(e) {
-                debugLog(`❌ Ошибка: ${e.message}`, 'error');
+                debugLog(`⚠️ Не удалось получить разблокированные фото: ${e.message}`, 'warning');
             }
         }
         
         // Проверка подписки
         async function checkSubscription() {
             if (!state.userId) return false;
+            if (state.offlineMode) {
+                debugLog('📴 Офлайн-режим: подписка не проверяется', 'warning');
+                return state.isSubscribed;
+            }
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                
                 const res = await fetch(`${TUNNEL_URL}/api/check-subscription`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId })
+                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId }),
+                    signal: controller.signal
                 });
+                
+                clearTimeout(timeoutId);
+                
                 const data = await res.json();
                 const isSubscribed = data.is_subscribed === true;
                 if (isSubscribed !== state.isSubscribed) {
@@ -326,13 +391,25 @@
                     updateUI();
                 }
                 return isSubscribed;
-            } catch(e) { return state.isSubscribed; }
+            } catch(e) {
+                debugLog(`⚠️ Не удалось проверить подписку: ${e.message}`, 'warning');
+                return state.isSubscribed;
+            }
         }
         
         // Проверка туннеля
         async function checkTunnel() {
             try {
-                const res = await fetch(`${TUNNEL_URL}/api/webapp-data`, { method: 'OPTIONS' });
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
+                
+                const res = await fetch(`${TUNNEL_URL}/api/webapp-data`, { 
+                    method: 'OPTIONS',
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
                 state.offlineMode = !(res.ok || res.status === 405);
                 const offlineBadge = document.getElementById('offline-badge');
                 if (offlineBadge) offlineBadge.style.display = state.offlineMode ? 'block' : 'none';
@@ -345,6 +422,7 @@
                 if (offlineBadge) offlineBadge.style.display = 'block';
                 const bananaBtn = document.getElementById('banana-btn');
                 if (bananaBtn) bananaBtn.classList.add('disabled');
+                debugLog('📴 Режим ОФФЛАЙН', 'warning');
                 return false;
             }
         }
@@ -352,7 +430,7 @@
         // Трата банана
         async function spendBanana() {
             if (state.offlineMode) {
-                showToast('📴 Нет соединения');
+                showToast('📴 Нет соединения, бананы нельзя тратить');
                 return;
             }
             
@@ -496,7 +574,7 @@
                 }
             }
             
-            debugLog(`🔄 UI обновлён: бананов=${state.bananasLeft}, разблокировано=${state.unlockedPhotos.length}, подписка=${state.isSubscribed}`);
+            debugLog(`🔄 UI обновлён: бананов=${state.bananasLeft}, разблокировано=${state.unlockedPhotos.length}, подписка=${state.isSubscribed}, оффлайн=${state.offlineMode}`);
         }
         
         function showInfo() { 
