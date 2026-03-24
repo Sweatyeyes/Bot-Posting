@@ -58,7 +58,7 @@
     <audio id="bg-music" loop preload="auto"><source src="song.mp3" type="audio/mpeg"></audio>
     <div id="loading"><div class="spinner"></div><div class="loading-text">🔄 Загрузка галереи...</div></div>
     <div id="gallery">
-        <div id="debug-panel"><div class="debug-entry">🔍 v13.6 - ИСПРАВЛЕН ПОИСК БЛЮРОВ</div></div>
+        <div id="debug-panel"><div class="debug-entry">🔍 v13.7 - ИСПРАВЛЕН ПОИСК POST_ID</div></div>
         <div id="badges">
             <div id="subscribed-badge" class="badge">🍓 Подписчик</div>
             <div id="purchased-badge" class="badge">🪙 Куплено</div>
@@ -93,16 +93,72 @@
     <div id="toast"></div><div id="error"></div>
 
     <script>
-        console.log('🚀 v13.6 - ИСПРАВЛЕН ПОИСК БЛЮРОВ');
+        console.log('🚀 v13.7 - ИСПРАВЛЕН ПОИСК POST_ID');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
-        const BOT_USERNAME = 'k0tbezzabot';
+        const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
+        const INTERFACE_BOT_USERNAME = 'k0tbezzabot';
         const tg = window.Telegram?.WebApp;
         
-        // Параметры из URL
+        // ==================== ПОЛУЧЕНИЕ ПАРАМЕТРОВ ====================
         const urlParams = new URLSearchParams(window.location.search);
-        const rawPost = urlParams.get('post') || (tg?.initDataUnsafe?.start_param?.split(':')[0]);
-        const rawUser = urlParams.get('user') || (tg?.initDataUnsafe?.start_param?.split(':')[1]) || tg?.initDataUnsafe?.user?.id;
+        
+        // Функция для получения post_id из разных источников
+        function getPostId() {
+            // 1. Из параметра post в URL
+            let postId = urlParams.get('post');
+            if (postId) return postId;
+            
+            // 2. Из tgWebAppStartParam (Telegram добавляет этот параметр)
+            const tgStartParam = urlParams.get('tgWebAppStartParam');
+            if (tgStartParam) {
+                if (tgStartParam.startsWith('buy_vip_')) {
+                    return tgStartParam.replace('buy_vip_', '');
+                }
+                return tgStartParam;
+            }
+            
+            // 3. Из start_param Telegram WebApp
+            const webAppStartParam = tg?.initDataUnsafe?.start_param;
+            if (webAppStartParam) {
+                if (webAppStartParam.startsWith('buy_vip_')) {
+                    return webAppStartParam.replace('buy_vip_', '');
+                }
+                return webAppStartParam;
+            }
+            
+            // 4. Из hash (для старых ссылок)
+            if (window.location.hash) {
+                const match = window.location.hash.match(/[?&]post=([^&]+)/);
+                if (match) return match[1];
+            }
+            
+            return null;
+        }
+        
+        function getUserId() {
+            // 1. Из параметра user в URL
+            let userId = urlParams.get('user');
+            if (userId) return parseInt(userId);
+            
+            // 2. Из Telegram WebApp
+            const user = tg?.initDataUnsafe?.user;
+            if (user && user.id) return user.id;
+            
+            // 3. Из start_param (если там есть user)
+            const startParam = tg?.initDataUnsafe?.start_param;
+            if (startParam && startParam.includes(':')) {
+                const parts = startParam.split(':');
+                if (parts.length >= 2 && !isNaN(parseInt(parts[1]))) {
+                    return parseInt(parts[1]);
+                }
+            }
+            
+            return null;
+        }
+        
+        const rawPost = getPostId();
+        const rawUser = getUserId();
         const rawSubscribed = urlParams.get('subscribed') === 'true';
         const rawPurchased = urlParams.get('purchased') === 'true';
         const rawBananas = parseInt(urlParams.get('bananas')) || 3;
@@ -110,8 +166,16 @@
         const unlockedParam = urlParams.get('unlocked') || '';
         const urlUnlockedPhotos = unlockedParam ? unlockedParam.split(',') : [];
         
+        console.log('🔍 ПАРАМЕТРЫ:');
+        console.log('  post:', rawPost);
+        console.log('  user:', rawUser);
+        console.log('  subscribed:', rawSubscribed);
+        console.log('  purchased:', rawPurchased);
+        console.log('  bananas:', rawBananas);
+        console.log('  unlocked:', urlUnlockedPhotos);
+        
         let state = {
-            files: [], index: 0, postId: rawPost, userId: parseInt(rawUser),
+            files: [], index: 0, postId: rawPost, userId: rawUser,
             isSubscribed: rawSubscribed, hasPurchased: rawPurchased,
             bananasLeft: rawBananas, startTime: Date.now(),
             offlineMode: false, loadingAttempts: 0,
@@ -135,7 +199,7 @@
             console.log(msg);
         }
         
-        debugLog(`📊 ИНИЦИАЛИЗАЦИЯ: подписка=${state.isSubscribed}, куплен=${state.hasPurchased}, бананов=${state.bananasLeft}, разблокировано=${state.unlockedPhotos.length}`);
+        debugLog(`📊 ИНИЦИАЛИЗАЦИЯ: post=${state.postId}, user=${state.userId}, подписка=${state.isSubscribed}, куплен=${state.hasPurchased}, бананов=${state.bananasLeft}`);
         
         // ==================== ЗАГРУЗКА СПИСКА ФАЙЛОВ С БОТА ====================
         async function fetchFiles() {
@@ -170,10 +234,8 @@
             }
         }
         
-        // ==================== ПОЛУЧЕНИЕ БЛЮР-ИМЕНИ (правильное) ====================
+        // ==================== ПОЛУЧЕНИЕ БЛЮР-ИМЕНИ ====================
         function findBlurName(originalName, fileList, type) {
-            // Для банана: оригинал banana_xxx.jpg, блюр banana_banana_banana_xxx.jpg
-            // Нужно убрать префикс "banana_" из оригинала, чтобы получить базовое имя
             let baseName = originalName;
             if (type === 'banana') {
                 baseName = originalName.replace(/^banana_/, '');
@@ -193,6 +255,11 @@
             debugLog(`📁 Пост: ${state.postId}`);
             debugLog(`🍓 Подписка: ${state.isSubscribed}`);
             debugLog(`🍌 Разблокировано бананами: ${state.unlockedPhotos.length}`);
+            
+            if (!state.postId) {
+                showError('Не указан ID поста');
+                return;
+            }
             
             let filesData = await fetchFiles();
             
@@ -226,7 +293,7 @@
                 }
             }
             
-            // 2. Банановые фото — фильтруем только оригиналы (не блюры)
+            // 2. Банановые фото
             const bananaOriginals = (filesData.banana || []).filter(f => 
                 !f.startsWith('banana_banana_banana_') && f.match(/\.(jpg|jpeg|png)$/i)
             );
@@ -245,7 +312,6 @@
                     imageUrl = `${baseUrl}/banana/${blurName}`;
                     debugLog(`🍌 ${originalName}: БЛЮР (найден)`);
                 } else {
-                    // Если нет блюра — показываем заглушку, а не оригинал!
                     imageUrl = 'https://via.placeholder.com/600x800/333/fff?text=No+Access';
                     debugLog(`🍌 ${originalName}: НЕТ БЛЮРА → заглушка`, 'warning');
                 }
@@ -261,7 +327,7 @@
                 });
             }
             
-            // 3. Клубничные фото — фильтруем только оригиналы
+            // 3. Клубничные фото
             const strawberryOriginals = (filesData.strawberry || []).filter(f => 
                 !f.startsWith('strawberry_strawberry_strawberry_') && f.match(/\.(jpg|jpeg|png)$/i)
             );
@@ -280,7 +346,6 @@
                     imageUrl = `${baseUrl}/strawberry/${blurName}`;
                     debugLog(`🍓 ${originalName}: БЛЮР (нет доступа)`);
                 } else {
-                    // Если нет блюра — показываем заглушку
                     imageUrl = 'https://via.placeholder.com/600x800/333/fff?text=No+Access';
                     debugLog(`🍓 ${originalName}: НЕТ БЛЮРА → заглушка`, 'warning');
                 }
@@ -522,8 +587,12 @@
         }
         
         function handleCoin() {
-            if (tg) tg.openLink(`https://t.me/${PAYMENT_BOT_USERNAME}?start=buy_vip_${state.postId}`);
-            showToast('🪙 Переход в бот...');
+            if (tg) {
+                const url = `https://t.me/${PAYMENT_BOT_USERNAME}?start=buy_vip_${state.postId}`;
+                debugLog(`🪙 Переход на оплату: ${url}`);
+                tg.openLink(url);
+            }
+            showToast('🪙 Переход в платёжный бот...');
         }
         
         function handleStrawberry() {
@@ -620,10 +689,6 @@
             if (tg) { 
                 tg.ready(); 
                 tg.expand(); 
-            }
-            if (!state.postId) { 
-                showError('Не указан ID поста'); 
-                return; 
             }
             
             await checkTunnel();
