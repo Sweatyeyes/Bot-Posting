@@ -58,7 +58,7 @@
     <audio id="bg-music" loop preload="auto"><source src="song.mp3" type="audio/mpeg"></audio>
     <div id="loading"><div class="spinner"></div><div class="loading-text">🔄 Загрузка галереи...</div></div>
     <div id="gallery">
-        <div id="debug-panel"><div class="debug-entry">🔍 v12.0 - RAW URL (без лимитов GitHub)</div></div>
+        <div id="debug-panel"><div class="debug-entry">🔍 v13.0 - Загрузка через API</div></div>
         <div id="badges">
             <div id="subscribed-badge" class="badge">🍓 Подписчик</div>
             <div id="purchased-badge" class="badge">🪙 Куплено</div>
@@ -93,7 +93,7 @@
     <div id="toast"></div><div id="error"></div>
 
     <script>
-        console.log('🚀 v12.0 - RAW URL (без лимитов GitHub)');
+        console.log('🚀 v13.0 - Загрузка через API');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const BOT_USERNAME = 'k0tbezzabot';
@@ -110,35 +110,13 @@
         const unlockedParam = urlParams.get('unlocked') || '';
         const urlUnlockedPhotos = unlockedParam ? unlockedParam.split(',') : [];
         
-        // 🔥 Декодируем список файлов из параметра files (base64)
-        const filesB64 = urlParams.get('files');
-        let filesData = { general: [], banana: [], strawberry: [] };
-        
-        if (filesB64) {
-            try {
-                // base64url to base64
-                let base64 = filesB64.replace(/-/g, '+').replace(/_/g, '/');
-                // Добавляем padding если нужно
-                while (base64.length % 4) base64 += '=';
-                const filesJson = atob(base64);
-                filesData = JSON.parse(filesJson);
-                console.log('📁 Файлы из URL:', filesData);
-                debugLog(`📁 Получены файлы: general=${filesData.general?.length || 0}, banana=${filesData.banana?.length || 0}, strawberry=${filesData.strawberry?.length || 0}`, 'success');
-            } catch(e) {
-                console.error('Ошибка декодирования files:', e);
-                debugLog(`❌ Ошибка декодирования files: ${e.message}`, 'error');
-            }
-        } else {
-            debugLog('⚠️ Параметр files отсутствует в URL', 'warning');
-        }
-        
         let state = {
             files: [], index: 0, postId: rawPost, userId: parseInt(rawUser),
             isSubscribed: rawSubscribed, hasPurchased: rawPurchased,
             bananasLeft: rawBananas, startTime: Date.now(),
             offlineMode: false, loadingAttempts: 0,
             unlockedPhotos: urlUnlockedPhotos,
-            filesData: filesData
+            filesData: null
         };
         
         // Отладка
@@ -157,13 +135,37 @@
             console.log(msg);
         }
         
+        // ==================== ЗАГРУЗКА СПИСКА ФАЙЛОВ С БОТА ====================
+        async function fetchFiles() {
+            if (!state.postId) return null;
+            debugLog('📁 Загрузка списка файлов с бота...');
+            try {
+                const res = await fetch(`${TUNNEL_URL}/api/get-files`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ post_id: state.postId })
+                });
+                const data = await res.json();
+                if (data.error) {
+                    debugLog(`❌ Ошибка: ${data.error}`, 'error');
+                    return null;
+                }
+                debugLog(`✅ Файлы: general=${data.general?.length || 0}, banana=${data.banana?.length || 0}, strawberry=${data.strawberry?.length || 0}`, 'success');
+                return data;
+            } catch(e) {
+                debugLog(`❌ Ошибка загрузки файлов: ${e.message}`, 'error');
+                return null;
+            }
+        }
+        
         // ==================== ПОСТРОЕНИЕ СПИСКА ФАЙЛОВ ИЗ RAW ССЫЛОК ====================
-        function buildFileList() {
+        function buildFileList(filesData) {
+            if (!filesData) return [];
             const baseUrl = `https://raw.githubusercontent.com/Sweatyeyes/Bot-Posting/main/posts/${state.postId}`;
             const files = [];
             
             // Общие фото
-            for (const fileName of state.filesData.general || []) {
+            for (const fileName of filesData.general || []) {
                 if (fileName.match(/\.(jpg|jpeg|png)$/i)) {
                     files.push({
                         name: fileName,
@@ -176,7 +178,7 @@
             }
             
             // Банановые фото
-            for (const fileName of state.filesData.banana || []) {
+            for (const fileName of filesData.banana || []) {
                 if (fileName.match(/\.(jpg|jpeg|png)$/i) && !fileName.startsWith('banana_banana_')) {
                     const isUnlocked = state.unlockedPhotos.includes(fileName) || state.hasPurchased;
                     files.push({
@@ -192,7 +194,7 @@
             }
             
             // Клубничные фото
-            for (const fileName of state.filesData.strawberry || []) {
+            for (const fileName of filesData.strawberry || []) {
                 if (fileName.match(/\.(jpg|jpeg|png)$/i) && !fileName.startsWith('strawberry_strawberry_')) {
                     const hasAccess = state.hasPurchased || state.isSubscribed;
                     files.push({
@@ -214,10 +216,16 @@
         async function loadGallery() {
             debugLog('🔄 Загрузка галереи...');
             debugLog(`📁 Пост: ${state.postId}`);
-            debugLog(`📊 Данные: general=${state.filesData.general?.length || 0}, banana=${state.filesData.banana?.length || 0}, strawberry=${state.filesData.strawberry?.length || 0}`);
-            debugLog(`🍌 Бананов: ${state.bananasLeft}, разблокировано: ${state.unlockedPhotos.length}`);
             
-            const files = buildFileList();
+            // Загружаем список файлов
+            const filesData = await fetchFiles();
+            if (!filesData) {
+                showError('Не удалось загрузить список фото');
+                return;
+            }
+            state.filesData = filesData;
+            
+            const files = buildFileList(filesData);
             
             if (files.length === 0) {
                 debugLog('❌ Нет файлов для отображения', 'error');
@@ -297,7 +305,6 @@
                     state.bananasLeft = data.available_bananas;
                     debugLog(`🍌 Разблокировано: ${state.unlockedPhotos.length}, бананов: ${state.bananasLeft}`, 'success');
                     updateUI();
-                    loadGallery();
                 }
             } catch(e) {
                 debugLog(`❌ Ошибка: ${e.message}`, 'error');
@@ -317,7 +324,6 @@
                 if (isSubscribed !== state.isSubscribed) {
                     state.isSubscribed = isSubscribed;
                     updateUI();
-                    if (isSubscribed) loadGallery();
                 }
                 return isSubscribed;
             } catch(e) { return state.isSubscribed; }
