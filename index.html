@@ -58,7 +58,7 @@
     <audio id="bg-music" loop preload="auto"><source src="song.mp3" type="audio/mpeg"></audio>
     <div id="loading"><div class="spinner"></div><div class="loading-text">🔄 Загрузка галереи...</div></div>
     <div id="gallery">
-        <div id="debug-panel"><div class="debug-entry">🔍 v13.4 - ФИНАЛЬНАЯ (логика из v11.5)</div></div>
+        <div id="debug-panel"><div class="debug-entry">🔍 v13.5 - ПРАВИЛЬНАЯ ФИЛЬТРАЦИЯ</div></div>
         <div id="badges">
             <div id="subscribed-badge" class="badge">🍓 Подписчик</div>
             <div id="purchased-badge" class="badge">🪙 Куплено</div>
@@ -93,7 +93,7 @@
     <div id="toast"></div><div id="error"></div>
 
     <script>
-        console.log('🚀 v13.4 - ФИНАЛЬНАЯ (логика из v11.5)');
+        console.log('🚀 v13.5 - ПРАВИЛЬНАЯ ФИЛЬТРАЦИЯ ОРИГИНАЛОВ И БЛЮРОВ');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const BOT_USERNAME = 'k0tbezzabot';
@@ -135,6 +135,8 @@
             console.log(msg);
         }
         
+        debugLog(`📊 ИНИЦИАЛИЗАЦИЯ: подписка=${state.isSubscribed}, куплен=${state.hasPurchased}, бананов=${state.bananasLeft}, разблокировано=${state.unlockedPhotos.length}`);
+        
         // ==================== ЗАГРУЗКА СПИСКА ФАЙЛОВ С БОТА ====================
         async function fetchFiles() {
             if (!state.postId) return null;
@@ -168,7 +170,7 @@
             }
         }
         
-        // ==================== ЗАГРУЗКА ГАЛЕРЕИ (ЛОГИКА ИЗ v11.5) ====================
+        // ==================== ЗАГРУЗКА ГАЛЕРЕИ С ПРАВИЛЬНОЙ ФИЛЬТРАЦИЕЙ ====================
         async function loadGallery() {
             debugLog('🔄 Загрузка галереи...');
             debugLog(`📁 Пост: ${state.postId}`);
@@ -178,18 +180,11 @@
             let filesData = await fetchFiles();
             
             if (!filesData) {
-                debugLog('📴 Офлайн-режим: показываем все фото с блюром', 'warning');
+                debugLog('📴 Офлайн-режим', 'warning');
                 state.offlineMode = true;
                 document.getElementById('offline-badge').style.display = 'block';
-                filesData = { general: [], banana: [], strawberry: [] };
-                
-                const cachedFiles = localStorage.getItem(`files_${state.postId}`);
-                if (cachedFiles) {
-                    try {
-                        filesData = JSON.parse(cachedFiles);
-                        debugLog(`📦 Загружено из кэша: general=${filesData.general?.length || 0}`, 'success');
-                    } catch(e) {}
-                }
+                const cached = localStorage.getItem(`files_${state.postId}`);
+                filesData = cached ? JSON.parse(cached) : { general: [], banana: [], strawberry: [] };
             } else {
                 localStorage.setItem(`files_${state.postId}`, JSON.stringify(filesData));
                 state.offlineMode = false;
@@ -198,16 +193,15 @@
             
             state.filesData = filesData;
             
-            // Строим список файлов — логика как в v11.5
             const baseUrl = `https://raw.githubusercontent.com/Sweatyeyes/Bot-Posting/main/posts/${state.postId}`;
             let files = [];
             
-            // Общие фото
-            for (const f of filesData.general || []) {
-                if (f.match(/\.(jpg|jpeg|png)$/i)) {
+            // 1. Общие фото — всегда без блюра
+            for (const fileName of filesData.general || []) {
+                if (fileName.match(/\.(jpg|jpeg|png)$/i)) {
                     files.push({
-                        name: f,
-                        url: `${baseUrl}/general/${f}`,
+                        name: fileName,
+                        url: `${baseUrl}/general/${fileName}`,
                         type: 'general',
                         isBlurred: false,
                         isBanana: false
@@ -215,41 +209,72 @@
                 }
             }
             
-            // Банановые фото
-            for (const f of filesData.banana || []) {
-                if (!f.startsWith('banana_banana_') && f.match(/\.(jpg|jpeg|png)$/i)) {
-                    // Ищем блюр-версию (но для raw ссылок её нет, поэтому просто проверяем доступ)
-                    const isUnlocked = state.hasPurchased || state.unlockedPhotos.includes(f);
-                    debugLog(`🍌 ${f}: доступ=${isUnlocked} (purchased=${state.hasPurchased}, unlocked=${state.unlockedPhotos.includes(f)})`);
-                    
-                    files.push({
-                        name: f,
-                        originalName: f,
-                        url: `${baseUrl}/banana/${f}`,
-                        originalUrl: `${baseUrl}/banana/${f}`,
-                        type: 'banana',
-                        isBlurred: !isUnlocked,
-                        isBanana: true
-                    });
+            // 2. Банановые фото — фильтруем только оригиналы (не блюры)
+            const bananaOriginals = (filesData.banana || []).filter(f => 
+                !f.startsWith('banana_banana_banana_') && f.match(/\.(jpg|jpeg|png)$/i)
+            );
+            debugLog(`🍌 Найдено оригиналов бананов: ${bananaOriginals.length}`);
+            
+            for (const originalName of bananaOriginals) {
+                const isUnlocked = state.hasPurchased || state.unlockedPhotos.includes(originalName);
+                const blurName = `banana_banana_banana_${originalName}`;
+                const hasBlur = (filesData.banana || []).includes(blurName);
+                
+                let imageUrl;
+                if (isUnlocked) {
+                    imageUrl = `${baseUrl}/banana/${originalName}`;
+                    debugLog(`🍌 ${originalName}: РАЗБЛОКИРОВАНО → оригинал`);
+                } else if (hasBlur) {
+                    imageUrl = `${baseUrl}/banana/${blurName}`;
+                    debugLog(`🍌 ${originalName}: БЛЮР (есть блюр-версия)`);
+                } else {
+                    imageUrl = `${baseUrl}/banana/${originalName}`;
+                    debugLog(`🍌 ${originalName}: НЕТ БЛЮРА → показываем оригинал (⚠️ косяк!)`, 'warning');
                 }
+                
+                files.push({
+                    name: originalName,
+                    originalName: originalName,
+                    url: imageUrl,
+                    originalUrl: `${baseUrl}/banana/${originalName}`,
+                    type: 'banana',
+                    isBlurred: !isUnlocked,
+                    isBanana: true
+                });
             }
             
-            // Клубничные фото
-            for (const f of filesData.strawberry || []) {
-                if (!f.startsWith('strawberry_strawberry_') && f.match(/\.(jpg|jpeg|png)$/i)) {
-                    const hasAccess = state.hasPurchased || state.isSubscribed;
-                    debugLog(`🍓 ${f}: доступ=${hasAccess} (purchased=${state.hasPurchased}, subscribed=${state.isSubscribed})`);
-                    
-                    files.push({
-                        name: f,
-                        originalName: f,
-                        url: `${baseUrl}/strawberry/${f}`,
-                        originalUrl: `${baseUrl}/strawberry/${f}`,
-                        type: 'strawberry',
-                        isBlurred: !hasAccess,
-                        isBanana: false
-                    });
+            // 3. Клубничные фото — фильтруем только оригиналы
+            const strawberryOriginals = (filesData.strawberry || []).filter(f => 
+                !f.startsWith('strawberry_strawberry_strawberry_') && f.match(/\.(jpg|jpeg|png)$/i)
+            );
+            debugLog(`🍓 Найдено оригиналов клубничных: ${strawberryOriginals.length}`);
+            
+            for (const originalName of strawberryOriginals) {
+                const hasAccess = state.hasPurchased || state.isSubscribed;
+                const blurName = `strawberry_strawberry_strawberry_${originalName}`;
+                const hasBlur = (filesData.strawberry || []).includes(blurName);
+                
+                let imageUrl;
+                if (hasAccess) {
+                    imageUrl = `${baseUrl}/strawberry/${originalName}`;
+                    debugLog(`🍓 ${originalName}: ДОСТУП ЕСТЬ → оригинал`);
+                } else if (hasBlur) {
+                    imageUrl = `${baseUrl}/strawberry/${blurName}`;
+                    debugLog(`🍓 ${originalName}: БЛЮР (нет доступа)`);
+                } else {
+                    imageUrl = `${baseUrl}/strawberry/${originalName}`;
+                    debugLog(`🍓 ${originalName}: НЕТ БЛЮРА → показываем оригинал (⚠️ косяк!)`, 'warning');
                 }
+                
+                files.push({
+                    name: originalName,
+                    originalName: originalName,
+                    url: imageUrl,
+                    originalUrl: `${baseUrl}/strawberry/${originalName}`,
+                    type: 'strawberry',
+                    isBlurred: !hasAccess,
+                    isBanana: false
+                });
             }
             
             if (files.length === 0) {
@@ -258,7 +283,7 @@
             }
             
             state.files = files;
-            debugLog(`✅ Загружено ${files.length} фото`);
+            debugLog(`✅ Загружено ${files.length} фото (${bananaOriginals.length} банановых, ${strawberryOriginals.length} клубничных)`, 'success');
             
             document.getElementById('loading').style.display = 'none';
             document.getElementById('gallery').style.display = 'block';
@@ -304,6 +329,7 @@
                 right.parentNode.replaceChild(newRight, right); 
                 newRight.addEventListener('click', () => next()); 
             }
+            debugLog('✅ Навигация настроена');
         }
         
         document.addEventListener('keydown', (e) => {
