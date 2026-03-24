@@ -58,7 +58,7 @@
     <audio id="bg-music" loop preload="auto"><source src="song.mp3" type="audio/mpeg"></audio>
     <div id="loading"><div class="spinner"></div><div class="loading-text">🔄 Загрузка галереи...</div></div>
     <div id="gallery">
-        <div id="debug-panel"><div class="debug-entry">🔍 v13.7 - ИСПРАВЛЕН ПОИСК POST_ID</div></div>
+        <div id="debug-panel"><div class="debug-entry">🔍 v14.0 - ПРОВЕРКА ПОКУПКИ ЧЕРЕЗ API</div></div>
         <div id="badges">
             <div id="subscribed-badge" class="badge">🍓 Подписчик</div>
             <div id="purchased-badge" class="badge">🪙 Куплено</div>
@@ -93,7 +93,7 @@
     <div id="toast"></div><div id="error"></div>
 
     <script>
-        console.log('🚀 v13.7 - ИСПРАВЛЕН ПОИСК POST_ID');
+        console.log('🚀 v14.0 - ПРОВЕРКА ПОКУПКИ ЧЕРЕЗ API');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -103,57 +103,36 @@
         // ==================== ПОЛУЧЕНИЕ ПАРАМЕТРОВ ====================
         const urlParams = new URLSearchParams(window.location.search);
         
-        // Функция для получения post_id из разных источников
         function getPostId() {
-            // 1. Из параметра post в URL
             let postId = urlParams.get('post');
             if (postId) return postId;
-            
-            // 2. Из tgWebAppStartParam (Telegram добавляет этот параметр)
             const tgStartParam = urlParams.get('tgWebAppStartParam');
             if (tgStartParam) {
-                if (tgStartParam.startsWith('buy_vip_')) {
-                    return tgStartParam.replace('buy_vip_', '');
-                }
+                if (tgStartParam.startsWith('buy_vip_')) return tgStartParam.replace('buy_vip_', '');
                 return tgStartParam;
             }
-            
-            // 3. Из start_param Telegram WebApp
             const webAppStartParam = tg?.initDataUnsafe?.start_param;
             if (webAppStartParam) {
-                if (webAppStartParam.startsWith('buy_vip_')) {
-                    return webAppStartParam.replace('buy_vip_', '');
-                }
+                if (webAppStartParam.startsWith('buy_vip_')) return webAppStartParam.replace('buy_vip_', '');
                 return webAppStartParam;
             }
-            
-            // 4. Из hash (для старых ссылок)
             if (window.location.hash) {
                 const match = window.location.hash.match(/[?&]post=([^&]+)/);
                 if (match) return match[1];
             }
-            
             return null;
         }
         
         function getUserId() {
-            // 1. Из параметра user в URL
             let userId = urlParams.get('user');
             if (userId) return parseInt(userId);
-            
-            // 2. Из Telegram WebApp
             const user = tg?.initDataUnsafe?.user;
             if (user && user.id) return user.id;
-            
-            // 3. Из start_param (если там есть user)
             const startParam = tg?.initDataUnsafe?.start_param;
             if (startParam && startParam.includes(':')) {
                 const parts = startParam.split(':');
-                if (parts.length >= 2 && !isNaN(parseInt(parts[1]))) {
-                    return parseInt(parts[1]);
-                }
+                if (parts.length >= 2 && !isNaN(parseInt(parts[1]))) return parseInt(parts[1]);
             }
-            
             return null;
         }
         
@@ -162,17 +141,13 @@
         const rawSubscribed = urlParams.get('subscribed') === 'true';
         const rawPurchased = urlParams.get('purchased') === 'true';
         const rawBananas = parseInt(urlParams.get('bananas')) || 3;
-        
         const unlockedParam = urlParams.get('unlocked') || '';
         const urlUnlockedPhotos = unlockedParam ? unlockedParam.split(',') : [];
         
         console.log('🔍 ПАРАМЕТРЫ:');
         console.log('  post:', rawPost);
         console.log('  user:', rawUser);
-        console.log('  subscribed:', rawSubscribed);
-        console.log('  purchased:', rawPurchased);
-        console.log('  bananas:', rawBananas);
-        console.log('  unlocked:', urlUnlockedPhotos);
+        console.log('  purchased из URL:', rawPurchased);
         
         let state = {
             files: [], index: 0, postId: rawPost, userId: rawUser,
@@ -183,7 +158,6 @@
             filesData: null
         };
         
-        // Отладка
         const debugPanel = document.getElementById('debug-panel');
         function debugLog(msg, type = 'info') {
             const entry = document.createElement('div');
@@ -199,33 +173,51 @@
             console.log(msg);
         }
         
-        debugLog(`📊 ИНИЦИАЛИЗАЦИЯ: post=${state.postId}, user=${state.userId}, подписка=${state.isSubscribed}, куплен=${state.hasPurchased}, бананов=${state.bananasLeft}`);
+        // ==================== ПРОВЕРКА ПОКУПКИ ЧЕРЕЗ API ====================
+        async function checkPurchase() {
+            if (!state.userId || !state.postId) return false;
+            debugLog('🪙 Проверка покупки через API...');
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                const res = await fetch(`${TUNNEL_URL}/api/check-purchase`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId }),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                const data = await res.json();
+                if (data.purchased) {
+                    state.hasPurchased = true;
+                    debugLog('🪙 Покупка подтверждена сервером!', 'success');
+                    return true;
+                }
+                debugLog('🪙 Покупка не найдена', 'info');
+                return false;
+            } catch(e) {
+                debugLog(`⚠️ Не удалось проверить покупку: ${e.message}`, 'warning');
+                return state.hasPurchased;
+            }
+        }
         
-        // ==================== ЗАГРУЗКА СПИСКА ФАЙЛОВ С БОТА ====================
+        // ==================== ЗАГРУЗКА ФАЙЛОВ ====================
         async function fetchFiles() {
             if (!state.postId) return null;
             debugLog('📁 Загрузка списка файлов...');
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
-                
                 const res = await fetch(`${TUNNEL_URL}/api/get-files`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ post_id: state.postId }),
                     signal: controller.signal
                 });
-                
                 clearTimeout(timeoutId);
-                
-                if (!res.ok) {
-                    throw new Error(`HTTP ${res.status}`);
-                }
-                
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
-                if (data.error) {
-                    throw new Error(data.error);
-                }
+                if (data.error) throw new Error(data.error);
                 debugLog(`✅ Файлы: general=${data.general?.length || 0}, banana=${data.banana?.length || 0}, strawberry=${data.strawberry?.length || 0}`, 'success');
                 return data;
             } catch(e) {
@@ -234,7 +226,6 @@
             }
         }
         
-        // ==================== ПОЛУЧЕНИЕ БЛЮР-ИМЕНИ ====================
         function findBlurName(originalName, fileList, type) {
             let baseName = originalName;
             if (type === 'banana') {
@@ -249,20 +240,20 @@
             return null;
         }
         
-        // ==================== ЗАГРУЗКА ГАЛЕРЕИ ====================
         async function loadGallery() {
             debugLog('🔄 Загрузка галереи...');
             debugLog(`📁 Пост: ${state.postId}`);
-            debugLog(`🍓 Подписка: ${state.isSubscribed}`);
-            debugLog(`🍌 Разблокировано бананами: ${state.unlockedPhotos.length}`);
             
             if (!state.postId) {
                 showError('Не указан ID поста');
                 return;
             }
             
-            let filesData = await fetchFiles();
+            // КРИТИЧЕСКИ ВАЖНО: проверяем покупку через API перед загрузкой!
+            await checkPurchase();
+            debugLog(`🪙 Итоговый статус покупки: ${state.hasPurchased}`);
             
+            let filesData = await fetchFiles();
             if (!filesData) {
                 debugLog('📴 Офлайн-режим', 'warning');
                 state.offlineMode = true;
@@ -276,89 +267,45 @@
             }
             
             state.filesData = filesData;
-            
             const baseUrl = `https://raw.githubusercontent.com/Sweatyeyes/Bot-Posting/main/posts/${state.postId}`;
             let files = [];
             
-            // 1. Общие фото — всегда без блюра
             for (const fileName of filesData.general || []) {
                 if (fileName.match(/\.(jpg|jpeg|png)$/i)) {
-                    files.push({
-                        name: fileName,
-                        url: `${baseUrl}/general/${fileName}`,
-                        type: 'general',
-                        isBlurred: false,
-                        isBanana: false
-                    });
+                    files.push({ name: fileName, url: `${baseUrl}/general/${fileName}`, type: 'general', isBlurred: false, isBanana: false });
                 }
             }
             
-            // 2. Банановые фото
-            const bananaOriginals = (filesData.banana || []).filter(f => 
-                !f.startsWith('banana_banana_banana_') && f.match(/\.(jpg|jpeg|png)$/i)
-            );
-            debugLog(`🍌 Найдено оригиналов бананов: ${bananaOriginals.length}`);
-            
+            const bananaOriginals = (filesData.banana || []).filter(f => !f.startsWith('banana_banana_banana_') && f.match(/\.(jpg|jpeg|png)$/i));
             for (const originalName of bananaOriginals) {
                 const isUnlocked = state.hasPurchased || state.unlockedPhotos.includes(originalName);
                 const blurName = findBlurName(originalName, filesData.banana, 'banana');
                 const hasBlur = !!blurName;
-                
                 let imageUrl;
                 if (isUnlocked) {
                     imageUrl = `${baseUrl}/banana/${originalName}`;
-                    debugLog(`🍌 ${originalName}: РАЗБЛОКИРОВАНО → оригинал`);
                 } else if (hasBlur) {
                     imageUrl = `${baseUrl}/banana/${blurName}`;
-                    debugLog(`🍌 ${originalName}: БЛЮР (найден)`);
                 } else {
                     imageUrl = 'https://via.placeholder.com/600x800/333/fff?text=No+Access';
-                    debugLog(`🍌 ${originalName}: НЕТ БЛЮРА → заглушка`, 'warning');
                 }
-                
-                files.push({
-                    name: originalName,
-                    originalName: originalName,
-                    url: imageUrl,
-                    originalUrl: `${baseUrl}/banana/${originalName}`,
-                    type: 'banana',
-                    isBlurred: !isUnlocked,
-                    isBanana: true
-                });
+                files.push({ name: originalName, originalName: originalName, url: imageUrl, originalUrl: `${baseUrl}/banana/${originalName}`, type: 'banana', isBlurred: !isUnlocked, isBanana: true });
             }
             
-            // 3. Клубничные фото
-            const strawberryOriginals = (filesData.strawberry || []).filter(f => 
-                !f.startsWith('strawberry_strawberry_strawberry_') && f.match(/\.(jpg|jpeg|png)$/i)
-            );
-            debugLog(`🍓 Найдено оригиналов клубничных: ${strawberryOriginals.length}`);
-            
+            const strawberryOriginals = (filesData.strawberry || []).filter(f => !f.startsWith('strawberry_strawberry_strawberry_') && f.match(/\.(jpg|jpeg|png)$/i));
             for (const originalName of strawberryOriginals) {
                 const hasAccess = state.hasPurchased || state.isSubscribed;
                 const blurName = findBlurName(originalName, filesData.strawberry, 'strawberry');
                 const hasBlur = !!blurName;
-                
                 let imageUrl;
                 if (hasAccess) {
                     imageUrl = `${baseUrl}/strawberry/${originalName}`;
-                    debugLog(`🍓 ${originalName}: ДОСТУП ЕСТЬ → оригинал`);
                 } else if (hasBlur) {
                     imageUrl = `${baseUrl}/strawberry/${blurName}`;
-                    debugLog(`🍓 ${originalName}: БЛЮР (нет доступа)`);
                 } else {
                     imageUrl = 'https://via.placeholder.com/600x800/333/fff?text=No+Access';
-                    debugLog(`🍓 ${originalName}: НЕТ БЛЮРА → заглушка`, 'warning');
                 }
-                
-                files.push({
-                    name: originalName,
-                    originalName: originalName,
-                    url: imageUrl,
-                    originalUrl: `${baseUrl}/strawberry/${originalName}`,
-                    type: 'strawberry',
-                    isBlurred: !hasAccess,
-                    isBanana: false
-                });
+                files.push({ name: originalName, originalName: originalName, url: imageUrl, originalUrl: `${baseUrl}/strawberry/${originalName}`, type: 'strawberry', isBlurred: !hasAccess, isBanana: false });
             }
             
             if (files.length === 0) {
@@ -367,8 +314,7 @@
             }
             
             state.files = files;
-            debugLog(`✅ Загружено ${files.length} фото (${bananaOriginals.length} банановых, ${strawberryOriginals.length} клубничных)`, 'success');
-            
+            debugLog(`✅ Загружено ${files.length} фото`, 'success');
             document.getElementById('loading').style.display = 'none';
             document.getElementById('gallery').style.display = 'block';
             updateUI();
@@ -378,22 +324,14 @@
         
         function showImage(i) {
             if (!state.files || state.files.length === 0) return;
-            
             state.index = (i + state.files.length) % state.files.length;
             const img = document.getElementById('image');
             const file = state.files[state.index];
-            
             if (!img || !file) return;
-            
             img.classList.remove('loaded');
             img.src = file.url + '?t=' + Date.now();
-            
             const counterText = document.getElementById('counter-text');
-            if (counterText) {
-                counterText.innerText = `${state.index+1}/${state.files.length}`;
-            }
-            
-            debugLog(`🖼 ${state.index+1}/${state.files.length}: ${file.name} ${file.isBlurred ? '🔒' : '✅'}`);
+            if (counterText) counterText.innerText = `${state.index+1}/${state.files.length}`;
         }
         
         function next() { if (state.files && state.files.length) showImage(state.index + 1); }
@@ -403,17 +341,8 @@
         function setupNavigation() {
             const left = document.getElementById('nav-left');
             const right = document.getElementById('nav-right');
-            if (left) { 
-                const newLeft = left.cloneNode(true); 
-                left.parentNode.replaceChild(newLeft, left); 
-                newLeft.addEventListener('click', () => prev()); 
-            }
-            if (right) { 
-                const newRight = right.cloneNode(true); 
-                right.parentNode.replaceChild(newRight, right); 
-                newRight.addEventListener('click', () => next()); 
-            }
-            debugLog('✅ Навигация настроена');
+            if (left) { const newLeft = left.cloneNode(true); left.parentNode.replaceChild(newLeft, left); newLeft.addEventListener('click', () => prev()); }
+            if (right) { const newRight = right.cloneNode(true); right.parentNode.replaceChild(newRight, right); newRight.addEventListener('click', () => next()); }
         }
         
         document.addEventListener('keydown', (e) => {
@@ -421,7 +350,6 @@
             if (e.key === 'ArrowRight') { next(); e.preventDefault(); }
         });
         
-        // ==================== ПОЛУЧЕНИЕ РАЗБЛОКИРОВАННЫХ ФОТО ====================
         async function fetchUnlockedPhotos() {
             if (!state.userId || !state.postId) return;
             if (state.offlineMode) return;
@@ -429,16 +357,12 @@
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
-                
                 const res = await fetch(`${TUNNEL_URL}/api/get-unlocked-photos`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ user_id: state.userId, post_id: state.postId }),
                     signal: controller.signal
                 });
-                
                 clearTimeout(timeoutId);
-                
                 const data = await res.json();
                 if (data.unlocked_photos) {
                     state.unlockedPhotos = data.unlocked_photos;
@@ -446,27 +370,21 @@
                     debugLog(`🍌 Разблокировано: ${state.unlockedPhotos.length}, бананов: ${state.bananasLeft}`, 'success');
                     updateUI();
                 }
-            } catch(e) {
-                debugLog(`⚠️ Не удалось получить разблокированные: ${e.message}`, 'warning');
-            }
+            } catch(e) { debugLog(`⚠️ Не удалось получить разблокированные: ${e.message}`, 'warning'); }
         }
         
-        // Проверка подписки
         async function checkSubscription() {
             if (!state.userId) return false;
             if (state.offlineMode) return state.isSubscribed;
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
-                
                 const res = await fetch(`${TUNNEL_URL}/api/check-subscription`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ user_id: state.userId, post_id: state.postId }),
                     signal: controller.signal
                 });
-                
                 clearTimeout(timeoutId);
-                
                 const data = await res.json();
                 const isSubscribed = data.is_subscribed === true;
                 if (isSubscribed !== state.isSubscribed) {
@@ -474,24 +392,15 @@
                     updateUI();
                 }
                 return isSubscribed;
-            } catch(e) {
-                return state.isSubscribed;
-            }
+            } catch(e) { return state.isSubscribed; }
         }
         
-        // Проверка туннеля
         async function checkTunnel() {
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 3000);
-                
-                const res = await fetch(`${TUNNEL_URL}/api/webapp-data`, { 
-                    method: 'OPTIONS',
-                    signal: controller.signal
-                });
-                
+                const res = await fetch(`${TUNNEL_URL}/api/webapp-data`, { method: 'OPTIONS', signal: controller.signal });
                 clearTimeout(timeoutId);
-                
                 state.offlineMode = !(res.ok || res.status === 405);
                 const offlineBadge = document.getElementById('offline-badge');
                 if (offlineBadge) offlineBadge.style.display = state.offlineMode ? 'block' : 'none';
@@ -500,49 +409,25 @@
                 return !state.offlineMode;
             } catch(e) {
                 state.offlineMode = true;
-                const offlineBadge = document.getElementById('offline-badge');
-                if (offlineBadge) offlineBadge.style.display = 'block';
+                document.getElementById('offline-badge').style.display = 'block';
                 const bananaBtn = document.getElementById('banana-btn');
                 if (bananaBtn) bananaBtn.classList.add('disabled');
                 return false;
             }
         }
         
-        // Трата банана
         async function spendBanana() {
-            if (state.offlineMode) {
-                showToast('📴 Нет соединения');
-                return;
-            }
-            
+            if (state.offlineMode) { showToast('📴 Нет соединения'); return; }
             const currentFile = state.files[state.index];
-            if (!currentFile || !currentFile.isBanana) {
-                showToast('🍌 Это фото нельзя разблокировать бананом');
-                return;
-            }
-            if (!currentFile.isBlurred) {
-                showToast('✅ Уже разблокировано');
-                return;
-            }
-            if (state.bananasLeft <= 0) {
-                showToast('❌ Нет бананов');
-                return;
-            }
-            
+            if (!currentFile || !currentFile.isBanana) { showToast('🍌 Это фото нельзя разблокировать бананом'); return; }
+            if (!currentFile.isBlurred) { showToast('✅ Уже разблокировано'); return; }
+            if (state.bananasLeft <= 0) { showToast('❌ Нет бананов'); return; }
             try {
                 const res = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        action: 'spend_banana',
-                        user_id: state.userId,
-                        post_id: state.postId,
-                        details: { photo_name: currentFile.originalName || currentFile.name }
-                    })
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'spend_banana', user_id: state.userId, post_id: state.postId, details: { photo_name: currentFile.originalName || currentFile.name } })
                 });
-                
                 const data = await res.json();
-                
                 if (data.success) {
                     state.bananasLeft = data.available;
                     if (!state.unlockedPhotos.includes(currentFile.originalName || currentFile.name)) {
@@ -553,22 +438,13 @@
                     showImage(state.index);
                     updateUI();
                     showToast('🍌 Банан потрачен!');
-                } else if (data.already_spent) {
-                    showToast('🍌 Уже тратили на это фото');
-                } else {
-                    showToast('❌ Ошибка');
-                }
-            } catch(e) {
-                showToast('❌ Ошибка соединения');
-            }
+                } else if (data.already_spent) { showToast('🍌 Уже тратили на это фото'); }
+                else { showToast('❌ Ошибка'); }
+            } catch(e) { showToast('❌ Ошибка соединения'); }
         }
         
         async function saveCurrentPhoto() {
-            if (!state.isSubscribed) {
-                showToast('🍓 Только для подписчиков!');
-                if (tg) tg.openLink('https://t.me/neuroticababes_bot');
-                return;
-            }
+            if (!state.isSubscribed) { showToast('🍓 Только для подписчиков!'); if (tg) tg.openLink('https://t.me/neuroticababes_bot'); return; }
             const f = state.files[state.index];
             if (!f) return;
             try {
@@ -581,142 +457,64 @@
                 link.click();
                 URL.revokeObjectURL(url);
                 showToast('✅ Фото сохранено!');
-            } catch(e) { 
-                showToast('❌ Ошибка'); 
-            }
+            } catch(e) { showToast('❌ Ошибка'); }
         }
         
         function handleCoin() {
-            if (tg) {
-                const url = `https://t.me/${PAYMENT_BOT_USERNAME}?start=buy_vip_${state.postId}`;
-                debugLog(`🪙 Переход на оплату: ${url}`);
-                tg.openLink(url);
-            }
+            if (tg) tg.openLink(`https://t.me/${PAYMENT_BOT_USERNAME}?start=buy_vip_${state.postId}`);
             showToast('🪙 Переход в платёжный бот...');
         }
         
-        function handleStrawberry() {
-            if (tg) tg.openLink('https://t.me/neuroticababes_bot');
-            showToast('🍓 Подпишитесь на канал');
-        }
+        function handleStrawberry() { if (tg) tg.openLink('https://t.me/neuroticababes_bot'); showToast('🍓 Подпишитесь на канал'); }
         
         let musicPlaying = false;
         const audio = document.getElementById('bg-music');
         let musicBtn = null;
-        
         function toggleMusic() {
-            if (musicPlaying) { 
-                audio.pause(); 
-                musicPlaying = false; 
-                if (musicBtn) musicBtn.style.opacity = '0.5';
-                showToast('🎵 Музыка выключена'); 
-            } else { 
-                audio.play().catch(() => {});
-                musicPlaying = true; 
-                if (musicBtn) musicBtn.style.opacity = '1';
-                showToast('🎵 Музыка включена'); 
-            }
+            if (musicPlaying) { audio.pause(); musicPlaying = false; if (musicBtn) musicBtn.style.opacity = '0.5'; showToast('🎵 Музыка выключена'); }
+            else { audio.play().catch(() => {}); musicPlaying = true; if (musicBtn) musicBtn.style.opacity = '1'; showToast('🎵 Музыка включена'); }
         }
         
         function updateUI() {
             const bananaBadge = document.getElementById('banana-count-badge');
-            if (bananaBadge) {
-                bananaBadge.textContent = state.bananasLeft;
-                bananaBadge.style.display = state.bananasLeft > 0 ? 'flex' : 'none';
-            }
-            
+            if (bananaBadge) { bananaBadge.textContent = state.bananasLeft; bananaBadge.style.display = state.bananasLeft > 0 ? 'flex' : 'none'; }
             const subStatus = document.getElementById('sub-status');
-            if (subStatus) {
-                subStatus.textContent = state.isSubscribed ? '(есть) ✅' : '(нет) ❌';
-                subStatus.style.color = state.isSubscribed ? '#ffd700' : '#ff6b6b';
-            }
-            
+            if (subStatus) { subStatus.textContent = state.isSubscribed ? '(есть) ✅' : '(нет) ❌'; subStatus.style.color = state.isSubscribed ? '#ffd700' : '#ff6b6b'; }
             const subBadge = document.getElementById('subscribed-badge');
             if (subBadge) subBadge.style.display = state.isSubscribed ? 'block' : 'none';
             const purchasedBadge = document.getElementById('purchased-badge');
             if (purchasedBadge) purchasedBadge.style.display = state.hasPurchased ? 'block' : 'none';
-            
             const saveBtn = document.getElementById('save-btn');
-            if (saveBtn) {
-                if (state.isSubscribed) {
-                    saveBtn.classList.remove('disabled');
-                } else {
-                    saveBtn.classList.add('disabled');
-                }
-            }
-            
+            if (saveBtn) { if (state.isSubscribed) saveBtn.classList.remove('disabled'); else saveBtn.classList.add('disabled'); }
             const bananaBtn = document.getElementById('banana-btn');
-            if (bananaBtn) {
-                if (state.offlineMode || state.bananasLeft <= 0) {
-                    bananaBtn.classList.add('disabled');
-                } else {
-                    bananaBtn.classList.remove('disabled');
-                }
-            }
+            if (bananaBtn) { if (state.offlineMode || state.bananasLeft <= 0) bananaBtn.classList.add('disabled'); else bananaBtn.classList.remove('disabled'); }
         }
         
-        function showInfo() { 
-            const modal = document.getElementById('info-modal');
-            if (modal) modal.classList.add('active'); 
-        }
-        function hideInfo() { 
-            const modal = document.getElementById('info-modal');
-            if (modal) modal.classList.remove('active'); 
-        }
-        function forceReload() { 
-            localStorage.clear(); 
-            location.reload(); 
-        }
-        function showToast(text) {
-            const toast = document.getElementById('toast');
-            if (!toast) return;
-            toast.textContent = text;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 2000);
-        }
-        function showError(msg) {
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('error').style.display = 'block';
-            document.getElementById('error').innerHTML = msg;
-        }
+        function showInfo() { document.getElementById('info-modal').classList.add('active'); }
+        function hideInfo() { document.getElementById('info-modal').classList.remove('active'); }
+        function forceReload() { localStorage.clear(); location.reload(); }
+        function showToast(text) { const toast = document.getElementById('toast'); if (!toast) return; toast.textContent = text; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2000); }
+        function showError(msg) { document.getElementById('loading').style.display = 'none'; document.getElementById('error').style.display = 'block'; document.getElementById('error').innerHTML = msg; }
         
-        // Запуск
         async function init() {
-            if (!window.Telegram?.WebApp) { 
-                showError('Откройте в Telegram'); 
-                return; 
-            }
-            if (tg) { 
-                tg.ready(); 
-                tg.expand(); 
-            }
-            
+            if (!window.Telegram?.WebApp) { showError('Откройте в Telegram'); return; }
+            if (tg) { tg.ready(); tg.expand(); }
             await checkTunnel();
             await checkSubscription();
             await fetchUnlockedPhotos();
             await loadGallery();
         }
         
-        // Привязка кнопок
         document.addEventListener('DOMContentLoaded', () => {
-            const strawberryBtn = document.getElementById('strawberry-btn');
-            const bananaBtn = document.getElementById('banana-btn');
-            const coinBtn = document.getElementById('coin-btn');
-            const saveBtn = document.getElementById('save-btn');
+            document.getElementById('strawberry-btn')?.addEventListener('click', handleStrawberry);
+            document.getElementById('banana-btn')?.addEventListener('click', spendBanana);
+            document.getElementById('coin-btn')?.addEventListener('click', handleCoin);
+            document.getElementById('save-btn')?.addEventListener('click', saveCurrentPhoto);
             musicBtn = document.getElementById('music-btn');
-            const infoBtn = document.getElementById('info-btn');
-            const modalCloseBtn = document.getElementById('modal-close-btn');
-            const forceReloadItem = document.getElementById('force-reload-item');
-            
-            if (strawberryBtn) strawberryBtn.addEventListener('click', handleStrawberry);
-            if (bananaBtn) bananaBtn.addEventListener('click', spendBanana);
-            if (coinBtn) coinBtn.addEventListener('click', handleCoin);
-            if (saveBtn) saveBtn.addEventListener('click', saveCurrentPhoto);
             if (musicBtn) musicBtn.addEventListener('click', toggleMusic);
-            if (infoBtn) infoBtn.addEventListener('click', showInfo);
-            if (modalCloseBtn) modalCloseBtn.addEventListener('click', hideInfo);
-            if (forceReloadItem) forceReloadItem.addEventListener('click', forceReload);
-            
+            document.getElementById('info-btn')?.addEventListener('click', showInfo);
+            document.getElementById('modal-close-btn')?.addEventListener('click', hideInfo);
+            document.getElementById('force-reload-item')?.addEventListener('click', forceReload);
             if (musicBtn) musicBtn.style.opacity = '0.5';
             debugLog('✅ Кнопки привязаны');
         });
