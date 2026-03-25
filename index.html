@@ -119,11 +119,11 @@
             100% { text-shadow: 0 0 20px #2ea6ff; }
         }
         
-        /* Значок над кнопкой (простая галочка/крестик без кружка) */
+        /* Значок над кнопкой (ближе к кнопке) */
         .badge-icon {
             position: absolute;
-            top: -12px;
-            right: -8px;
+            top: -5px;
+            right: -5px;
             font-size: 14px;
             font-weight: bold;
             z-index: 600;
@@ -142,7 +142,7 @@
             color: #6bff6b;
         }
         
-        /* Счётчик бананов — как было (коричневый фон) */
+        /* Счётчик бананов */
         .banana-count-badge {
             position: absolute;
             top: -5px;
@@ -319,7 +319,7 @@
     
     <div id="gallery">
         <div id="debug-panel">
-            <div class="debug-entry">🔍 v15.3 - ГАЛОЧКИ ✔️</div>
+            <div class="debug-entry">🔍 v15.4 - ОТЛАДКА</div>
         </div>
         
         <div id="badges">
@@ -363,7 +363,7 @@
                 <div class="modal-icon">🍓</div>
                 <div class="modal-text">
                     <div class="modal-text-title">Клубничка</div>
-                    <div class="modal-text-desc">Для подписчиков канала <span id="sub-status-modal">(✔️ у вас есть / ✖️ у вас нет)</span></div>
+                    <div class="modal-text-desc">Для подписчиков канала <span id="sub-status-modal"></span></div>
                 </div>
             </div>
             
@@ -371,7 +371,7 @@
                 <div class="modal-icon">🍌</div>
                 <div class="modal-text">
                     <div class="modal-text-title">Банан</div>
-                    <div class="modal-text-desc">3 банана на пост. Разблокированные фото сохраняются</div>
+                    <div class="modal-text-desc">3 банана на пост</div>
                 </div>
             </div>
             
@@ -387,7 +387,7 @@
                 <div class="modal-icon">💾</div>
                 <div class="modal-text">
                     <div class="modal-text-title">Сохранить</div>
-                    <div class="modal-text-desc">Доступно подписчикам 🍓 или после покупки 🪙</div>
+                    <div class="modal-text-desc">Доступно подписчикам или после покупки</div>
                 </div>
             </div>
             
@@ -395,20 +395,20 @@
                 <div class="modal-icon">🎵</div>
                 <div class="modal-text">
                     <div class="modal-text-title">Музыка</div>
-                    <div class="modal-text-desc">Включить/выключить фоновую музыку</div>
+                    <div class="modal-text-desc">Включить/выключить</div>
                 </div>
             </div>
             
             <div class="modal-item" id="force-reload-item">
                 <div class="modal-icon">🔄</div>
                 <div class="modal-text">
-                    <div class="modal-text-title">Принудительно обновить</div>
-                    <div class="modal-text-desc">Очистить кэш и перезагрузить</div>
+                    <div class="modal-text-title">Обновить</div>
+                    <div class="modal-text-desc">Перезагрузить галерею</div>
                 </div>
             </div>
             
-            <div class="offline-note" id="offline-note" style="display: none;">📴 Режим оффлайн - статистика не отправляется</div>
-            <button class="modal-close" id="modal-close-btn">Понятно</button>
+            <div class="offline-note" id="offline-note" style="display: none;">📴 Оффлайн режим</div>
+            <button class="modal-close" id="modal-close-btn">Закрыть</button>
         </div>
     </div>
     
@@ -416,7 +416,7 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v15.3 - ГАЛОЧКИ ✔️');
+        console.log('🚀 v15.4 - ОТЛАДКА');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -850,7 +850,7 @@
             const canSave = state.isSubscribed || state.hasPurchased;
             
             if (!canSave) {
-                showToast('🍓 Сохранить фото можно только подписчикам 🍓 или после покупки поста 🪙');
+                showToast('🍓 Сохранить фото можно только подписчикам или после покупки поста');
                 return;
             }
             
@@ -903,14 +903,14 @@
         }
         
         function updateUI() {
-            // Счётчик бананов (коричневый фон, как было)
+            // Счётчик бананов
             const bananaBadge = document.getElementById('banana-count-badge');
             if (bananaBadge) {
                 bananaBadge.textContent = state.bananasLeft;
                 bananaBadge.style.display = state.bananasLeft >= 0 ? 'flex' : 'none';
             }
             
-            // Галочка/крестик над клубничкой (✔️ или ✖️)
+            // Галочка/крестик над клубничкой
             const subBadgeIcon = document.getElementById('subscribed-badge-icon');
             if (subBadgeIcon) {
                 if (state.isSubscribed) {
@@ -924,7 +924,7 @@
                 }
             }
             
-            // Галочка над монетой (✔️)
+            // Галочка над монетой
             const purchasedBadgeIcon = document.getElementById('purchased-badge-icon');
             if (purchasedBadgeIcon) {
                 if (state.hasPurchased) {
@@ -936,24 +936,22 @@
                 }
             }
             
-            // Модальное окно
+            // Модальное окно (упрощённо)
             const subStatusModal = document.getElementById('sub-status-modal');
             if (subStatusModal) {
-                subStatusModal.textContent = state.isSubscribed ? '(✔️ у вас есть)' : '(✖️ у вас нет)';
+                subStatusModal.textContent = state.isSubscribed ? '✔️ есть' : '✖️ нет';
             }
             
             const purchasedStatusModal = document.getElementById('purchased-status-modal');
             if (purchasedStatusModal) {
-                purchasedStatusModal.textContent = state.hasPurchased ? '✔️ куплен' : '';
+                purchasedStatusModal.textContent = state.hasPurchased ? '✔️' : '';
             }
             
-            // Кнопка сохранения всегда активна (тост покажет ошибку)
             const saveBtn = document.getElementById('save-btn');
             if (saveBtn) {
                 saveBtn.classList.remove('disabled');
             }
             
-            // Кнопка банана активна (тост покажет подсказку при 0 бананов)
             const bananaBtn = document.getElementById('banana-btn');
             if (bananaBtn) {
                 if (state.offlineMode) {
