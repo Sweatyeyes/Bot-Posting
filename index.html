@@ -9,45 +9,316 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #000; color: #fff; font-family: sans-serif; height: 100vh; overflow: hidden; }
-        #loading { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; gap: 20px; }
-        .spinner { width: 40px; height: 40px; border: 3px solid #333; border-top-color: #2ea6ff; border-radius: 50%; animation: spin 1s linear infinite; }
+        
+        #loading { 
+            position: fixed; 
+            inset: 0; 
+            background: #000; 
+            display: flex; 
+            flex-direction: column;
+            align-items: center; 
+            justify-content: center; 
+            z-index: 100; 
+            gap: 20px;
+        }
+        .spinner { 
+            width: 40px; 
+            height: 40px; 
+            border: 3px solid #333; 
+            border-top-color: #2ea6ff; 
+            border-radius: 50%; 
+            animation: spin 1s linear infinite; 
+        }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .loading-text { color: #888; }
-        #gallery { display: none; height: 100vh; position: relative; background: #000; }
-        #image-container { position: absolute; top: 0; left: 0; right: 0; bottom: 80px; display: flex; align-items: center; justify-content: center; background: #000; z-index: 1; }
-        #image { max-width: 100%; max-height: 100%; object-fit: contain; opacity: 0; transition: opacity 0.2s; }
+        .loading-text { color: #888; font-size: 14px; }
+        
+        #gallery { 
+            display: none; 
+            height: 100vh; 
+            position: relative; 
+            background: #000;
+        }
+        
+        #image-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            z-index: 1;
+        }
+        
+        #image { 
+            max-width: 100%; 
+            max-height: 100%; 
+            object-fit: contain; 
+            opacity: 0; 
+            transition: opacity 0.2s; 
+        }
         #image.loaded { opacity: 1; }
-        #nav-left, #nav-right { position: absolute; top: 0; bottom: 80px; width: 30%; z-index: 1000; cursor: pointer; background: transparent; }
+        
+        #nav-left, #nav-right { 
+            position: absolute; 
+            top: 0; 
+            bottom: 80px;
+            width: 30%; 
+            z-index: 1000;
+            cursor: pointer; 
+            background: transparent;
+        }
         #nav-left { left: 0; }
         #nav-right { right: 0; }
-        #bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 80px; background: linear-gradient(to top, #000, transparent); display: flex; align-items: center; justify-content: space-around; padding: 0 10px; z-index: 500; }
-        .bottom-btn { background: transparent; border: none; color: white; font-size: 32px; cursor: pointer; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; padding: 0; position: relative; }
+        
+        #bottom-bar { 
+            position: absolute; 
+            bottom: 0; 
+            left: 0;
+            right: 0;
+            height: 80px; 
+            background: linear-gradient(to top, #000, transparent); 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-around; 
+            padding: 0 10px; 
+            z-index: 500;
+        }
+        
+        .bottom-btn {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 32px;
+            cursor: pointer;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            text-shadow: 0 2px 10px rgba(255, 255, 255, 0.3);
+            padding: 0;
+            position: relative;
+        }
+        
         .bottom-btn:active { transform: scale(0.9); }
         .bottom-btn.disabled { opacity: 0.3; pointer-events: none; }
-        .banana-count-badge { position: absolute; top: -5px; right: -5px; background: #8B4513; color: white; font-size: 14px; font-weight: bold; min-width: 22px; height: 22px; border-radius: 12px; display: flex; align-items: center; justify-content: center; padding: 0 5px; border: 2px solid #ffd700; }
-        #counter { color: white; font-size: 16px; min-width: 70px; text-align: center; display: flex; align-items: center; gap: 10px; }
-        #save-btn { font-size: 24px; cursor: pointer; background: transparent; border: none; color: white; padding: 0 5px; }
-        #save-btn.disabled { opacity: 0.3; pointer-events: none; }
-        #badges { position: absolute; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 1500; }
-        .badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
-        #subscribed-badge { background: #ffd700; color: #000; display: none; }
-        #purchased-badge { background: #2ea6ff; color: #fff; display: none; }
-        #offline-badge { background: #666; color: #fff; display: none; }
-        #info-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.95); backdrop-filter: blur(10px); z-index: 2000; display: none; align-items: center; justify-content: center; padding: 20px; }
+        .bottom-btn.offline { opacity: 0.7; filter: grayscale(50%); }
+        
+        .music-btn-off {
+            filter: grayscale(100%);
+            opacity: 0.5;
+        }
+        
+        .music-btn-playing { animation: pulse 1s infinite; }
+        @keyframes pulse {
+            0% { text-shadow: 0 0 5px #2ea6ff; }
+            100% { text-shadow: 0 0 20px #2ea6ff; }
+        }
+        
+        /* Значки над кнопками */
+        .badge-icon {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #2d2d2d;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            min-width: 22px;
+            height: 22px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 5px;
+            border: 2px solid;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            z-index: 600;
+            background: #1a1a1a;
+        }
+        
+        .badge-icon.subscribed-true {
+            border-color: #ffd700;
+            background: #ffd700;
+            color: #000;
+        }
+        
+        .badge-icon.subscribed-false {
+            border-color: #ff6b6b;
+            background: #ff6b6b;
+            color: #fff;
+        }
+        
+        .badge-icon.purchased-true {
+            border-color: #2ea6ff;
+            background: #2ea6ff;
+            color: #fff;
+        }
+        
+        .banana-count-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #8B4513;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            min-width: 22px;
+            height: 22px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 5px;
+            border: 2px solid #ffd700;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            z-index: 600;
+        }
+        
+        #counter {
+            color: white;
+            font-size: 16px;
+            font-weight: 500;
+            min-width: 70px;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        #save-btn {
+            font-size: 24px;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            color: white;
+            transition: all 0.2s ease;
+            padding: 0 5px;
+        }
+        
+        #save-btn:active { transform: scale(0.9); }
+        
+        #badges {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 1500;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        
+        .badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        #offline-badge {
+            background: #666;
+            color: #fff;
+            display: none;
+        }
+        
+        #info-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
         #info-modal.active { display: flex; }
-        .modal-content { background: #2d2d2d; border-radius: 20px; padding: 25px; max-width: 350px; width: 100%; border: 1px solid #404040; max-height: 80vh; overflow-y: auto; }
+        
+        .modal-content {
+            background: #2d2d2d;
+            border-radius: 20px;
+            padding: 25px;
+            max-width: 350px;
+            width: 100%;
+            border: 1px solid #404040;
+            animation: slideUp 0.3s ease;
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
         .modal-title { color: #ffd700; font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 20px; }
         .modal-item { display: flex; align-items: center; gap: 15px; padding: 12px 0; border-bottom: 1px solid #404040; cursor: pointer; }
         .modal-item:last-child { border-bottom: none; }
         .modal-icon { font-size: 32px; width: 50px; text-align: center; }
         .modal-text-title { font-weight: bold; color: #2ea6ff; }
         .modal-text-desc { font-size: 14px; color: #b1b1b1; }
-        .modal-close { background: #2ea6ff; color: white; border: none; padding: 12px; border-radius: 10px; font-size: 16px; font-weight: bold; width: 100%; margin-top: 20px; cursor: pointer; }
-        #toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(300px); background: rgba(0,0,0,0.9); color: white; padding: 10px 20px; border-radius: 30px; font-size: 14px; z-index: 3000; border: 1px solid #2ea6ff; transition: transform 0.3s; white-space: nowrap; opacity: 0; }
+        .offline-note { margin-top: 15px; padding: 10px; background: #333; border-radius: 10px; font-size: 13px; color: #ffaa00; text-align: center; }
+        .modal-close { background: #2ea6ff; color: white; border: none; padding: 12px 20px; border-radius: 10px; font-size: 16px; font-weight: bold; width: 100%; margin-top: 20px; cursor: pointer; }
+        
+        #toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%) translateY(300px);
+            background: rgba(0,0,0,0.9);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-size: 14px;
+            z-index: 3000;
+            border: 1px solid #2ea6ff;
+            transition: transform 0.3s;
+            white-space: nowrap;
+            opacity: 0;
+        }
         #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-        #error { display: none; text-align: center; padding: 20px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #ff6b6b; background: rgba(0,0,0,0.8); border-radius: 10px; width: 80%; z-index: 2000; }
-        #debug-panel { position: absolute; bottom: 90px; left: 10px; right: 10px; background: rgba(0,0,0,0.95); color: #0f0; font-size: 11px; padding: 10px; border-radius: 5px; display: block; z-index: 2000; max-height: 300px; overflow-y: auto; border: 2px solid #ffaa00; font-family: monospace; }
-        .debug-entry { border-bottom: 1px solid #333; padding: 3px 0; word-break: break-all; }
+        #toast.warning { border-color: #ffaa00; background: rgba(0,0,0,0.95); }
+        
+        #error {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2000;
+            color: #ff6b6b;
+            font-size: 18px;
+            background: rgba(0,0,0,0.8);
+            border-radius: 10px;
+            width: 80%;
+        }
+        #error small { display: block; margin-top: 10px; color: #999; font-size: 14px; }
+        
+        #debug-panel {
+            position: absolute;
+            bottom: 90px;
+            left: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.95);
+            color: #0f0;
+            font-size: 11px;
+            padding: 10px;
+            border-radius: 5px;
+            display: block;
+            z-index: 2000;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 2px solid #ffaa00;
+            font-family: monospace;
+        }
+        
+        .debug-entry { border-bottom: 1px solid #333; padding: 3px 0; font-family: monospace; word-break: break-all; }
         .debug-error { color: #ff6b6b; }
         .debug-success { color: #6bff6b; }
         .debug-warning { color: #ffaa00; }
@@ -56,44 +327,112 @@
 </head>
 <body>
     <audio id="bg-music" loop preload="auto"><source src="song.mp3" type="audio/mpeg"></audio>
-    <div id="loading"><div class="spinner"></div><div class="loading-text">🔄 Загрузка галереи...</div></div>
+    
+    <div id="loading">
+        <div class="spinner"></div>
+        <div class="loading-text">🔄 Загрузка галереи...</div>
+    </div>
+    
     <div id="gallery">
-        <div id="debug-panel"><div class="debug-entry">🔍 v14.1 - ПРАВИЛЬНАЯ ЛОГИКА ДОСТУПА</div></div>
+        <div id="debug-panel">
+            <div class="debug-entry">🔍 v15.1 - НОВЫЕ ЗНАЧКИ</div>
+        </div>
+        
         <div id="badges">
-            <div id="subscribed-badge" class="badge">🍓 Подписчик</div>
-            <div id="purchased-badge" class="badge">🪙 Куплено</div>
             <div id="offline-badge" class="badge">📴 Оффлайн</div>
         </div>
-        <div id="nav-left"></div><div id="nav-right"></div>
-        <div id="image-container"><img id="image" src="" onload="this.classList.add('loaded')" onerror="onImageError()"></div>
+        
+        <div id="nav-left"></div>
+        <div id="nav-right"></div>
+        
+        <div id="image-container">
+            <img id="image" src="" onload="this.classList.add('loaded')" onerror="onImageError()">
+        </div>
+        
         <div id="bottom-bar">
-            <button class="bottom-btn" id="strawberry-btn" title="Клубничка">🍓</button>
-            <button class="bottom-btn" id="banana-btn" title="Потратить банан">🍌<span id="banana-count-badge" class="banana-count-badge">0</span></button>
+            <button class="bottom-btn" id="strawberry-btn" title="Клубничка">
+                🍓
+                <span id="subscribed-badge-icon" class="badge-icon" style="display: none;"></span>
+            </button>
+            <button class="bottom-btn" id="banana-btn" title="Потратить банан">
+                🍌
+                <span id="banana-count-badge" class="banana-count-badge">0</span>
+            </button>
             <div id="counter">
-                <button class="bottom-btn" id="coin-btn" title="Купить пост">🪙</button>
+                <button class="bottom-btn" id="coin-btn" title="Купить пост">
+                    🪙
+                    <span id="purchased-badge-icon" class="badge-icon" style="display: none;"></span>
+                </button>
                 <span id="counter-text">1/1</span>
             </div>
-            <button class="bottom-btn" id="save-btn" title="Сохранить фото (только для подписчиков)">💾</button>
+            <button class="bottom-btn" id="save-btn" title="Сохранить фото">💾</button>
             <button class="bottom-btn" id="music-btn" title="Музыка">🎵</button>
             <button class="bottom-btn" id="info-btn" title="Помощь">❓</button>
         </div>
     </div>
+    
     <div id="info-modal" onclick="hideInfo(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
             <div class="modal-title">🍓 ИНФОРМАЦИЯ</div>
-            <div class="modal-item"><div class="modal-icon">🍓</div><div class="modal-text"><div class="modal-text-title">Клубничка</div><div class="modal-text-desc">Для подписчиков канала <span id="sub-status">(у вас её пока нет)</span></div></div></div>
-            <div class="modal-item"><div class="modal-icon">🍌</div><div class="modal-text"><div class="modal-text-title">Банан</div><div class="modal-text-desc">3 банана на пост. Разблокированные фото сохраняются</div></div></div>
-            <div class="modal-item"><div class="modal-icon">🪙</div><div class="modal-text"><div class="modal-text-title">Монета</div><div class="modal-text-desc">Купить весь пост (199₽)</div></div></div>
-            <div class="modal-item"><div class="modal-icon">💾</div><div class="modal-text"><div class="modal-text-title">Сохранить</div><div class="modal-text-desc">Доступно только подписчикам</div></div></div>
-            <div class="modal-item"><div class="modal-icon">🎵</div><div class="modal-text"><div class="modal-text-title">Музыка</div><div class="modal-text-desc">Включить/выключить фоновую музыку</div></div></div>
-            <div class="modal-item" id="force-reload-item"><div class="modal-icon">🔄</div><div class="modal-text"><div class="modal-text-title">Перезагрузить</div><div class="modal-text-desc">Обновить галерею</div></div></div>
-            <button class="modal-close" id="modal-close-btn">Закрыть</button>
+            
+            <div class="modal-item">
+                <div class="modal-icon">🍓</div>
+                <div class="modal-text">
+                    <div class="modal-text-title">Клубничка</div>
+                    <div class="modal-text-desc">Для подписчиков канала <span id="sub-status-modal">(✅ у вас есть / ❌ у вас нет)</span></div>
+                </div>
+            </div>
+            
+            <div class="modal-item">
+                <div class="modal-icon">🍌</div>
+                <div class="modal-text">
+                    <div class="modal-text-title">Банан</div>
+                    <div class="modal-text-desc">3 банана на пост. Разблокированные фото сохраняются</div>
+                </div>
+            </div>
+            
+            <div class="modal-item">
+                <div class="modal-icon">🪙</div>
+                <div class="modal-text">
+                    <div class="modal-text-title">Монета</div>
+                    <div class="modal-text-desc">Купить весь пост (99₽) <span id="purchased-status-modal"></span></div>
+                </div>
+            </div>
+            
+            <div class="modal-item">
+                <div class="modal-icon">💾</div>
+                <div class="modal-text">
+                    <div class="modal-text-title">Сохранить</div>
+                    <div class="modal-text-desc">Доступно подписчикам 🍓 или после покупки 🪙</div>
+                </div>
+            </div>
+            
+            <div class="modal-item">
+                <div class="modal-icon">🎵</div>
+                <div class="modal-text">
+                    <div class="modal-text-title">Музыка</div>
+                    <div class="modal-text-desc">Включить/выключить фоновую музыку</div>
+                </div>
+            </div>
+            
+            <div class="modal-item" id="force-reload-item">
+                <div class="modal-icon">🔄</div>
+                <div class="modal-text">
+                    <div class="modal-text-title">Принудительно обновить</div>
+                    <div class="modal-text-desc">Очистить кэш и перезагрузить</div>
+                </div>
+            </div>
+            
+            <div class="offline-note" id="offline-note" style="display: none;">📴 Режим оффлайн - статистика не отправляется</div>
+            <button class="modal-close" id="modal-close-btn">Понятно</button>
         </div>
     </div>
-    <div id="toast"></div><div id="error"></div>
-
+    
+    <div id="toast"></div>
+    <div id="error"></div>
+    
     <script>
-        console.log('🚀 v14.1 - ПРАВИЛЬНАЯ ЛОГИКА ДОСТУПА');
+        console.log('🚀 v15.1 - НОВЫЕ ЗНАЧКИ');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -247,9 +586,6 @@
         async function loadGallery() {
             debugLog('🔄 Загрузка галереи...');
             debugLog(`📁 Пост: ${state.postId}`);
-            debugLog(`🍓 Подписка: ${state.isSubscribed}`);
-            debugLog(`🪙 Куплен: ${state.hasPurchased}`);
-            debugLog(`🍌 Разблокировано бананами: ${state.unlockedPhotos.length}`);
             
             if (!state.postId) {
                 showError('Не указан ID поста');
@@ -276,7 +612,7 @@
             const baseUrl = `https://raw.githubusercontent.com/Sweatyeyes/Bot-Posting/main/posts/${state.postId}`;
             let files = [];
             
-            // 1. Общие фото — всегда без блюра
+            // Общие фото
             for (const fileName of filesData.general || []) {
                 if (fileName.match(/\.(jpg|jpeg|png)$/i)) {
                     files.push({
@@ -289,14 +625,11 @@
                 }
             }
             
-            // 2. Банановые фото — ПОДПИСЧИКИ И КУПИВШИЕ ВИДЯТ ВСЁ
+            // Банановые фото
             const bananaOriginals = (filesData.banana || []).filter(f => 
                 !f.startsWith('banana_banana_banana_') && f.match(/\.(jpg|jpeg|png)$/i)
             );
-            debugLog(`🍌 Найдено оригиналов бананов: ${bananaOriginals.length}`);
-            
             for (const originalName of bananaOriginals) {
-                // Подписчик ИЛИ купил пост ИЛИ потрачен банан
                 const isUnlocked = state.isSubscribed || state.hasPurchased || state.unlockedPhotos.includes(originalName);
                 const blurName = findBlurName(originalName, filesData.banana, 'banana');
                 const hasBlur = !!blurName;
@@ -304,13 +637,10 @@
                 let imageUrl;
                 if (isUnlocked) {
                     imageUrl = `${baseUrl}/banana/${originalName}`;
-                    debugLog(`🍌 ${originalName}: РАЗБЛОКИРОВАНО (sub=${state.isSubscribed}, purchased=${state.hasPurchased})`, 'success');
                 } else if (hasBlur) {
                     imageUrl = `${baseUrl}/banana/${blurName}`;
-                    debugLog(`🍌 ${originalName}: БЛЮР (нет доступа)`);
                 } else {
                     imageUrl = 'https://via.placeholder.com/600x800/333/fff?text=No+Access';
-                    debugLog(`🍌 ${originalName}: НЕТ БЛЮРА → заглушка`, 'warning');
                 }
                 
                 files.push({
@@ -324,12 +654,10 @@
                 });
             }
             
-            // 3. Клубничные фото — ТОЛЬКО ДЛЯ ПОДПИСЧИКОВ И КУПИВШИХ
+            // Клубничные фото
             const strawberryOriginals = (filesData.strawberry || []).filter(f => 
                 !f.startsWith('strawberry_strawberry_strawberry_') && f.match(/\.(jpg|jpeg|png)$/i)
             );
-            debugLog(`🍓 Найдено оригиналов клубничных: ${strawberryOriginals.length}`);
-            
             for (const originalName of strawberryOriginals) {
                 const hasAccess = state.hasPurchased || state.isSubscribed;
                 const blurName = findBlurName(originalName, filesData.strawberry, 'strawberry');
@@ -338,13 +666,10 @@
                 let imageUrl;
                 if (hasAccess) {
                     imageUrl = `${baseUrl}/strawberry/${originalName}`;
-                    debugLog(`🍓 ${originalName}: ДОСТУП ЕСТЬ (sub=${state.isSubscribed}, purchased=${state.hasPurchased})`, 'success');
                 } else if (hasBlur) {
                     imageUrl = `${baseUrl}/strawberry/${blurName}`;
-                    debugLog(`🍓 ${originalName}: БЛЮР (нет доступа)`);
                 } else {
                     imageUrl = 'https://via.placeholder.com/600x800/333/fff?text=No+Access';
-                    debugLog(`🍓 ${originalName}: НЕТ БЛЮРА → заглушка`, 'warning');
                 }
                 
                 files.push({
@@ -364,7 +689,7 @@
             }
             
             state.files = files;
-            debugLog(`✅ Загружено ${files.length} фото (${bananaOriginals.length} банановых, ${strawberryOriginals.length} клубничных)`, 'success');
+            debugLog(`✅ Загружено ${files.length} фото`, 'success');
             
             document.getElementById('loading').style.display = 'none';
             document.getElementById('gallery').style.display = 'block';
@@ -388,7 +713,6 @@
             if (counterText) {
                 counterText.innerText = `${state.index+1}/${state.files.length}`;
             }
-            debugLog(`🖼 ${state.index+1}/${state.files.length}: ${file.name} ${file.isBlurred ? '🔒' : '✅'}`);
         }
         
         function next() { if (state.files && state.files.length) showImage(state.index + 1); }
@@ -408,7 +732,6 @@
                 right.parentNode.replaceChild(newRight, right); 
                 newRight.addEventListener('click', () => next()); 
             }
-            debugLog('✅ Навигация настроена');
         }
         
         document.addEventListener('keydown', (e) => {
@@ -499,8 +822,9 @@
                 showToast('✅ Уже разблокировано');
                 return;
             }
+            
             if (state.bananasLeft <= 0) {
-                showToast('❌ Нет бананов');
+                showToast('🍌 У вас 0 бананов. Купите 🪙 доступ ко всем фото за 99₽ или подпишитесь на 🍓');
                 return;
             }
             
@@ -539,13 +863,17 @@
         }
         
         async function saveCurrentPhoto() {
-            if (!state.isSubscribed) {
-                showToast('🍓 Только для подписчиков!');
-                if (tg) tg.openLink('https://t.me/neuroticababes_bot');
+            // Проверяем доступ: подписчик ИЛИ купил пост
+            const canSave = state.isSubscribed || state.hasPurchased;
+            
+            if (!canSave) {
+                showToast('🍓 Сохранить фото можно только подписчикам 🍓 или после покупки поста 🪙');
                 return;
             }
+            
             const f = state.files[state.index];
             if (!f) return;
+            
             try {
                 const res = await fetch(f.url);
                 const blob = await res.blob();
@@ -553,11 +881,13 @@
                 const link = document.createElement('a');
                 link.href = url;
                 link.download = f.name;
+                document.body.appendChild(link);
                 link.click();
+                document.body.removeChild(link);
                 URL.revokeObjectURL(url);
                 showToast('✅ Фото сохранено!');
             } catch(e) { 
-                showToast('❌ Ошибка'); 
+                showToast('❌ Ошибка сохранения'); 
             }
         }
         
@@ -590,42 +920,65 @@
         }
         
         function updateUI() {
+            // Обновляем счётчик бананов
             const bananaBadge = document.getElementById('banana-count-badge');
             if (bananaBadge) {
                 bananaBadge.textContent = state.bananasLeft;
-                bananaBadge.style.display = state.bananasLeft > 0 ? 'flex' : 'none';
+                bananaBadge.style.display = state.bananasLeft >= 0 ? 'flex' : 'none';
             }
             
-            const subStatus = document.getElementById('sub-status');
-            if (subStatus) {
-                subStatus.textContent = state.isSubscribed ? '(есть) ✅' : '(нет) ❌';
-                subStatus.style.color = state.isSubscribed ? '#ffd700' : '#ff6b6b';
-            }
-            
-            const subBadge = document.getElementById('subscribed-badge');
-            if (subBadge) subBadge.style.display = state.isSubscribed ? 'block' : 'none';
-            const purchasedBadge = document.getElementById('purchased-badge');
-            if (purchasedBadge) purchasedBadge.style.display = state.hasPurchased ? 'block' : 'none';
-            
-            const saveBtn = document.getElementById('save-btn');
-            if (saveBtn) {
+            // Обновляем значок подписки над клубничкой
+            const subBadgeIcon = document.getElementById('subscribed-badge-icon');
+            if (subBadgeIcon) {
                 if (state.isSubscribed) {
-                    saveBtn.classList.remove('disabled');
+                    subBadgeIcon.textContent = '✅';
+                    subBadgeIcon.className = 'badge-icon subscribed-true';
+                    subBadgeIcon.style.display = 'flex';
                 } else {
-                    saveBtn.classList.add('disabled');
+                    subBadgeIcon.textContent = '❌';
+                    subBadgeIcon.className = 'badge-icon subscribed-false';
+                    subBadgeIcon.style.display = 'flex';
                 }
             }
             
+            // Обновляем значок покупки над монетой
+            const purchasedBadgeIcon = document.getElementById('purchased-badge-icon');
+            if (purchasedBadgeIcon) {
+                if (state.hasPurchased) {
+                    purchasedBadgeIcon.textContent = '✅';
+                    purchasedBadgeIcon.className = 'badge-icon purchased-true';
+                    purchasedBadgeIcon.style.display = 'flex';
+                } else {
+                    purchasedBadgeIcon.style.display = 'none';
+                }
+            }
+            
+            // Обновляем модальное окно
+            const subStatusModal = document.getElementById('sub-status-modal');
+            if (subStatusModal) {
+                subStatusModal.textContent = state.isSubscribed ? '(✅ у вас есть)' : '(❌ у вас нет)';
+            }
+            
+            const purchasedStatusModal = document.getElementById('purchased-status-modal');
+            if (purchasedStatusModal) {
+                purchasedStatusModal.textContent = state.hasPurchased ? '✅ куплен' : '';
+            }
+            
+            // Обновляем кнопку сохранения (она всегда активна, но тост покажет ошибку)
+            const saveBtn = document.getElementById('save-btn');
+            if (saveBtn) {
+                saveBtn.classList.remove('disabled');
+            }
+            
+            // Обновляем кнопку банана (всегда активна, но тост покажет подсказку)
             const bananaBtn = document.getElementById('banana-btn');
             if (bananaBtn) {
-                if (state.offlineMode || state.bananasLeft <= 0) {
+                if (state.offlineMode) {
                     bananaBtn.classList.add('disabled');
                 } else {
                     bananaBtn.classList.remove('disabled');
                 }
             }
-            
-            debugLog(`🔄 UI обновлён: бананов=${state.bananasLeft}, подписка=${state.isSubscribed}, куплен=${state.hasPurchased}, разблокировано=${state.unlockedPhotos.length}`);
         }
         
         function showInfo() { 
@@ -645,7 +998,7 @@
             if (!toast) return;
             toast.textContent = text;
             toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 2000);
+            setTimeout(() => toast.classList.remove('show'), 2500);
         }
         function showError(msg) {
             document.getElementById('loading').style.display = 'none';
