@@ -142,24 +142,24 @@
             color: #6bff6b;
         }
         
-        /* Счётчик бананов — прозрачный фон, золотая обводка */
+        /* Счётчик бананов — как было (коричневый фон) */
         .banana-count-badge {
             position: absolute;
-            top: -8px;
-            right: -8px;
-            background: rgba(0, 0, 0, 0.6);
+            top: -5px;
+            right: -5px;
+            background: #8B4513;
             color: white;
-            font-size: 12px;
+            font-size: 14px;
             font-weight: bold;
-            min-width: 20px;
-            height: 20px;
+            min-width: 22px;
+            height: 22px;
             border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 0 4px;
-            border: 1.5px solid #ffd700;
-            backdrop-filter: blur(2px);
+            padding: 0 5px;
+            border: 2px solid #ffd700;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
             z-index: 600;
         }
         
@@ -319,7 +319,7 @@
     
     <div id="gallery">
         <div id="debug-panel">
-            <div class="debug-entry">🔍 v15.2 - НОВЫЕ ЗНАЧКИ (прозрачный счётчик)</div>
+            <div class="debug-entry">🔍 v15.3 - ГАЛОЧКИ ✔️</div>
         </div>
         
         <div id="badges">
@@ -363,7 +363,7 @@
                 <div class="modal-icon">🍓</div>
                 <div class="modal-text">
                     <div class="modal-text-title">Клубничка</div>
-                    <div class="modal-text-desc">Для подписчиков канала <span id="sub-status-modal">(✅ у вас есть / ❌ у вас нет)</span></div>
+                    <div class="modal-text-desc">Для подписчиков канала <span id="sub-status-modal">(✔️ у вас есть / ✖️ у вас нет)</span></div>
                 </div>
             </div>
             
@@ -416,7 +416,7 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v15.2 - НОВЫЕ ЗНАЧКИ (прозрачный счётчик)');
+        console.log('🚀 v15.3 - ГАЛОЧКИ ✔️');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -903,32 +903,32 @@
         }
         
         function updateUI() {
-            // Счётчик бананов (прозрачный фон)
+            // Счётчик бананов (коричневый фон, как было)
             const bananaBadge = document.getElementById('banana-count-badge');
             if (bananaBadge) {
                 bananaBadge.textContent = state.bananasLeft;
                 bananaBadge.style.display = state.bananasLeft >= 0 ? 'flex' : 'none';
             }
             
-            // Галочка/крестик над клубничкой (без кружка)
+            // Галочка/крестик над клубничкой (✔️ или ✖️)
             const subBadgeIcon = document.getElementById('subscribed-badge-icon');
             if (subBadgeIcon) {
                 if (state.isSubscribed) {
-                    subBadgeIcon.textContent = '✅';
+                    subBadgeIcon.textContent = '✔️';
                     subBadgeIcon.className = 'badge-icon subscribed-true';
                     subBadgeIcon.style.display = 'flex';
                 } else {
-                    subBadgeIcon.textContent = '❌';
+                    subBadgeIcon.textContent = '✖️';
                     subBadgeIcon.className = 'badge-icon subscribed-false';
                     subBadgeIcon.style.display = 'flex';
                 }
             }
             
-            // Галочка над монетой (без кружка)
+            // Галочка над монетой (✔️)
             const purchasedBadgeIcon = document.getElementById('purchased-badge-icon');
             if (purchasedBadgeIcon) {
                 if (state.hasPurchased) {
-                    purchasedBadgeIcon.textContent = '✅';
+                    purchasedBadgeIcon.textContent = '✔️';
                     purchasedBadgeIcon.className = 'badge-icon purchased-true';
                     purchasedBadgeIcon.style.display = 'flex';
                 } else {
@@ -939,12 +939,12 @@
             // Модальное окно
             const subStatusModal = document.getElementById('sub-status-modal');
             if (subStatusModal) {
-                subStatusModal.textContent = state.isSubscribed ? '(✅ у вас есть)' : '(❌ у вас нет)';
+                subStatusModal.textContent = state.isSubscribed ? '(✔️ у вас есть)' : '(✖️ у вас нет)';
             }
             
             const purchasedStatusModal = document.getElementById('purchased-status-modal');
             if (purchasedStatusModal) {
-                purchasedStatusModal.textContent = state.hasPurchased ? '✅ куплен' : '';
+                purchasedStatusModal.textContent = state.hasPurchased ? '✔️ куплен' : '';
             }
             
             // Кнопка сохранения всегда активна (тост покажет ошибку)
