@@ -393,7 +393,7 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v16.0 - ОФЛАЙН-РЕЖИМ С ПРЯМОЙ ЗАГРУЗКОЙ');
+        console.log('🚀 v16.1 - МНОГОСТРОЧНЫЕ ТОСТЫ');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -777,9 +777,41 @@
             }
         }
         
+        // Многострочный тост
+        function showMultilineToast(text, duration = 4000) {
+            const toast = document.getElementById('toast');
+            if (!toast) return;
+            
+            // Устанавливаем белый цвет текста и перенос строк
+            toast.style.whiteSpace = 'normal';
+            toast.style.wordBreak = 'break-word';
+            toast.style.maxWidth = '80%';
+            toast.style.width = 'auto';
+            toast.style.minWidth = '200px';
+            toast.style.textAlign = 'center';
+            toast.style.lineHeight = '1.4';
+            toast.style.padding = '12px 16px';
+            
+            toast.textContent = text;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+                // Возвращаем исходные стили
+                setTimeout(() => {
+                    toast.style.whiteSpace = 'nowrap';
+                    toast.style.maxWidth = '';
+                    toast.style.width = '';
+                    toast.style.minWidth = '';
+                    toast.style.textAlign = '';
+                    toast.style.lineHeight = '';
+                    toast.style.padding = '10px 20px';
+                }, 300);
+            }, duration);
+        }
+        
         async function spendBanana() {
             if (state.botOffline) {
-                showToast('📴 Бот недоступен, бананы нельзя тратить');
+                showMultilineToast('📴 Бот недоступен, бананы нельзя тратить');
                 return;
             }
             
@@ -794,7 +826,7 @@
             }
             
             if (state.bananasLeft <= 0) {
-                showToast('🍌 У вас 0 бананов. Купите 🪙 доступ ко всем фото за 99₽ или подпишитесь на 🍓');
+                showMultilineToast('🍌 У вас 0 бананов.\nКупите 🪙 доступ ко всем фото за 99₽\nили подпишитесь на 🍓');
                 return;
             }
             
@@ -836,7 +868,7 @@
             const canSave = state.isSubscribed || state.hasPurchased;
             
             if (!canSave) {
-                showToast('🍓 Сохранить фото можно только подписчикам или после покупки поста');
+                showMultilineToast('🍓 Сохранить фото можно только\nподписчикам 🍓 или после покупки поста 🪙');
                 return;
             }
             
@@ -862,7 +894,7 @@
         
         function handleCoin() {
             if (state.botOffline) {
-                showToast('📴 Бот недоступен, оплата временно недоступна');
+                showMultilineToast('📴 Бот недоступен,\nоплата временно недоступна');
                 return;
             }
             if (tg) tg.openLink(`https://t.me/${PAYMENT_BOT_USERNAME}?start=buy_vip_${state.postId}`);
@@ -871,7 +903,7 @@
         
         function handleStrawberry() {
             if (state.botOffline) {
-                showToast('📴 Бот недоступен, проверка подписки временно недоступна');
+                showMultilineToast('📴 Бот недоступен,\nпроверка подписки временно недоступна');
                 return;
             }
             if (tg) tg.openLink('https://t.me/neuroticababes_bot');
@@ -979,10 +1011,18 @@
         function showToast(text) {
             const toast = document.getElementById('toast');
             if (!toast) return;
+            toast.style.whiteSpace = 'nowrap';
+            toast.style.maxWidth = '';
+            toast.style.width = '';
+            toast.style.minWidth = '';
+            toast.style.textAlign = '';
+            toast.style.lineHeight = '';
+            toast.style.padding = '10px 20px';
             toast.textContent = text;
             toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 2500);
+            setTimeout(() => toast.classList.remove('show'), 2000);
         }
+        
         function showError(msg) {
             document.getElementById('loading').style.display = 'none';
             document.getElementById('error').style.display = 'block';
