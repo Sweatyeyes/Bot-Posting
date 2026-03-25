@@ -119,63 +119,47 @@
             100% { text-shadow: 0 0 20px #2ea6ff; }
         }
         
-        /* Значки над кнопками */
+        /* Значок над кнопкой (простая галочка/крестик без кружка) */
         .badge-icon {
             position: absolute;
-            top: -8px;
+            top: -12px;
             right: -8px;
-            background: #2d2d2d;
-            color: white;
             font-size: 14px;
             font-weight: bold;
-            min-width: 22px;
-            height: 22px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0 5px;
-            border: 2px solid;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
             z-index: 600;
-            background: #1a1a1a;
+            text-shadow: 0 0 2px rgba(0,0,0,0.5);
         }
         
         .badge-icon.subscribed-true {
-            border-color: #ffd700;
-            background: #ffd700;
-            color: #000;
+            color: #6bff6b;
         }
         
         .badge-icon.subscribed-false {
-            border-color: #ff6b6b;
-            background: #ff6b6b;
-            color: #fff;
+            color: #ff6b6b;
         }
         
         .badge-icon.purchased-true {
-            border-color: #2ea6ff;
-            background: #2ea6ff;
-            color: #fff;
+            color: #6bff6b;
         }
         
+        /* Счётчик бананов — прозрачный фон, золотая обводка */
         .banana-count-badge {
             position: absolute;
-            top: -5px;
-            right: -5px;
-            background: #8B4513;
+            top: -8px;
+            right: -8px;
+            background: rgba(0, 0, 0, 0.6);
             color: white;
-            font-size: 14px;
+            font-size: 12px;
             font-weight: bold;
-            min-width: 22px;
-            height: 22px;
+            min-width: 20px;
+            height: 20px;
             border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 0 5px;
-            border: 2px solid #ffd700;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            padding: 0 4px;
+            border: 1.5px solid #ffd700;
+            backdrop-filter: blur(2px);
             z-index: 600;
         }
         
@@ -335,7 +319,7 @@
     
     <div id="gallery">
         <div id="debug-panel">
-            <div class="debug-entry">🔍 v15.1 - НОВЫЕ ЗНАЧКИ</div>
+            <div class="debug-entry">🔍 v15.2 - НОВЫЕ ЗНАЧКИ (прозрачный счётчик)</div>
         </div>
         
         <div id="badges">
@@ -432,7 +416,7 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v15.1 - НОВЫЕ ЗНАЧКИ');
+        console.log('🚀 v15.2 - НОВЫЕ ЗНАЧКИ (прозрачный счётчик)');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -863,7 +847,6 @@
         }
         
         async function saveCurrentPhoto() {
-            // Проверяем доступ: подписчик ИЛИ купил пост
             const canSave = state.isSubscribed || state.hasPurchased;
             
             if (!canSave) {
@@ -920,14 +903,14 @@
         }
         
         function updateUI() {
-            // Обновляем счётчик бананов
+            // Счётчик бананов (прозрачный фон)
             const bananaBadge = document.getElementById('banana-count-badge');
             if (bananaBadge) {
                 bananaBadge.textContent = state.bananasLeft;
                 bananaBadge.style.display = state.bananasLeft >= 0 ? 'flex' : 'none';
             }
             
-            // Обновляем значок подписки над клубничкой
+            // Галочка/крестик над клубничкой (без кружка)
             const subBadgeIcon = document.getElementById('subscribed-badge-icon');
             if (subBadgeIcon) {
                 if (state.isSubscribed) {
@@ -941,7 +924,7 @@
                 }
             }
             
-            // Обновляем значок покупки над монетой
+            // Галочка над монетой (без кружка)
             const purchasedBadgeIcon = document.getElementById('purchased-badge-icon');
             if (purchasedBadgeIcon) {
                 if (state.hasPurchased) {
@@ -953,7 +936,7 @@
                 }
             }
             
-            // Обновляем модальное окно
+            // Модальное окно
             const subStatusModal = document.getElementById('sub-status-modal');
             if (subStatusModal) {
                 subStatusModal.textContent = state.isSubscribed ? '(✅ у вас есть)' : '(❌ у вас нет)';
@@ -964,13 +947,13 @@
                 purchasedStatusModal.textContent = state.hasPurchased ? '✅ куплен' : '';
             }
             
-            // Обновляем кнопку сохранения (она всегда активна, но тост покажет ошибку)
+            // Кнопка сохранения всегда активна (тост покажет ошибку)
             const saveBtn = document.getElementById('save-btn');
             if (saveBtn) {
                 saveBtn.classList.remove('disabled');
             }
             
-            // Обновляем кнопку банана (всегда активна, но тост покажет подсказку)
+            // Кнопка банана активна (тост покажет подсказку при 0 бананов)
             const bananaBtn = document.getElementById('banana-btn');
             if (bananaBtn) {
                 if (state.offlineMode) {
