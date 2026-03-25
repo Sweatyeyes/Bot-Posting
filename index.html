@@ -119,7 +119,7 @@
             100% { text-shadow: 0 0 20px #2ea6ff; }
         }
         
-        /* Значок над кнопкой (ближе к кнопке) */
+        /* Значок над кнопкой */
         .badge-icon {
             position: absolute;
             top: -5px;
@@ -284,29 +284,10 @@
         }
         #error small { display: block; margin-top: 10px; color: #999; font-size: 14px; }
         
+        /* Отладочная панель скрыта */
         #debug-panel {
-            position: absolute;
-            bottom: 90px;
-            left: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.95);
-            color: #0f0;
-            font-size: 11px;
-            padding: 10px;
-            border-radius: 5px;
-            display: block;
-            z-index: 2000;
-            max-height: 300px;
-            overflow-y: auto;
-            border: 2px solid #ffaa00;
-            font-family: monospace;
+            display: none;
         }
-        
-        .debug-entry { border-bottom: 1px solid #333; padding: 3px 0; font-family: monospace; word-break: break-all; }
-        .debug-error { color: #ff6b6b; }
-        .debug-success { color: #6bff6b; }
-        .debug-warning { color: #ffaa00; }
-        .debug-info { color: #2ea6ff; }
     </style>
 </head>
 <body>
@@ -318,10 +299,6 @@
     </div>
     
     <div id="gallery">
-        <div id="debug-panel">
-            <div class="debug-entry">🔍 v15.4 - ОТЛАДКА</div>
-        </div>
-        
         <div id="badges">
             <div id="offline-badge" class="badge">📴 Оффлайн</div>
         </div>
@@ -416,7 +393,7 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v15.4 - ОТЛАДКА');
+        console.log('🚀 v15.5 - ФИНАЛЬНАЯ');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -467,13 +444,6 @@
         const unlockedParam = urlParams.get('unlocked') || '';
         const urlUnlockedPhotos = unlockedParam ? unlockedParam.split(',') : [];
         
-        console.log('🔍 ПАРАМЕТРЫ:');
-        console.log('  post:', rawPost);
-        console.log('  user:', rawUser);
-        console.log('  subscribed:', rawSubscribed);
-        console.log('  purchased:', rawPurchased);
-        console.log('  bananas:', rawBananas);
-        
         let state = {
             files: [], index: 0, postId: rawPost, userId: rawUser,
             isSubscribed: rawSubscribed, hasPurchased: rawPurchased,
@@ -483,27 +453,9 @@
             filesData: null
         };
         
-        const debugPanel = document.getElementById('debug-panel');
-        function debugLog(msg, type = 'info') {
-            const entry = document.createElement('div');
-            entry.className = 'debug-entry';
-            if (type === 'error') entry.classList.add('debug-error');
-            if (type === 'success') entry.classList.add('debug-success');
-            if (type === 'warning') entry.classList.add('debug-warning');
-            if (type === 'info') entry.classList.add('debug-info');
-            entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-            debugPanel.appendChild(entry);
-            debugPanel.scrollTop = debugPanel.scrollHeight;
-            while(debugPanel.children.length > 50) debugPanel.removeChild(debugPanel.firstChild);
-            console.log(msg);
-        }
-        
-        debugLog(`📊 ИНИЦИАЛИЗАЦИЯ: post=${state.postId}, user=${state.userId}, подписка=${state.isSubscribed}, куплен=${state.hasPurchased}, бананов=${state.bananasLeft}`);
-        
-        // ==================== ПРОВЕРКА ПОКУПКИ ЧЕРЕЗ API ====================
+        // ==================== ПРОВЕРКА ПОКУПКИ ====================
         async function checkPurchase() {
             if (!state.userId || !state.postId) return false;
-            debugLog('🪙 Проверка покупки через API...');
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -517,13 +469,10 @@
                 const data = await res.json();
                 if (data.purchased) {
                     state.hasPurchased = true;
-                    debugLog('🪙 Покупка подтверждена сервером!', 'success');
                     return true;
                 }
-                debugLog('🪙 Покупка не найдена', 'info');
                 return false;
             } catch(e) {
-                debugLog(`⚠️ Не удалось проверить покупку: ${e.message}`, 'warning');
                 return state.hasPurchased;
             }
         }
@@ -531,7 +480,6 @@
         // ==================== ЗАГРУЗКА ФАЙЛОВ ====================
         async function fetchFiles() {
             if (!state.postId) return null;
-            debugLog('📁 Загрузка списка файлов...');
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -542,13 +490,11 @@
                     signal: controller.signal
                 });
                 clearTimeout(timeoutId);
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                if (!res.ok) return null;
                 const data = await res.json();
-                if (data.error) throw new Error(data.error);
-                debugLog(`✅ Файлы: general=${data.general?.length || 0}, banana=${data.banana?.length || 0}, strawberry=${data.strawberry?.length || 0}`, 'success');
+                if (data.error) return null;
                 return data;
             } catch(e) {
-                debugLog(`⚠️ Не удалось загрузить файлы: ${e.message}`, 'warning');
                 return null;
             }
         }
@@ -568,20 +514,15 @@
         }
         
         async function loadGallery() {
-            debugLog('🔄 Загрузка галереи...');
-            debugLog(`📁 Пост: ${state.postId}`);
-            
             if (!state.postId) {
                 showError('Не указан ID поста');
                 return;
             }
             
             await checkPurchase();
-            debugLog(`🪙 Итоговый статус покупки: ${state.hasPurchased}`);
             
             let filesData = await fetchFiles();
             if (!filesData) {
-                debugLog('📴 Офлайн-режим', 'warning');
                 state.offlineMode = true;
                 document.getElementById('offline-badge').style.display = 'block';
                 const cached = localStorage.getItem(`files_${state.postId}`);
@@ -673,7 +614,6 @@
             }
             
             state.files = files;
-            debugLog(`✅ Загружено ${files.length} фото`, 'success');
             
             document.getElementById('loading').style.display = 'none';
             document.getElementById('gallery').style.display = 'block';
@@ -726,7 +666,6 @@
         async function fetchUnlockedPhotos() {
             if (!state.userId || !state.postId) return;
             if (state.offlineMode) return;
-            debugLog('🍌 Запрос разблокированных фото...');
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -740,12 +679,9 @@
                 if (data.unlocked_photos) {
                     state.unlockedPhotos = data.unlocked_photos;
                     state.bananasLeft = data.available_bananas;
-                    debugLog(`🍌 Разблокировано: ${state.unlockedPhotos.length}, бананов: ${state.bananasLeft}`, 'success');
                     updateUI();
                 }
-            } catch(e) {
-                debugLog(`⚠️ Не удалось получить разблокированные: ${e.message}`, 'warning');
-            }
+            } catch(e) {}
         }
         
         async function checkSubscription() {
@@ -903,14 +839,12 @@
         }
         
         function updateUI() {
-            // Счётчик бананов
             const bananaBadge = document.getElementById('banana-count-badge');
             if (bananaBadge) {
                 bananaBadge.textContent = state.bananasLeft;
                 bananaBadge.style.display = state.bananasLeft >= 0 ? 'flex' : 'none';
             }
             
-            // Галочка/крестик над клубничкой
             const subBadgeIcon = document.getElementById('subscribed-badge-icon');
             if (subBadgeIcon) {
                 if (state.isSubscribed) {
@@ -924,7 +858,6 @@
                 }
             }
             
-            // Галочка над монетой
             const purchasedBadgeIcon = document.getElementById('purchased-badge-icon');
             if (purchasedBadgeIcon) {
                 if (state.hasPurchased) {
@@ -936,7 +869,6 @@
                 }
             }
             
-            // Модальное окно (упрощённо)
             const subStatusModal = document.getElementById('sub-status-modal');
             if (subStatusModal) {
                 subStatusModal.textContent = state.isSubscribed ? '✔️ есть' : '✖️ нет';
@@ -948,9 +880,7 @@
             }
             
             const saveBtn = document.getElementById('save-btn');
-            if (saveBtn) {
-                saveBtn.classList.remove('disabled');
-            }
+            if (saveBtn) saveBtn.classList.remove('disabled');
             
             const bananaBtn = document.getElementById('banana-btn');
             if (bananaBtn) {
@@ -1022,7 +952,6 @@
             if (forceReloadItem) forceReloadItem.addEventListener('click', forceReload);
             
             if (musicBtn) musicBtn.style.opacity = '0.5';
-            debugLog('✅ Кнопки привязаны');
         });
         
         init();
