@@ -384,7 +384,7 @@
                 </div>
             </div>
             
-            <div class="offline-note" id="offline-note" style="display: none;">📴 Оффлайн режим</div>
+            <div class="offline-note" id="offline-note" style="display: none;">📴 Оффлайн режим (бот недоступен)</div>
             <button class="modal-close" id="modal-close-btn">Закрыть</button>
         </div>
     </div>
@@ -393,12 +393,13 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v15.5 - ФИНАЛЬНАЯ');
+        console.log('🚀 v16.0 - ОФЛАЙН-РЕЖИМ С ПРЯМОЙ ЗАГРУЗКОЙ');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
         const INTERFACE_BOT_USERNAME = 'k0tbezzabot';
         const tg = window.Telegram?.WebApp;
+        const GITHUB_REPO = 'Sweatyeyes/Bot-Posting';
         
         // ==================== ПОЛУЧЕНИЕ ПАРАМЕТРОВ ====================
         const urlParams = new URLSearchParams(window.location.search);
@@ -448,14 +449,70 @@
             files: [], index: 0, postId: rawPost, userId: rawUser,
             isSubscribed: rawSubscribed, hasPurchased: rawPurchased,
             bananasLeft: rawBananas, startTime: Date.now(),
-            offlineMode: false, loadingAttempts: 0,
+            botOffline: false, loadingAttempts: 0,
             unlockedPhotos: urlUnlockedPhotos,
             filesData: null
         };
         
+        // ==================== ПРЯМАЯ ЗАГРУЗКА С GITHUB (БЕЗ БОТА) ====================
+        async function fetchFilesDirect() {
+            console.log('📁 Прямая загрузка с GitHub (без бота)');
+            const folders = ['general', 'banana', 'strawberry'];
+            const result = { general: [], banana: [], strawberry: [] };
+            
+            for (const folder of folders) {
+                const url = `https://api.github.com/repos/${GITHUB_REPO}/contents/posts/${state.postId}/${folder}`;
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 5000);
+                    const res = await fetch(url, {
+                        headers: { 'Accept': 'application/vnd.github.v3+json' },
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
+                    
+                    if (res.status === 404) continue;
+                    if (!res.ok) continue;
+                    
+                    const data = await res.json();
+                    const files = data
+                        .filter(f => f.name.match(/\.(jpg|jpeg|png)$/i))
+                        .map(f => f.name);
+                    result[folder] = files;
+                    console.log(`✅ ${folder}: ${files.length} фото (прямая загрузка)`);
+                } catch(e) {
+                    console.log(`⚠️ Не удалось загрузить ${folder}: ${e.message}`);
+                }
+            }
+            return result;
+        }
+        
+        // ==================== ЗАГРУЗКА ЧЕРЕЗ БОТА ====================
+        async function fetchFilesFromBot() {
+            if (!state.postId) return null;
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                const res = await fetch(`${TUNNEL_URL}/api/get-files`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ post_id: state.postId }),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                if (!res.ok) return null;
+                const data = await res.json();
+                if (data.error) return null;
+                return data;
+            } catch(e) {
+                return null;
+            }
+        }
+        
         // ==================== ПРОВЕРКА ПОКУПКИ ====================
         async function checkPurchase() {
             if (!state.userId || !state.postId) return false;
+            if (state.botOffline) return false;
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -477,28 +534,6 @@
             }
         }
         
-        // ==================== ЗАГРУЗКА ФАЙЛОВ ====================
-        async function fetchFiles() {
-            if (!state.postId) return null;
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-                const res = await fetch(`${TUNNEL_URL}/api/get-files`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ post_id: state.postId }),
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-                if (!res.ok) return null;
-                const data = await res.json();
-                if (data.error) return null;
-                return data;
-            } catch(e) {
-                return null;
-            }
-        }
-        
         function findBlurName(originalName, fileList, type) {
             let baseName = originalName;
             if (type === 'banana') {
@@ -513,29 +548,9 @@
             return null;
         }
         
-        async function loadGallery() {
-            if (!state.postId) {
-                showError('Не указан ID поста');
-                return;
-            }
-            
-            await checkPurchase();
-            
-            let filesData = await fetchFiles();
-            if (!filesData) {
-                state.offlineMode = true;
-                document.getElementById('offline-badge').style.display = 'block';
-                const cached = localStorage.getItem(`files_${state.postId}`);
-                filesData = cached ? JSON.parse(cached) : { general: [], banana: [], strawberry: [] };
-            } else {
-                localStorage.setItem(`files_${state.postId}`, JSON.stringify(filesData));
-                state.offlineMode = false;
-                document.getElementById('offline-badge').style.display = 'none';
-            }
-            
-            state.filesData = filesData;
-            const baseUrl = `https://raw.githubusercontent.com/Sweatyeyes/Bot-Posting/main/posts/${state.postId}`;
-            let files = [];
+        function buildFileList(filesData) {
+            const baseUrl = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/posts/${state.postId}`;
+            const files = [];
             
             // Общие фото
             for (const fileName of filesData.general || []) {
@@ -608,6 +623,49 @@
                 });
             }
             
+            return files;
+        }
+        
+        async function loadGallery() {
+            if (!state.postId) {
+                showError('Не указан ID поста');
+                return;
+            }
+            
+            // Пытаемся загрузить через бота
+            let filesData = await fetchFilesFromBot();
+            
+            if (!filesData) {
+                // Бот недоступен — офлайн-режим, грузим напрямую с GitHub
+                state.botOffline = true;
+                document.getElementById('offline-badge').style.display = 'block';
+                console.log('📴 Бот недоступен, переключаемся в офлайн-режим');
+                
+                filesData = await fetchFilesDirect();
+                
+                if (!filesData || (Object.values(filesData).every(arr => arr.length === 0))) {
+                    showError('Нет соединения с GitHub');
+                    return;
+                }
+                
+                // В офлайн-режиме считаем, что подписки и покупки нет (все фото с блюром)
+                state.isSubscribed = false;
+                state.hasPurchased = false;
+                state.unlockedPhotos = [];
+                state.bananasLeft = 3;
+            } else {
+                state.botOffline = false;
+                document.getElementById('offline-badge').style.display = 'none';
+                
+                // Проверяем покупку и подписку
+                await checkPurchase();
+                await checkSubscription();
+                await fetchUnlockedPhotos();
+            }
+            
+            state.filesData = filesData;
+            const files = buildFileList(filesData);
+            
             if (files.length === 0) {
                 showError('В этом посте нет фото');
                 return;
@@ -665,7 +723,7 @@
         
         async function fetchUnlockedPhotos() {
             if (!state.userId || !state.postId) return;
-            if (state.offlineMode) return;
+            if (state.botOffline) return;
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -686,7 +744,7 @@
         
         async function checkSubscription() {
             if (!state.userId) return false;
-            if (state.offlineMode) return state.isSubscribed;
+            if (state.botOffline) return state.isSubscribed;
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -707,29 +765,21 @@
         }
         
         async function checkTunnel() {
+            if (state.botOffline) return false;
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 3000);
                 const res = await fetch(`${TUNNEL_URL}/api/webapp-data`, { method: 'OPTIONS', signal: controller.signal });
                 clearTimeout(timeoutId);
-                state.offlineMode = !(res.ok || res.status === 405);
-                const offlineBadge = document.getElementById('offline-badge');
-                if (offlineBadge) offlineBadge.style.display = state.offlineMode ? 'block' : 'none';
-                const bananaBtn = document.getElementById('banana-btn');
-                if (bananaBtn && state.offlineMode) bananaBtn.classList.add('disabled');
-                return !state.offlineMode;
+                return res.ok || res.status === 405;
             } catch(e) {
-                state.offlineMode = true;
-                document.getElementById('offline-badge').style.display = 'block';
-                const bananaBtn = document.getElementById('banana-btn');
-                if (bananaBtn) bananaBtn.classList.add('disabled');
                 return false;
             }
         }
         
         async function spendBanana() {
-            if (state.offlineMode) {
-                showToast('📴 Нет соединения');
+            if (state.botOffline) {
+                showToast('📴 Бот недоступен, бананы нельзя тратить');
                 return;
             }
             
@@ -811,11 +861,19 @@
         }
         
         function handleCoin() {
+            if (state.botOffline) {
+                showToast('📴 Бот недоступен, оплата временно недоступна');
+                return;
+            }
             if (tg) tg.openLink(`https://t.me/${PAYMENT_BOT_USERNAME}?start=buy_vip_${state.postId}`);
             showToast('🪙 Переход в платёжный бот...');
         }
         
         function handleStrawberry() {
+            if (state.botOffline) {
+                showToast('📴 Бот недоступен, проверка подписки временно недоступна');
+                return;
+            }
             if (tg) tg.openLink('https://t.me/neuroticababes_bot');
             showToast('🍓 Подпишитесь на канал');
         }
@@ -884,11 +942,25 @@
             
             const bananaBtn = document.getElementById('banana-btn');
             if (bananaBtn) {
-                if (state.offlineMode) {
+                if (state.botOffline) {
                     bananaBtn.classList.add('disabled');
                 } else {
                     bananaBtn.classList.remove('disabled');
                 }
+            }
+            
+            const strawberryBtn = document.getElementById('strawberry-btn');
+            if (strawberryBtn && state.botOffline) {
+                strawberryBtn.classList.add('disabled');
+            } else if (strawberryBtn) {
+                strawberryBtn.classList.remove('disabled');
+            }
+            
+            const coinBtn = document.getElementById('coin-btn');
+            if (coinBtn && state.botOffline) {
+                coinBtn.classList.add('disabled');
+            } else if (coinBtn) {
+                coinBtn.classList.remove('disabled');
             }
         }
         
@@ -926,9 +998,6 @@
                 tg.ready(); 
                 tg.expand(); 
             }
-            await checkTunnel();
-            await checkSubscription();
-            await fetchUnlockedPhotos();
             await loadGallery();
         }
         
