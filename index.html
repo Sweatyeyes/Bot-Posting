@@ -8,14 +8,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            background: #000; 
-            color: #fff; 
-            font-family: sans-serif; 
-            height: 100vh; 
-            overflow: hidden; 
-            touch-action: pan-y pinch-zoom;
-        }
+        body { background: #000; color: #fff; font-family: sans-serif; height: 100vh; overflow: hidden; touch-action: pan-y pinch-zoom; }
         
         #loading { 
             position: fixed; 
@@ -395,7 +388,7 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v18.0 - СВАЙП ПО ВСЕМУ ЭКРАНУ');
+        console.log('🚀 v18.0 - Упрощённое именование файлов');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -403,14 +396,12 @@
         const tg = window.Telegram?.WebApp;
         const GITHUB_REPO = 'Sweatyeyes/Bot-Posting';
         
-        // ==================== ПЕРЕМЕННЫЕ ДЛЯ СВАЙПОВ ====================
         let touchStartX = 0;
         let touchStartY = 0;
         let touchEndX = 0;
         let touchEndY = 0;
         const minSwipeDistance = 50;
         
-        // ==================== ПОЛУЧЕНИЕ ПАРАМЕТРОВ ====================
         const urlParams = new URLSearchParams(window.location.search);
         
         function getPostId() {
@@ -463,7 +454,6 @@
             filesData: null
         };
         
-        // ==================== ПРЯМАЯ ЗАГРУЗКА С GITHUB ====================
         async function fetchFilesDirect() {
             console.log('📁 Прямая загрузка с GitHub (без бота)');
             const folders = ['general', 'banana', 'strawberry'];
@@ -496,7 +486,6 @@
             return result;
         }
         
-        // ==================== ЗАГРУЗКА ЧЕРЕЗ БОТА ====================
         async function fetchFilesFromBot() {
             if (!state.postId) return null;
             try {
@@ -518,7 +507,6 @@
             }
         }
         
-        // ==================== ПРОВЕРКА ПОКУПКИ ====================
         async function checkPurchase() {
             if (!state.userId || !state.postId) return false;
             if (state.botOffline) return false;
@@ -546,12 +534,10 @@
         function findBlurName(originalName, fileList, type) {
             let baseName = originalName;
             if (type === 'banana') {
-                baseName = originalName.replace(/^banana_/, '');
-                const blurPattern = `banana_banana_banana_${baseName}`;
+                const blurPattern = originalName.replace('.jpg', '_blur.jpg');
                 return fileList.find(f => f === blurPattern);
             } else if (type === 'strawberry') {
-                baseName = originalName.replace(/^strawberry_/, '');
-                const blurPattern = `strawberry_strawberry_strawberry_${baseName}`;
+                const blurPattern = originalName.replace('.jpg', '_blur.jpg');
                 return fileList.find(f => f === blurPattern);
             }
             return null;
@@ -574,12 +560,12 @@
             }
             
             const bananaOriginals = (filesData.banana || []).filter(f => 
-                !f.startsWith('banana_banana_banana_') && f.match(/\.(jpg|jpeg|png)$/i)
+                !f.includes('_blur') && f.match(/\.(jpg|jpeg|png)$/i)
             );
             for (const originalName of bananaOriginals) {
                 const isUnlocked = state.isSubscribed || state.hasPurchased || state.unlockedPhotos.includes(originalName);
-                const blurName = findBlurName(originalName, filesData.banana, 'banana');
-                const hasBlur = !!blurName;
+                const blurName = originalName.replace('.jpg', '_blur.jpg');
+                const hasBlur = filesData.banana.includes(blurName);
                 
                 let imageUrl;
                 if (isUnlocked) {
@@ -602,12 +588,12 @@
             }
             
             const strawberryOriginals = (filesData.strawberry || []).filter(f => 
-                !f.startsWith('strawberry_strawberry_strawberry_') && f.match(/\.(jpg|jpeg|png)$/i)
+                !f.includes('_blur') && f.match(/\.(jpg|jpeg|png)$/i)
             );
             for (const originalName of strawberryOriginals) {
                 const hasAccess = state.hasPurchased || state.isSubscribed;
-                const blurName = findBlurName(originalName, filesData.strawberry, 'strawberry');
-                const hasBlur = !!blurName;
+                const blurName = originalName.replace('.jpg', '_blur.jpg');
+                const hasBlur = filesData.strawberry.includes(blurName);
                 
                 let imageUrl;
                 if (hasAccess) {
@@ -719,23 +705,18 @@
             }
         }
         
-        // ==================== НАСТРОЙКА СВАЙПОВ (ПО ВСЕМУ ЭКРАНУ) ====================
         function setupSwipeListeners() {
-            // Отключаем системный свайп Telegram (закрытие приложения)
             if (tg && tg.disableVerticalSwipes) {
                 tg.disableVerticalSwipes();
             }
             
-            // Навешиваем обработчики на весь документ
             document.addEventListener('touchstart', handleTouchStart, { passive: false });
             document.addEventListener('touchend', handleTouchEnd, { passive: false });
             
-            // Блокируем стандартную навигацию браузера
             document.body.style.touchAction = 'pan-y pinch-zoom';
         }
         
         function handleTouchStart(e) {
-            // Игнорируем если начали свайп на кнопке
             const target = e.target;
             if (target.closest('.bottom-btn') || target.closest('#bottom-bar')) {
                 return;
@@ -746,7 +727,6 @@
         }
         
         function handleTouchEnd(e) {
-            // Игнорируем если не было начала свайпа
             if (touchStartX === 0) return;
             
             touchEndX = e.changedTouches[0].screenX;
@@ -755,26 +735,21 @@
             const deltaX = touchEndX - touchStartX;
             const deltaY = touchEndY - touchStartY;
             
-            // Проверяем, что свайп горизонтальный
             if (Math.abs(deltaX) < Math.abs(deltaY)) {
                 touchStartX = 0;
                 return;
             }
             
-            // Проверяем минимальное расстояние
             if (Math.abs(deltaX) < minSwipeDistance) {
                 touchStartX = 0;
                 return;
             }
             
-            // Предотвращаем закрытие WebApp при свайпе
             e.preventDefault();
             
             if (deltaX > 0) {
-                // Свайп вправо -> предыдущее фото
                 prev();
             } else {
-                // Свайп влево -> следующее фото
                 next();
             }
             
