@@ -2,13 +2,13 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Gallery</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #000; color: #fff; font-family: sans-serif; height: 100vh; overflow: hidden; }
+        body { background: #000; color: #fff; font-family: sans-serif; height: 100vh; overflow: hidden; touch-action: pan-y pinch-zoom; }
         
         #loading { 
             position: fixed; 
@@ -50,6 +50,7 @@
             justify-content: center;
             background: #000;
             z-index: 1;
+            touch-action: pan-y pinch-zoom;
         }
         
         #image { 
@@ -58,8 +59,25 @@
             object-fit: contain; 
             opacity: 0; 
             transition: opacity 0.2s; 
+            pointer-events: none;
         }
         #image.loaded { opacity: 1; }
+        
+        /* Зоны для свайпов - занимают всю область изображения */
+        .swipe-area {
+            position: absolute;
+            top: 0;
+            bottom: 80px;
+            width: 50%;
+            z-index: 100;
+            touch-action: none;
+        }
+        .swipe-left {
+            left: 0;
+        }
+        .swipe-right {
+            right: 0;
+        }
         
         #nav-left, #nav-right { 
             position: absolute; 
@@ -102,6 +120,7 @@
             text-shadow: 0 2px 10px rgba(255, 255, 255, 0.3);
             padding: 0;
             position: relative;
+            touch-action: manipulation;
         }
         
         .bottom-btn:active { transform: scale(0.9); }
@@ -119,7 +138,6 @@
             100% { text-shadow: 0 0 20px #2ea6ff; }
         }
         
-        /* Значок над кнопкой */
         .badge-icon {
             position: absolute;
             top: -5px;
@@ -142,7 +160,6 @@
             color: #6bff6b;
         }
         
-        /* Счётчик бананов */
         .banana-count-badge {
             position: absolute;
             top: -5px;
@@ -303,6 +320,10 @@
             <div id="offline-badge" class="badge">📴 Оффлайн</div>
         </div>
         
+        <!-- Зоны для свайпов -->
+        <div class="swipe-area swipe-left" id="swipe-left-area"></div>
+        <div class="swipe-area swipe-right" id="swipe-right-area"></div>
+        
         <div id="nav-left"></div>
         <div id="nav-right"></div>
         
@@ -393,13 +414,20 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v16.1 - МНОГОСТРОЧНЫЕ ТОСТЫ');
+        console.log('🚀 v17.0 - СВАЙПЫ ДЛЯ ФОТОГРАФИЙ');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
         const INTERFACE_BOT_USERNAME = 'k0tbezzabot';
         const tg = window.Telegram?.WebApp;
         const GITHUB_REPO = 'Sweatyeyes/Bot-Posting';
+        
+        // ==================== ПЕРЕМЕННЫЕ ДЛЯ СВАЙПОВ ====================
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchEndX = 0;
+        let touchEndY = 0;
+        const minSwipeDistance = 50;
         
         // ==================== ПОЛУЧЕНИЕ ПАРАМЕТРОВ ====================
         const urlParams = new URLSearchParams(window.location.search);
@@ -454,7 +482,7 @@
             filesData: null
         };
         
-        // ==================== ПРЯМАЯ ЗАГРУЗКА С GITHUB (БЕЗ БОТА) ====================
+        // ==================== ПРЯМАЯ ЗАГРУЗКА С GITHUB ====================
         async function fetchFilesDirect() {
             console.log('📁 Прямая загрузка с GitHub (без бота)');
             const folders = ['general', 'banana', 'strawberry'];
@@ -552,7 +580,6 @@
             const baseUrl = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/posts/${state.postId}`;
             const files = [];
             
-            // Общие фото
             for (const fileName of filesData.general || []) {
                 if (fileName.match(/\.(jpg|jpeg|png)$/i)) {
                     files.push({
@@ -565,7 +592,6 @@
                 }
             }
             
-            // Банановые фото
             const bananaOriginals = (filesData.banana || []).filter(f => 
                 !f.startsWith('banana_banana_banana_') && f.match(/\.(jpg|jpeg|png)$/i)
             );
@@ -594,7 +620,6 @@
                 });
             }
             
-            // Клубничные фото
             const strawberryOriginals = (filesData.strawberry || []).filter(f => 
                 !f.startsWith('strawberry_strawberry_strawberry_') && f.match(/\.(jpg|jpeg|png)$/i)
             );
@@ -632,11 +657,9 @@
                 return;
             }
             
-            // Пытаемся загрузить через бота
             let filesData = await fetchFilesFromBot();
             
             if (!filesData) {
-                // Бот недоступен — офлайн-режим, грузим напрямую с GitHub
                 state.botOffline = true;
                 document.getElementById('offline-badge').style.display = 'block';
                 console.log('📴 Бот недоступен, переключаемся в офлайн-режим');
@@ -648,7 +671,6 @@
                     return;
                 }
                 
-                // В офлайн-режиме считаем, что подписки и покупки нет (все фото с блюром)
                 state.isSubscribed = false;
                 state.hasPurchased = false;
                 state.unlockedPhotos = [];
@@ -657,7 +679,6 @@
                 state.botOffline = false;
                 document.getElementById('offline-badge').style.display = 'none';
                 
-                // Проверяем покупку и подписку
                 await checkPurchase();
                 await checkSubscription();
                 await fetchUnlockedPhotos();
@@ -678,6 +699,7 @@
             updateUI();
             showImage(0);
             setupNavigation();
+            setupSwipeListeners();
         }
         
         function showImage(i) {
@@ -707,12 +729,66 @@
             if (left) { 
                 const newLeft = left.cloneNode(true); 
                 left.parentNode.replaceChild(newLeft, left); 
-                newLeft.addEventListener('click', () => prev()); 
+                newLeft.addEventListener('click', (e) => { e.stopPropagation(); prev(); }); 
             }
             if (right) { 
                 const newRight = right.cloneNode(true); 
                 right.parentNode.replaceChild(newRight, right); 
-                newRight.addEventListener('click', () => next()); 
+                newRight.addEventListener('click', (e) => { e.stopPropagation(); next(); }); 
+            }
+        }
+        
+        // ==================== НАСТРОЙКА СВАЙПОВ ====================
+        function setupSwipeListeners() {
+            const container = document.getElementById('image-container');
+            if (!container) return;
+            
+            const handleTouchStart = (e) => {
+                touchStartX = e.changedTouches[0].screenX;
+                touchStartY = e.changedTouches[0].screenY;
+            };
+            
+            const handleTouchEnd = (e) => {
+                touchEndX = e.changedTouches[0].screenX;
+                touchEndY = e.changedTouches[0].screenY;
+                handleSwipe();
+            };
+            
+            container.addEventListener('touchstart', handleTouchStart, { passive: false });
+            container.addEventListener('touchend', handleTouchEnd, { passive: false });
+            
+            // Также добавляем на зоны для более точного определения
+            const leftArea = document.getElementById('swipe-left-area');
+            const rightArea = document.getElementById('swipe-right-area');
+            
+            if (leftArea) {
+                leftArea.addEventListener('touchstart', handleTouchStart);
+                leftArea.addEventListener('touchend', handleTouchEnd);
+            }
+            if (rightArea) {
+                rightArea.addEventListener('touchstart', handleTouchStart);
+                rightArea.addEventListener('touchend', handleTouchEnd);
+            }
+        }
+        
+        function handleSwipe() {
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+            
+            // Проверяем, что свайп горизонтальный (горизонтальное перемещение больше вертикального)
+            if (Math.abs(deltaX) < Math.abs(deltaY)) return;
+            
+            // Проверяем минимальное расстояние
+            if (Math.abs(deltaX) < minSwipeDistance) return;
+            
+            if (deltaX > 0) {
+                // Свайп вправо -> предыдущее фото
+                prev();
+                showToast('◀️');
+            } else {
+                // Свайп влево -> следующее фото
+                next();
+                showToast('▶️');
             }
         }
         
@@ -764,25 +840,10 @@
             } catch(e) { return state.isSubscribed; }
         }
         
-        async function checkTunnel() {
-            if (state.botOffline) return false;
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 3000);
-                const res = await fetch(`${TUNNEL_URL}/api/webapp-data`, { method: 'OPTIONS', signal: controller.signal });
-                clearTimeout(timeoutId);
-                return res.ok || res.status === 405;
-            } catch(e) {
-                return false;
-            }
-        }
-        
-        // Многострочный тост
         function showMultilineToast(text, duration = 4000) {
             const toast = document.getElementById('toast');
             if (!toast) return;
             
-            // Устанавливаем белый цвет текста и перенос строк
             toast.style.whiteSpace = 'normal';
             toast.style.wordBreak = 'break-word';
             toast.style.maxWidth = '80%';
@@ -796,7 +857,6 @@
             toast.classList.add('show');
             setTimeout(() => {
                 toast.classList.remove('show');
-                // Возвращаем исходные стили
                 setTimeout(() => {
                     toast.style.whiteSpace = 'nowrap';
                     toast.style.maxWidth = '';
@@ -1000,7 +1060,8 @@
             const modal = document.getElementById('info-modal');
             if (modal) modal.classList.add('active'); 
         }
-        function hideInfo() { 
+        function hideInfo(e) { 
+            if (e && e.target !== e.currentTarget) return;
             const modal = document.getElementById('info-modal');
             if (modal) modal.classList.remove('active'); 
         }
@@ -1057,7 +1118,7 @@
             if (saveBtn) saveBtn.addEventListener('click', saveCurrentPhoto);
             if (musicBtn) musicBtn.addEventListener('click', toggleMusic);
             if (infoBtn) infoBtn.addEventListener('click', showInfo);
-            if (modalCloseBtn) modalCloseBtn.addEventListener('click', hideInfo);
+            if (modalCloseBtn) modalCloseBtn.addEventListener('click', () => hideInfo());
             if (forceReloadItem) forceReloadItem.addEventListener('click', forceReload);
             
             if (musicBtn) musicBtn.style.opacity = '0.5';
