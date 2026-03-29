@@ -418,7 +418,7 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v23.0 - ИСПРАВЛЕНА ЗАГРУЗКА ФОТО: используется API_URL из параметров');
+        console.log('🚀 v24.0 - МАКСИМАЛЬНОЕ ЛОГИРОВАНИЕ');
         
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
         const INTERFACE_BOT_USERNAME = 'k0tbezzabot';
@@ -430,10 +430,8 @@
         let touchEndY = 0;
         const minSwipeDistance = 50;
         
-        // Флаг для предотвращения бесконечного цикла при ошибке загрузки
         let errorCounter = 0;
         
-        // Отладочная панель
         const debugPanel = document.getElementById('debug-panel');
         
         function debugLog(message, type = 'info') {
@@ -450,16 +448,13 @@
             if (debugPanel) {
                 debugPanel.appendChild(entry);
                 debugPanel.scrollTop = debugPanel.scrollHeight;
-                
-                while (debugPanel.children.length > 50) {
+                while (debugPanel.children.length > 100) {
                     debugPanel.removeChild(debugPanel.firstChild);
                 }
             }
-            
             console.log(`🔍 [${type}] ${message}`);
         }
         
-        // Показываем отладочную панель при нажатии на информационную кнопку
         document.addEventListener('DOMContentLoaded', () => {
             const infoBtn = document.getElementById('info-btn');
             if (infoBtn) {
@@ -478,10 +473,13 @@
         
         const urlParams = new URLSearchParams(window.location.search);
         
-        // ВАЖНО: API_URL берем из параметра api, который передает бот
+        debugLog(`🔍 ПАРАМЕТРЫ URL: ${window.location.search}`, 'info');
+        
+        // API_URL из параметра api (передается ботом)
         let API_URL = urlParams.get('api');
+        debugLog(`🔍 api параметр из URL: "${API_URL}"`, 'info');
+        
         if (!API_URL) {
-            // Если параметр не передан — используем дефолтный (но так быть не должно)
             API_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
             debugLog(`⚠️ API_URL не передан, используем дефолтный: ${API_URL}`, 'warning');
         } else {
@@ -490,6 +488,7 @@
         
         function getPostId() {
             let postId = urlParams.get('post');
+            debugLog(`🔍 getPostId: из URL post=${postId}`, 'info');
             if (postId) return postId;
             const tgStartParam = urlParams.get('tgWebAppStartParam');
             if (tgStartParam) {
@@ -510,6 +509,7 @@
         
         function getUserId() {
             let userId = urlParams.get('user');
+            debugLog(`🔍 getUserId: из URL user=${userId}`, 'info');
             if (userId) return parseInt(userId);
             const user = tg?.initDataUnsafe?.user;
             if (user && user.id) return user.id;
@@ -529,9 +529,14 @@
         const unlockedParam = urlParams.get('unlocked') || '';
         const urlUnlockedPhotos = unlockedParam ? unlockedParam.split(',') : [];
         
-        debugLog(`Параметры: post=${rawPost}, user=${rawUser}, subscribed=${rawSubscribed}, purchased=${rawPurchased}, bananas=${rawBananas}`, 'info');
-        debugLog(`Разблокированные фото из URL: ${urlUnlockedPhotos.length}`, 'info');
-        debugLog(`API_URL для запросов: ${API_URL}`, 'info');
+        debugLog(`📊 ПАРАМЕТРЫ СОСТОЯНИЯ:`, 'info');
+        debugLog(`   post=${rawPost}`, 'info');
+        debugLog(`   user=${rawUser}`, 'info');
+        debugLog(`   subscribed=${rawSubscribed}`, 'info');
+        debugLog(`   purchased=${rawPurchased}`, 'info');
+        debugLog(`   bananas=${rawBananas}`, 'info');
+        debugLog(`   unlocked=${urlUnlockedPhotos.length} фото`, 'info');
+        debugLog(`   API_URL=${API_URL}`, 'info');
         
         let state = {
             files: [], index: 0, postId: rawPost, userId: rawUser,
@@ -545,125 +550,101 @@
         
         async function fetchFilesFromBot() {
             if (!state.postId) {
-                debugLog(`fetchFilesFromBot: postId отсутствует`, 'error');
+                debugLog(`❌ fetchFilesFromBot: postId отсутствует`, 'error');
                 return null;
             }
-            debugLog(`📡 Запрос списка файлов для поста ${state.postId}`, 'info');
-            debugLog(`📡 URL: ${state.apiUrl}/api/get-files`, 'info');
+            const url = `${state.apiUrl}/api/get-files`;
+            debugLog(`📡 [fetchFiles] POST ${url}`, 'info');
+            debugLog(`📡 [fetchFiles] body: ${JSON.stringify({ post_id: state.postId })}`, 'info');
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
-                const res = await fetch(`${state.apiUrl}/api/get-files`, {
+                const res = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ post_id: state.postId }),
                     signal: controller.signal
                 });
                 clearTimeout(timeoutId);
-                debugLog(`📡 Ответ /api/get-files: ${res.status}`, res.ok ? 'success' : 'error');
+                debugLog(`📡 [fetchFiles] ответ: ${res.status} ${res.statusText}`, res.ok ? 'success' : 'error');
                 if (!res.ok) return null;
                 const data = await res.json();
-                if (data.error) {
-                    debugLog(`📡 Ошибка в ответе: ${data.error}`, 'error');
-                    return null;
-                }
-                debugLog(`📡 Файлы: general=${data.general?.length || 0}, banana=${data.banana?.length || 0}, strawberry=${data.strawberry?.length || 0}`, 'success');
+                debugLog(`📡 [fetchFiles] данные получены`, 'success');
+                debugLog(`📡   general: ${data.general?.length || 0} фото`, 'info');
+                debugLog(`📡   banana: ${data.banana?.length || 0} фото`, 'info');
+                debugLog(`📡   strawberry: ${data.strawberry?.length || 0} фото`, 'info');
                 return data;
             } catch(e) {
-                debugLog(`📡 Ошибка загрузки файлов: ${e.message}`, 'error');
+                debugLog(`❌ [fetchFiles] ошибка: ${e.message}`, 'error');
                 return null;
             }
         }
         
         async function checkPurchase() {
             if (!state.userId || !state.postId) {
-                debugLog(`checkPurchase: userId=${state.userId}, postId=${state.postId}`, 'warning');
+                debugLog(`⚠️ checkPurchase: пропуск (нет userId или postId)`, 'warning');
                 return false;
             }
-            if (state.botOffline) return false;
-            debugLog(`🪙 Проверка покупки для user=${state.userId}, post=${state.postId}`, 'info');
+            const url = `${state.apiUrl}/api/check-purchase`;
+            debugLog(`🪙 [checkPurchase] POST ${url}`, 'info');
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-                const res = await fetch(`${state.apiUrl}/api/check-purchase`, {
+                const res = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId }),
-                    signal: controller.signal
+                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId })
                 });
-                clearTimeout(timeoutId);
                 const data = await res.json();
-                debugLog(`🪙 Покупка: ${data.purchased}`, data.purchased ? 'success' : 'warning');
-                if (data.purchased) {
-                    state.hasPurchased = true;
-                    return true;
-                }
-                return false;
+                debugLog(`🪙 [checkPurchase] результат: ${data.purchased}`, data.purchased ? 'success' : 'warning');
+                if (data.purchased) state.hasPurchased = true;
+                return data.purchased;
             } catch(e) {
-                debugLog(`🪙 Ошибка проверки покупки: ${e.message}`, 'error');
+                debugLog(`❌ [checkPurchase] ошибка: ${e.message}`, 'error');
                 return state.hasPurchased;
             }
         }
         
         async function fetchUnlockedPhotos() {
-            if (!state.userId || !state.postId) {
-                debugLog(`fetchUnlockedPhotos: userId=${state.userId}, postId=${state.postId}`, 'warning');
-                return;
-            }
-            if (state.botOffline) return;
-            debugLog(`🍌 Запрос разблокированных фото для user=${state.userId}, post=${state.postId}`, 'info');
+            if (!state.userId || !state.postId) return;
+            const url = `${state.apiUrl}/api/get-unlocked-photos`;
+            debugLog(`🍌 [fetchUnlocked] POST ${url}`, 'info');
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-                const res = await fetch(`${state.apiUrl}/api/get-unlocked-photos`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId }),
-                    signal: controller.signal
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId })
                 });
-                clearTimeout(timeoutId);
                 const data = await res.json();
                 if (data.unlocked_photos) {
                     state.unlockedPhotos = data.unlocked_photos;
                     state.bananasLeft = data.available_bananas;
-                    debugLog(`🍌 Разблокировано фото: ${state.unlockedPhotos.length}, бананов осталось: ${state.bananasLeft}`, 'success');
-                    updateUI();
+                    debugLog(`🍌 [fetchUnlocked] разблокировано: ${state.unlockedPhotos.length}, бананов осталось: ${state.bananasLeft}`, 'success');
                 }
             } catch(e) {
-                debugLog(`🍌 Ошибка получения разблокированных: ${e.message}`, 'error');
+                debugLog(`❌ [fetchUnlocked] ошибка: ${e.message}`, 'error');
             }
         }
         
         async function checkSubscription() {
-            if (!state.userId) {
-                debugLog(`checkSubscription: userId отсутствует`, 'warning');
-                return false;
-            }
-            if (state.botOffline) return state.isSubscribed;
-            debugLog(`🍓 Проверка подписки для user=${state.userId}`, 'info');
+            if (!state.userId) return false;
+            const url = `${state.apiUrl}/api/check-subscription`;
+            debugLog(`🍓 [checkSubscription] POST ${url}`, 'info');
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-                const res = await fetch(`${state.apiUrl}/api/check-subscription`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId }),
-                    signal: controller.signal
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId })
                 });
-                clearTimeout(timeoutId);
                 const data = await res.json();
                 const isSubscribed = data.is_subscribed === true;
-                debugLog(`🍓 Подписка: ${isSubscribed}`, isSubscribed ? 'success' : 'warning');
-                if (isSubscribed !== state.isSubscribed) {
-                    state.isSubscribed = isSubscribed;
-                    updateUI();
-                }
+                debugLog(`🍓 [checkSubscription] результат: ${isSubscribed}`, isSubscribed ? 'success' : 'warning');
+                if (isSubscribed !== state.isSubscribed) state.isSubscribed = isSubscribed;
                 return isSubscribed;
             } catch(e) {
-                debugLog(`🍓 Ошибка проверки подписки: ${e.message}`, 'error');
+                debugLog(`❌ [checkSubscription] ошибка: ${e.message}`, 'error');
                 return state.isSubscribed;
             }
         }
         
-        // ИСПРАВЛЕНО: функция возвращает URL, используя state.apiUrl (из параметра api)
         function getPhotoUrl(folder, filename) {
             if (!state.postId) {
                 debugLog(`❌ getPhotoUrl: postId отсутствует!`, 'error');
@@ -673,27 +654,23 @@
                 debugLog(`❌ getPhotoUrl: userId отсутствует!`, 'error');
                 return null;
             }
-            // ИСПРАВЛЕНО: используем state.apiUrl (из параметра api), а не window.location.origin
             const url = `${state.apiUrl}/api/get-photo?post=${state.postId}&folder=${folder}&file=${filename}&user=${state.userId}&t=${Date.now()}`;
-            debugLog(`📸 Создан URL: ${url.substring(0, 100)}...`, 'info');
+            debugLog(`📸 getPhotoUrl: ${folder}/${filename} -> ${url.substring(0, 100)}...`, 'info');
             return url;
         }
         
-        function findBlurName(originalName) {
-            return originalName.replace('.jpg', '_blur.jpg');
-        }
-        
-        // Сборка списка файлов — без fetch, только URL
         function buildFileList(filesData) {
             const files = [];
-            debugLog(`📦 Начинаем сборку списка файлов (без fetch)...`, 'info');
-            debugLog(`📦 state.userId = ${state.userId}, state.postId = ${state.postId}`, 'info');
-            debugLog(`📦 state.apiUrl = ${state.apiUrl}`, 'info');
+            debugLog(`📦 ========== BUILD FILE LIST ==========`, 'info');
+            debugLog(`📦 state.userId=${state.userId}, state.postId=${state.postId}`, 'info');
+            debugLog(`📦 state.apiUrl=${state.apiUrl}`, 'info');
+            debugLog(`📦 state.isSubscribed=${state.isSubscribed}, state.hasPurchased=${state.hasPurchased}`, 'info');
+            debugLog(`📦 state.unlockedPhotos: ${JSON.stringify(state.unlockedPhotos)}`, 'info');
             
-            // Общие фото
-            const generalCount = filesData.general?.length || 0;
-            debugLog(`📦 Обработка general фото: ${generalCount}`, 'info');
-            for (const fileName of filesData.general || []) {
+            // GENERAL
+            const generalList = filesData.general || [];
+            debugLog(`📦 GENERAL: ${generalList.length} фото`, 'info');
+            for (const fileName of generalList) {
                 if (fileName.match(/\.(jpg|jpeg|png)$/i)) {
                     const url = getPhotoUrl('general', fileName);
                     if (url) {
@@ -705,31 +682,25 @@
                             isBanana: false,
                             originalUrl: url
                         });
-                        debugLog(`✅ general добавлено: ${fileName}`, 'success');
+                        debugLog(`✅ GENERAL добавлено: ${fileName}`, 'success');
                     } else {
-                        debugLog(`❌ general URL не создан: ${fileName}`, 'error');
+                        debugLog(`❌ GENERAL URL не создан: ${fileName}`, 'error');
                     }
                 }
             }
             
-            // Банановые фото
-            const bananaOriginals = (filesData.banana || []).filter(f => 
-                !f.includes('_blur') && f.match(/\.(jpg|jpeg|png)$/i)
-            );
-            debugLog(`📦 Обработка banana фото: ${bananaOriginals.length} оригиналов`, 'info');
+            // BANANA
+            const bananaAll = filesData.banana || [];
+            debugLog(`📦 BANANA: всего ${bananaAll.length} файлов`, 'info');
+            const bananaOriginals = bananaAll.filter(f => !f.includes('_blur') && f.match(/\.(jpg|jpeg|png)$/i));
+            debugLog(`📦 BANANA оригиналов: ${bananaOriginals.length}`, 'info');
+            
             for (const originalName of bananaOriginals) {
                 const isUnlocked = state.isSubscribed || state.hasPurchased || state.unlockedPhotos.includes(originalName);
                 debugLog(`📦 banana ${originalName}: unlocked=${isUnlocked}`, isUnlocked ? 'success' : 'warning');
                 
-                let displayFileName;
-                if (isUnlocked) {
-                    displayFileName = originalName;
-                } else {
-                    displayFileName = findBlurName(originalName);
-                    debugLog(`📦 Показываем блюр: ${displayFileName}`, 'warning');
-                }
-                
-                const url = getPhotoUrl('banana', displayFileName);
+                const displayName = isUnlocked ? originalName : originalName.replace('.jpg', '_blur.jpg');
+                const url = getPhotoUrl('banana', displayName);
                 const originalUrl = getPhotoUrl('banana', originalName);
                 
                 if (url) {
@@ -742,30 +713,24 @@
                         isBlurred: !isUnlocked,
                         isBanana: true
                     });
-                    debugLog(`✅ banana добавлено: ${originalName}`, 'success');
+                    debugLog(`✅ BANANA добавлено: ${originalName} (показываем ${displayName})`, 'success');
                 } else {
-                    debugLog(`❌ banana URL не создан: ${originalName}`, 'error');
+                    debugLog(`❌ BANANA URL не создан: ${originalName}`, 'error');
                 }
             }
             
-            // Клубничные фото
-            const strawberryOriginals = (filesData.strawberry || []).filter(f => 
-                !f.includes('_blur') && f.match(/\.(jpg|jpeg|png)$/i)
-            );
-            debugLog(`📦 Обработка strawberry фото: ${strawberryOriginals.length} оригиналов`, 'info');
+            // STRAWBERRY
+            const strawberryAll = filesData.strawberry || [];
+            debugLog(`📦 STRAWBERRY: всего ${strawberryAll.length} файлов`, 'info');
+            const strawberryOriginals = strawberryAll.filter(f => !f.includes('_blur') && f.match(/\.(jpg|jpeg|png)$/i));
+            debugLog(`📦 STRAWBERRY оригиналов: ${strawberryOriginals.length}`, 'info');
+            
             for (const originalName of strawberryOriginals) {
                 const hasAccess = state.hasPurchased || state.isSubscribed;
                 debugLog(`📦 strawberry ${originalName}: hasAccess=${hasAccess}`, hasAccess ? 'success' : 'warning');
                 
-                let displayFileName;
-                if (hasAccess) {
-                    displayFileName = originalName;
-                } else {
-                    displayFileName = findBlurName(originalName);
-                    debugLog(`📦 Показываем блюр: ${displayFileName}`, 'warning');
-                }
-                
-                const url = getPhotoUrl('strawberry', displayFileName);
+                const displayName = hasAccess ? originalName : originalName.replace('.jpg', '_blur.jpg');
+                const url = getPhotoUrl('strawberry', displayName);
                 const originalUrl = getPhotoUrl('strawberry', originalName);
                 
                 if (url) {
@@ -778,33 +743,33 @@
                         isBlurred: !hasAccess,
                         isBanana: false
                     });
-                    debugLog(`✅ strawberry добавлено: ${originalName}`, 'success');
+                    debugLog(`✅ STRAWBERRY добавлено: ${originalName} (показываем ${displayName})`, 'success');
                 } else {
-                    debugLog(`❌ strawberry URL не создан: ${originalName}`, 'error');
+                    debugLog(`❌ STRAWBERRY URL не создан: ${originalName}`, 'error');
                 }
             }
             
-            debugLog(`📦 Итого собрано файлов: ${files.length}`, files.length > 0 ? 'success' : 'error');
+            debugLog(`📦 ИТОГО собрано файлов: ${files.length}`, files.length > 0 ? 'success' : 'error');
             return files;
         }
         
         async function loadGallery() {
+            debugLog(`🚀 ========== LOAD GALLERY START ==========`, 'info');
+            
             if (!state.postId) {
-                debugLog('❌ Не указан ID поста', 'error');
+                debugLog(`❌ Не указан ID поста`, 'error');
                 showError('Не указан ID поста');
                 return;
             }
             
-            debugLog(`🚀 Начинаем загрузку галереи для поста ${state.postId}`, 'info');
-            debugLog(`🚀 API URL: ${state.apiUrl}`, 'info');
+            debugLog(`🚀 postId=${state.postId}`, 'info');
+            debugLog(`🚀 apiUrl=${state.apiUrl}`, 'info');
             
-            // Загружаем список файлов
             let filesData = await fetchFilesFromBot();
-            
             if (!filesData) {
                 state.botOffline = true;
                 document.getElementById('offline-badge').style.display = 'block';
-                debugLog('❌ Бот недоступен', 'error');
+                debugLog(`❌ Бот недоступен (нет данных)`, 'error');
                 showError('Бот недоступен');
                 return;
             }
@@ -812,17 +777,15 @@
             state.botOffline = false;
             document.getElementById('offline-badge').style.display = 'none';
             
-            // Обновляем данные о покупке и подписке
             await checkPurchase();
             await checkSubscription();
             await fetchUnlockedPhotos();
             
             state.filesData = filesData;
-            // Собираем список файлов (синхронно, без await)
             const files = buildFileList(filesData);
             
             if (files.length === 0) {
-                debugLog('❌ В этом посте нет фото', 'error');
+                debugLog(`❌ В этом посте нет фото`, 'error');
                 showError('В этом посте нет фото');
                 return;
             }
@@ -842,18 +805,13 @@
         function onImageLoadError() {
             const img = document.getElementById('image');
             if (!img) return;
-            
             errorCounter++;
             debugLog(`❌ Ошибка загрузки изображения (${errorCounter}): ${img.src.substring(0, 100)}`, 'error');
-            
-            // Не перезагружаем бесконечно, просто показываем заглушку
             if (errorCounter > 3) {
-                debugLog(`⚠️ Слишком много ошибок, останавливаем попытки`, 'warning');
+                debugLog(`⚠️ Слишком много ошибок, останавливаем`, 'warning');
                 img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Crect width="100" height="100" fill="%23333"/%3E%3Ctext x="50" y="55" text-anchor="middle" fill="%23fff" font-size="12"%3EError%3C/text%3E%3C/svg%3E';
                 return;
             }
-            
-            // Повторная попытка через 2 секунды
             setTimeout(() => {
                 if (state.files && state.files[state.index]) {
                     const file = state.files[state.index];
@@ -864,25 +822,17 @@
         
         function showImage(i) {
             if (!state.files || state.files.length === 0) return;
-            
             state.index = (i + state.files.length) % state.files.length;
             const img = document.getElementById('image');
             const file = state.files[state.index];
             if (!img || !file) return;
-            
-            // Сбрасываем счетчик ошибок при новом фото
             errorCounter = 0;
-            
             debugLog(`🖼 Показ фото ${state.index+1}/${state.files.length}: ${file.name}`, 'info');
             debugLog(`🖼 URL: ${file.url.substring(0, 100)}...`, 'info');
-            
             img.classList.remove('loaded');
             img.src = file.url + '&v=' + Date.now();
-            
             const counterText = document.getElementById('counter-text');
-            if (counterText) {
-                counterText.innerText = `${state.index+1}/${state.files.length}`;
-            }
+            if (counterText) counterText.innerText = `${state.index+1}/${state.files.length}`;
         }
         
         function next() { if (state.files && state.files.length) showImage(state.index + 1); }
@@ -891,66 +841,33 @@
         function setupNavigation() {
             const left = document.getElementById('nav-left');
             const right = document.getElementById('nav-right');
-            if (left) { 
-                const newLeft = left.cloneNode(true); 
-                left.parentNode.replaceChild(newLeft, left); 
-                newLeft.addEventListener('click', (e) => { e.stopPropagation(); prev(); }); 
-            }
-            if (right) { 
-                const newRight = right.cloneNode(true); 
-                right.parentNode.replaceChild(newRight, right); 
-                newRight.addEventListener('click', (e) => { e.stopPropagation(); next(); }); 
-            }
+            if (left) { const newLeft = left.cloneNode(true); left.parentNode.replaceChild(newLeft, left); newLeft.addEventListener('click', (e) => { e.stopPropagation(); prev(); }); }
+            if (right) { const newRight = right.cloneNode(true); right.parentNode.replaceChild(newRight, right); newRight.addEventListener('click', (e) => { e.stopPropagation(); next(); }); }
         }
         
         function setupSwipeListeners() {
-            if (tg && tg.disableVerticalSwipes) {
-                tg.disableVerticalSwipes();
-            }
-            
+            if (tg && tg.disableVerticalSwipes) tg.disableVerticalSwipes();
             document.addEventListener('touchstart', handleTouchStart, { passive: false });
             document.addEventListener('touchend', handleTouchEnd, { passive: false });
-            
             document.body.style.touchAction = 'pan-y pinch-zoom';
         }
         
         function handleTouchStart(e) {
-            const target = e.target;
-            if (target.closest('.bottom-btn') || target.closest('#bottom-bar')) {
-                return;
-            }
-            
+            if (e.target.closest('.bottom-btn') || e.target.closest('#bottom-bar')) return;
             touchStartX = e.changedTouches[0].screenX;
             touchStartY = e.changedTouches[0].screenY;
         }
         
         function handleTouchEnd(e) {
             if (touchStartX === 0) return;
-            
             touchEndX = e.changedTouches[0].screenX;
             touchEndY = e.changedTouches[0].screenY;
-            
             const deltaX = touchEndX - touchStartX;
             const deltaY = touchEndY - touchStartY;
-            
-            if (Math.abs(deltaX) < Math.abs(deltaY)) {
-                touchStartX = 0;
-                return;
-            }
-            
-            if (Math.abs(deltaX) < minSwipeDistance) {
-                touchStartX = 0;
-                return;
-            }
-            
+            if (Math.abs(deltaX) < Math.abs(deltaY)) { touchStartX = 0; return; }
+            if (Math.abs(deltaX) < minSwipeDistance) { touchStartX = 0; return; }
             e.preventDefault();
-            
-            if (deltaX > 0) {
-                prev();
-            } else {
-                next();
-            }
-            
+            if (deltaX > 0) prev(); else next();
             touchStartX = 0;
         }
         
@@ -962,7 +879,6 @@
         function showMultilineToast(text, duration = 4000) {
             const toast = document.getElementById('toast');
             if (!toast) return;
-            
             toast.style.whiteSpace = 'normal';
             toast.style.wordBreak = 'break-word';
             toast.style.maxWidth = '80%';
@@ -971,7 +887,6 @@
             toast.style.textAlign = 'center';
             toast.style.lineHeight = '1.4';
             toast.style.padding = '12px 16px';
-            
             toast.textContent = text;
             toast.classList.add('show');
             setTimeout(() => {
@@ -993,7 +908,6 @@
                 showMultilineToast('📴 Бот недоступен, бананы нельзя тратить');
                 return;
             }
-            
             const currentFile = state.files[state.index];
             if (!currentFile || !currentFile.isBanana) {
                 showToast('🍌 Это фото нельзя разблокировать бананом');
@@ -1003,12 +917,10 @@
                 showToast('✅ Уже разблокировано');
                 return;
             }
-            
             if (state.bananasLeft <= 0) {
                 showMultilineToast('У вас 0 бананов.\nКупите 🪙 доступ ко всем фото за 99₽\nили подпишитесь на 🍓');
                 return;
             }
-            
             try {
                 const res = await fetch(`${state.apiUrl}/api/webapp-data`, {
                     method: 'POST',
@@ -1020,15 +932,12 @@
                         details: { photo_name: currentFile.originalName || currentFile.name }
                     })
                 });
-                
                 const data = await res.json();
-                
                 if (data.success) {
                     state.bananasLeft = data.available;
                     if (!state.unlockedPhotos.includes(currentFile.originalName || currentFile.name)) {
                         state.unlockedPhotos.push(currentFile.originalName || currentFile.name);
                     }
-                    // Обновляем URL фото на оригинал
                     const newUrl = getPhotoUrl(currentFile.type, currentFile.originalName || currentFile.name);
                     if (newUrl) {
                         currentFile.url = newUrl;
@@ -1049,15 +958,12 @@
         
         async function saveCurrentPhoto() {
             const canSave = state.isSubscribed || state.hasPurchased;
-            
             if (!canSave) {
                 showMultilineToast('Сохранить фото можно только\nподписчикам 🍓 или после покупки поста 🪙');
                 return;
             }
-            
             const f = state.files[state.index];
             if (!f) return;
-            
             try {
                 const res = await fetch(f.url);
                 const blob = await res.blob();
@@ -1096,102 +1002,43 @@
         let musicPlaying = false;
         const audio = document.getElementById('bg-music');
         let musicBtn = null;
-        
         function toggleMusic() {
-            if (musicPlaying) { 
-                audio.pause(); 
-                musicPlaying = false; 
-                if (musicBtn) musicBtn.style.opacity = '0.5';
-                showToast('🎵 Музыка выключена'); 
-            } else { 
-                audio.play().catch(() => {});
-                musicPlaying = true; 
-                if (musicBtn) musicBtn.style.opacity = '1';
-                showToast('🎵 Музыка включена'); 
-            }
+            if (musicPlaying) { audio.pause(); musicPlaying = false; if (musicBtn) musicBtn.style.opacity = '0.5'; showToast('🎵 Музыка выключена'); }
+            else { audio.play().catch(() => {}); musicPlaying = true; if (musicBtn) musicBtn.style.opacity = '1'; showToast('🎵 Музыка включена'); }
         }
         
         function updateUI() {
             const bananaBadge = document.getElementById('banana-count-badge');
-            if (bananaBadge) {
-                bananaBadge.textContent = state.bananasLeft;
-                bananaBadge.style.display = state.bananasLeft >= 0 ? 'flex' : 'none';
-            }
-            
+            if (bananaBadge) { bananaBadge.textContent = state.bananasLeft; bananaBadge.style.display = state.bananasLeft >= 0 ? 'flex' : 'none'; }
             const subBadgeIcon = document.getElementById('subscribed-badge-icon');
             if (subBadgeIcon) {
-                if (state.isSubscribed) {
-                    subBadgeIcon.textContent = '✔️';
-                    subBadgeIcon.className = 'badge-icon subscribed-true';
-                    subBadgeIcon.style.display = 'flex';
-                } else {
-                    subBadgeIcon.textContent = '✖️';
-                    subBadgeIcon.className = 'badge-icon subscribed-false';
-                    subBadgeIcon.style.display = 'flex';
-                }
+                if (state.isSubscribed) { subBadgeIcon.textContent = '✔️'; subBadgeIcon.className = 'badge-icon subscribed-true'; subBadgeIcon.style.display = 'flex'; }
+                else { subBadgeIcon.textContent = '✖️'; subBadgeIcon.className = 'badge-icon subscribed-false'; subBadgeIcon.style.display = 'flex'; }
             }
-            
             const purchasedBadgeIcon = document.getElementById('purchased-badge-icon');
             if (purchasedBadgeIcon) {
-                if (state.hasPurchased) {
-                    purchasedBadgeIcon.textContent = '✔️';
-                    purchasedBadgeIcon.className = 'badge-icon purchased-true';
-                    purchasedBadgeIcon.style.display = 'flex';
-                } else {
-                    purchasedBadgeIcon.style.display = 'none';
-                }
+                if (state.hasPurchased) { purchasedBadgeIcon.textContent = '✔️'; purchasedBadgeIcon.className = 'badge-icon purchased-true'; purchasedBadgeIcon.style.display = 'flex'; }
+                else { purchasedBadgeIcon.style.display = 'none'; }
             }
-            
             const subStatusModal = document.getElementById('sub-status-modal');
-            if (subStatusModal) {
-                subStatusModal.textContent = state.isSubscribed ? '✔️ есть' : '✖️ нет';
-            }
-            
+            if (subStatusModal) subStatusModal.textContent = state.isSubscribed ? '✔️ есть' : '✖️ нет';
             const purchasedStatusModal = document.getElementById('purchased-status-modal');
-            if (purchasedStatusModal) {
-                purchasedStatusModal.textContent = state.hasPurchased ? '✔️' : '';
-            }
-            
+            if (purchasedStatusModal) purchasedStatusModal.textContent = state.hasPurchased ? '✔️' : '';
             const saveBtn = document.getElementById('save-btn');
             if (saveBtn) saveBtn.classList.remove('disabled');
-            
             const bananaBtn = document.getElementById('banana-btn');
-            if (bananaBtn) {
-                if (state.botOffline) {
-                    bananaBtn.classList.add('disabled');
-                } else {
-                    bananaBtn.classList.remove('disabled');
-                }
-            }
-            
+            if (bananaBtn) { if (state.botOffline) bananaBtn.classList.add('disabled'); else bananaBtn.classList.remove('disabled'); }
             const strawberryBtn = document.getElementById('strawberry-btn');
-            if (strawberryBtn && state.botOffline) {
-                strawberryBtn.classList.add('disabled');
-            } else if (strawberryBtn) {
-                strawberryBtn.classList.remove('disabled');
-            }
-            
+            if (strawberryBtn && state.botOffline) strawberryBtn.classList.add('disabled');
+            else if (strawberryBtn) strawberryBtn.classList.remove('disabled');
             const coinBtn = document.getElementById('coin-btn');
-            if (coinBtn && state.botOffline) {
-                coinBtn.classList.add('disabled');
-            } else if (coinBtn) {
-                coinBtn.classList.remove('disabled');
-            }
+            if (coinBtn && state.botOffline) coinBtn.classList.add('disabled');
+            else if (coinBtn) coinBtn.classList.remove('disabled');
         }
         
-        function showInfo() { 
-            const modal = document.getElementById('info-modal');
-            if (modal) modal.classList.add('active'); 
-        }
-        function hideInfo(e) { 
-            if (e && e.target !== e.currentTarget) return;
-            const modal = document.getElementById('info-modal');
-            if (modal) modal.classList.remove('active'); 
-        }
-        function forceReload() { 
-            localStorage.clear(); 
-            location.reload(); 
-        }
+        function showInfo() { const modal = document.getElementById('info-modal'); if (modal) modal.classList.add('active'); }
+        function hideInfo(e) { if (e && e.target !== e.currentTarget) return; const modal = document.getElementById('info-modal'); if (modal) modal.classList.remove('active'); }
+        function forceReload() { localStorage.clear(); location.reload(); }
         function showToast(text) {
             const toast = document.getElementById('toast');
             if (!toast) return;
@@ -1214,14 +1061,9 @@
         }
         
         async function init() {
-            if (!window.Telegram?.WebApp) { 
-                showError('Откройте в Telegram'); 
-                return; 
-            }
-            if (tg) { 
-                tg.ready(); 
-                tg.expand(); 
-            }
+            debugLog(`🚀 INIT: проверка Telegram WebApp`, 'info');
+            if (!window.Telegram?.WebApp) { showError('Откройте в Telegram'); return; }
+            if (tg) { tg.ready(); tg.expand(); }
             await loadGallery();
         }
         
@@ -1234,7 +1076,6 @@
             const infoBtn = document.getElementById('info-btn');
             const modalCloseBtn = document.getElementById('modal-close-btn');
             const forceReloadItem = document.getElementById('force-reload-item');
-            
             if (strawberryBtn) strawberryBtn.addEventListener('click', handleStrawberry);
             if (bananaBtn) bananaBtn.addEventListener('click', spendBanana);
             if (coinBtn) coinBtn.addEventListener('click', handleCoin);
@@ -1243,7 +1084,6 @@
             if (infoBtn) infoBtn.addEventListener('click', showInfo);
             if (modalCloseBtn) modalCloseBtn.addEventListener('click', () => hideInfo());
             if (forceReloadItem) forceReloadItem.addEventListener('click', forceReload);
-            
             if (musicBtn) musicBtn.style.opacity = '0.5';
         });
         
