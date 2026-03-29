@@ -388,13 +388,11 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v18.0 - Упрощённое именование файлов');
+        console.log('🚀 v18.0 - Приватный репозиторий, загрузка через API');
         
-        const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
         const INTERFACE_BOT_USERNAME = 'k0tbezzabot';
         const tg = window.Telegram?.WebApp;
-        const GITHUB_REPO = 'Sweatyeyes/Bot-Posting';
         
         let touchStartX = 0;
         let touchStartY = 0;
@@ -403,6 +401,9 @@
         const minSwipeDistance = 50;
         
         const urlParams = new URLSearchParams(window.location.search);
+        
+        // Получаем API URL из параметров или используем по умолчанию
+        let API_URL = urlParams.get('api') || 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         
         function getPostId() {
             let postId = urlParams.get('post');
@@ -451,47 +452,16 @@
             bananasLeft: rawBananas, startTime: Date.now(),
             botOffline: false, loadingAttempts: 0,
             unlockedPhotos: urlUnlockedPhotos,
-            filesData: null
+            filesData: null,
+            apiUrl: API_URL
         };
-        
-        async function fetchFilesDirect() {
-            console.log('📁 Прямая загрузка с GitHub (без бота)');
-            const folders = ['general', 'banana', 'strawberry'];
-            const result = { general: [], banana: [], strawberry: [] };
-            
-            for (const folder of folders) {
-                const url = `https://api.github.com/repos/${GITHUB_REPO}/contents/posts/${state.postId}/${folder}`;
-                try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 5000);
-                    const res = await fetch(url, {
-                        headers: { 'Accept': 'application/vnd.github.v3+json' },
-                        signal: controller.signal
-                    });
-                    clearTimeout(timeoutId);
-                    
-                    if (res.status === 404) continue;
-                    if (!res.ok) continue;
-                    
-                    const data = await res.json();
-                    const files = data
-                        .filter(f => f.name.match(/\.(jpg|jpeg|png)$/i))
-                        .map(f => f.name);
-                    result[folder] = files;
-                    console.log(`✅ ${folder}: ${files.length} фото (прямая загрузка)`);
-                } catch(e) {
-                    console.log(`⚠️ Не удалось загрузить ${folder}: ${e.message}`);
-                }
-            }
-            return result;
-        }
         
         async function fetchFilesFromBot() {
             if (!state.postId) return null;
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
-                const res = await fetch(`${TUNNEL_URL}/api/get-files`, {
+                const res = await fetch(`${state.apiUrl}/api/get-files`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ post_id: state.postId }),
@@ -503,6 +473,7 @@
                 if (data.error) return null;
                 return data;
             } catch(e) {
+                console.log('Ошибка загрузки файлов:', e);
                 return null;
             }
         }
@@ -513,7 +484,7 @@
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
-                const res = await fetch(`${TUNNEL_URL}/api/check-purchase`, {
+                const res = await fetch(`${state.apiUrl}/api/check-purchase`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ user_id: state.userId, post_id: state.postId }),
@@ -531,88 +502,143 @@
             }
         }
         
-        function findBlurName(originalName, fileList, type) {
-            let baseName = originalName;
-            if (type === 'banana') {
-                const blurPattern = originalName.replace('.jpg', '_blur.jpg');
-                return fileList.find(f => f === blurPattern);
-            } else if (type === 'strawberry') {
-                const blurPattern = originalName.replace('.jpg', '_blur.jpg');
-                return fileList.find(f => f === blurPattern);
-            }
-            return null;
+        async function fetchUnlockedPhotos() {
+            if (!state.userId || !state.postId) return;
+            if (state.botOffline) return;
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                const res = await fetch(`${state.apiUrl}/api/get-unlocked-photos`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId }),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                const data = await res.json();
+                if (data.unlocked_photos) {
+                    state.unlockedPhotos = data.unlocked_photos;
+                    state.bananasLeft = data.available_bananas;
+                    updateUI();
+                }
+            } catch(e) {}
         }
         
-        function buildFileList(filesData) {
-            const baseUrl = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/posts/${state.postId}`;
+        async function checkSubscription() {
+            if (!state.userId) return false;
+            if (state.botOffline) return state.isSubscribed;
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                const res = await fetch(`${state.apiUrl}/api/check-subscription`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId }),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                const data = await res.json();
+                const isSubscribed = data.is_subscribed === true;
+                if (isSubscribed !== state.isSubscribed) {
+                    state.isSubscribed = isSubscribed;
+                    updateUI();
+                }
+                return isSubscribed;
+            } catch(e) { return state.isSubscribed; }
+        }
+        
+        // Функция загрузки фото через API бота
+        async function loadPhotoViaApi(folder, filename) {
+            const url = `${state.apiUrl}/api/get-photo?post=${state.postId}&folder=${folder}&file=${filename}&user=${state.userId}&t=${Date.now()}`;
+            try {
+                const res = await fetch(url);
+                if (res.ok) {
+                    const blob = await res.blob();
+                    return URL.createObjectURL(blob);
+                }
+                return null;
+            } catch(e) {
+                console.log('Ошибка загрузки фото:', e);
+                return null;
+            }
+        }
+        
+        function findBlurName(originalName) {
+            return originalName.replace('.jpg', '_blur.jpg');
+        }
+        
+        async function buildFileList(filesData) {
             const files = [];
             
+            // Общие фото
             for (const fileName of filesData.general || []) {
                 if (fileName.match(/\.(jpg|jpeg|png)$/i)) {
-                    files.push({
-                        name: fileName,
-                        url: `${baseUrl}/general/${fileName}`,
-                        type: 'general',
-                        isBlurred: false,
-                        isBanana: false
-                    });
+                    const photoUrl = await loadPhotoViaApi('general', fileName);
+                    if (photoUrl) {
+                        files.push({
+                            name: fileName,
+                            url: photoUrl,
+                            type: 'general',
+                            isBlurred: false,
+                            isBanana: false,
+                            originalUrl: photoUrl
+                        });
+                    }
                 }
             }
             
+            // Банановые фото
             const bananaOriginals = (filesData.banana || []).filter(f => 
                 !f.includes('_blur') && f.match(/\.(jpg|jpeg|png)$/i)
             );
             for (const originalName of bananaOriginals) {
                 const isUnlocked = state.isSubscribed || state.hasPurchased || state.unlockedPhotos.includes(originalName);
-                const blurName = originalName.replace('.jpg', '_blur.jpg');
-                const hasBlur = filesData.banana.includes(blurName);
                 
-                let imageUrl;
+                let photoUrl;
                 if (isUnlocked) {
-                    imageUrl = `${baseUrl}/banana/${originalName}`;
-                } else if (hasBlur) {
-                    imageUrl = `${baseUrl}/banana/${blurName}`;
+                    photoUrl = await loadPhotoViaApi('banana', originalName);
                 } else {
-                    imageUrl = 'https://via.placeholder.com/600x800/333/fff?text=No+Access';
+                    const blurName = findBlurName(originalName);
+                    photoUrl = await loadPhotoViaApi('banana', blurName);
                 }
                 
-                files.push({
-                    name: originalName,
-                    originalName: originalName,
-                    url: imageUrl,
-                    originalUrl: `${baseUrl}/banana/${originalName}`,
-                    type: 'banana',
-                    isBlurred: !isUnlocked,
-                    isBanana: true
-                });
+                if (photoUrl) {
+                    files.push({
+                        name: originalName,
+                        originalName: originalName,
+                        url: photoUrl,
+                        originalUrl: await loadPhotoViaApi('banana', originalName),
+                        type: 'banana',
+                        isBlurred: !isUnlocked,
+                        isBanana: true
+                    });
+                }
             }
             
+            // Клубничные фото
             const strawberryOriginals = (filesData.strawberry || []).filter(f => 
                 !f.includes('_blur') && f.match(/\.(jpg|jpeg|png)$/i)
             );
             for (const originalName of strawberryOriginals) {
                 const hasAccess = state.hasPurchased || state.isSubscribed;
-                const blurName = originalName.replace('.jpg', '_blur.jpg');
-                const hasBlur = filesData.strawberry.includes(blurName);
                 
-                let imageUrl;
+                let photoUrl;
                 if (hasAccess) {
-                    imageUrl = `${baseUrl}/strawberry/${originalName}`;
-                } else if (hasBlur) {
-                    imageUrl = `${baseUrl}/strawberry/${blurName}`;
+                    photoUrl = await loadPhotoViaApi('strawberry', originalName);
                 } else {
-                    imageUrl = 'https://via.placeholder.com/600x800/333/fff?text=No+Access';
+                    const blurName = findBlurName(originalName);
+                    photoUrl = await loadPhotoViaApi('strawberry', blurName);
                 }
                 
-                files.push({
-                    name: originalName,
-                    originalName: originalName,
-                    url: imageUrl,
-                    originalUrl: `${baseUrl}/strawberry/${originalName}`,
-                    type: 'strawberry',
-                    isBlurred: !hasAccess,
-                    isBanana: false
-                });
+                if (photoUrl) {
+                    files.push({
+                        name: originalName,
+                        originalName: originalName,
+                        url: photoUrl,
+                        originalUrl: await loadPhotoViaApi('strawberry', originalName),
+                        type: 'strawberry',
+                        isBlurred: !hasAccess,
+                        isBanana: false
+                    });
+                }
             }
             
             return files;
@@ -624,35 +650,26 @@
                 return;
             }
             
+            // Загружаем список файлов
             let filesData = await fetchFilesFromBot();
             
             if (!filesData) {
                 state.botOffline = true;
                 document.getElementById('offline-badge').style.display = 'block';
-                console.log('📴 Бот недоступен, переключаемся в офлайн-режим');
-                
-                filesData = await fetchFilesDirect();
-                
-                if (!filesData || (Object.values(filesData).every(arr => arr.length === 0))) {
-                    showError('Нет соединения с GitHub');
-                    return;
-                }
-                
-                state.isSubscribed = false;
-                state.hasPurchased = false;
-                state.unlockedPhotos = [];
-                state.bananasLeft = 3;
-            } else {
-                state.botOffline = false;
-                document.getElementById('offline-badge').style.display = 'none';
-                
-                await checkPurchase();
-                await checkSubscription();
-                await fetchUnlockedPhotos();
+                showError('Бот недоступен');
+                return;
             }
             
+            state.botOffline = false;
+            document.getElementById('offline-badge').style.display = 'none';
+            
+            // Обновляем данные о покупке и подписке
+            await checkPurchase();
+            await checkSubscription();
+            await fetchUnlockedPhotos();
+            
             state.filesData = filesData;
-            const files = buildFileList(filesData);
+            const files = await buildFileList(filesData);
             
             if (files.length === 0) {
                 showError('В этом посте нет фото');
@@ -678,7 +695,7 @@
             if (!img || !file) return;
             
             img.classList.remove('loaded');
-            img.src = file.url + '?t=' + Date.now();
+            img.src = file.url + '&_t=' + Date.now();
             
             const counterText = document.getElementById('counter-text');
             if (counterText) {
@@ -761,49 +778,6 @@
             if (e.key === 'ArrowRight') { next(); e.preventDefault(); }
         });
         
-        async function fetchUnlockedPhotos() {
-            if (!state.userId || !state.postId) return;
-            if (state.botOffline) return;
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-                const res = await fetch(`${TUNNEL_URL}/api/get-unlocked-photos`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId }),
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-                const data = await res.json();
-                if (data.unlocked_photos) {
-                    state.unlockedPhotos = data.unlocked_photos;
-                    state.bananasLeft = data.available_bananas;
-                    updateUI();
-                }
-            } catch(e) {}
-        }
-        
-        async function checkSubscription() {
-            if (!state.userId) return false;
-            if (state.botOffline) return state.isSubscribed;
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-                const res = await fetch(`${TUNNEL_URL}/api/check-subscription`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId }),
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-                const data = await res.json();
-                const isSubscribed = data.is_subscribed === true;
-                if (isSubscribed !== state.isSubscribed) {
-                    state.isSubscribed = isSubscribed;
-                    updateUI();
-                }
-                return isSubscribed;
-            } catch(e) { return state.isSubscribed; }
-        }
-        
         function showMultilineToast(text, duration = 4000) {
             const toast = document.getElementById('toast');
             if (!toast) return;
@@ -855,7 +829,7 @@
             }
             
             try {
-                const res = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
+                const res = await fetch(`${state.apiUrl}/api/webapp-data`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -873,9 +847,13 @@
                     if (!state.unlockedPhotos.includes(currentFile.originalName || currentFile.name)) {
                         state.unlockedPhotos.push(currentFile.originalName || currentFile.name);
                     }
-                    currentFile.isBlurred = false;
-                    currentFile.url = currentFile.originalUrl;
-                    showImage(state.index);
+                    // Перезагружаем текущее фото (теперь оригинал)
+                    const newUrl = await loadPhotoViaApi(currentFile.type, currentFile.originalName || currentFile.name);
+                    if (newUrl) {
+                        currentFile.url = newUrl;
+                        currentFile.isBlurred = false;
+                        showImage(state.index);
+                    }
                     updateUI();
                     showToast('🍌 Банан потрачен!');
                 } else if (data.already_spent) {
@@ -900,6 +878,7 @@
             if (!f) return;
             
             try {
+                // Скачиваем фото через fetch и сохраняем
                 const res = await fetch(f.url);
                 const blob = await res.blob();
                 const url = URL.createObjectURL(blob);
