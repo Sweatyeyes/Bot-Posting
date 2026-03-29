@@ -283,34 +283,6 @@
             width: 80%;
         }
         #error small { display: block; margin-top: 10px; color: #999; font-size: 14px; }
-        
-        /* Отладочная панель */
-        #debug-panel {
-            position: fixed;
-            bottom: 90px;
-            left: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.95);
-            color: #0f0;
-            font-size: 11px;
-            padding: 8px;
-            border-radius: 8px;
-            z-index: 2000;
-            max-height: 250px;
-            overflow-y: auto;
-            font-family: monospace;
-            display: none;
-            border: 1px solid #2ea6ff;
-        }
-        .debug-entry {
-            border-bottom: 1px solid #333;
-            padding: 2px 0;
-            word-break: break-all;
-        }
-        .debug-error { color: #ff6b6b; }
-        .debug-success { color: #6bff6b; }
-        .debug-warning { color: #ffaa00; }
-        .debug-info { color: #2ea6ff; }
     </style>
 </head>
 <body>
@@ -322,8 +294,6 @@
     </div>
     
     <div id="gallery">
-        <div id="debug-panel"></div>
-        
         <div id="badges">
             <div id="offline-badge" class="badge">📴 Оффлайн</div>
         </div>
@@ -332,7 +302,7 @@
         <div id="nav-right"></div>
         
         <div id="image-container">
-            <img id="image" src="" onload="this.classList.add('loaded')" onerror="onImageLoadError()">
+            <img id="image" src="" onload="this.classList.add('loaded')" onerror="onImageError()">
         </div>
         
         <div id="bottom-bar">
@@ -418,11 +388,13 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v25.0 - CORS FIX: GET эндпоинты, правильные URL');
+        console.log('🚀 v18.0 - Упрощённое именование файлов');
         
+        const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
         const INTERFACE_BOT_USERNAME = 'k0tbezzabot';
         const tg = window.Telegram?.WebApp;
+        const GITHUB_REPO = 'Sweatyeyes/Bot-Posting';
         
         let touchStartX = 0;
         let touchStartY = 0;
@@ -430,59 +402,7 @@
         let touchEndY = 0;
         const minSwipeDistance = 50;
         
-        let errorCounter = 0;
-        
-        const debugPanel = document.getElementById('debug-panel');
-        
-        function debugLog(message, type = 'info') {
-            const entry = document.createElement('div');
-            entry.className = 'debug-entry';
-            if (type === 'error') entry.classList.add('debug-error');
-            if (type === 'success') entry.classList.add('debug-success');
-            if (type === 'warning') entry.classList.add('debug-warning');
-            if (type === 'info') entry.classList.add('debug-info');
-            
-            const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
-            entry.textContent = `[${time}] ${message}`;
-            
-            if (debugPanel) {
-                debugPanel.appendChild(entry);
-                debugPanel.scrollTop = debugPanel.scrollHeight;
-                while (debugPanel.children.length > 100) {
-                    debugPanel.removeChild(debugPanel.firstChild);
-                }
-            }
-            console.log(`🔍 [${type}] ${message}`);
-        }
-        
-        document.addEventListener('DOMContentLoaded', () => {
-            const infoBtn = document.getElementById('info-btn');
-            if (infoBtn) {
-                infoBtn.addEventListener('click', () => {
-                    if (debugPanel) {
-                        debugPanel.style.display = debugPanel.style.display === 'block' ? 'none' : 'block';
-                        setTimeout(() => {
-                            if (debugPanel.style.display === 'block') {
-                                setTimeout(() => debugPanel.style.display = 'none', 15000);
-                            }
-                        }, 15000);
-                    }
-                });
-            }
-        });
-        
         const urlParams = new URLSearchParams(window.location.search);
-        
-        // API_URL из параметра api (передается ботом)
-        let API_URL = urlParams.get('api');
-        debugLog(`🔍 api параметр из URL: "${API_URL}"`, 'info');
-        
-        if (!API_URL) {
-            API_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
-            debugLog(`⚠️ API_URL не передан, используем дефолтный: ${API_URL}`, 'warning');
-        } else {
-            debugLog(`✅ API_URL из параметров: ${API_URL}`, 'success');
-        }
         
         function getPostId() {
             let postId = urlParams.get('post');
@@ -525,149 +445,176 @@
         const unlockedParam = urlParams.get('unlocked') || '';
         const urlUnlockedPhotos = unlockedParam ? unlockedParam.split(',') : [];
         
-        debugLog(`📊 ПАРАМЕТРЫ: post=${rawPost}, user=${rawUser}`, 'info');
-        debugLog(`📊 subscribed=${rawSubscribed}, purchased=${rawPurchased}, bananas=${rawBananas}`, 'info');
-        debugLog(`📊 API_URL=${API_URL}`, 'info');
-        
         let state = {
             files: [], index: 0, postId: rawPost, userId: rawUser,
             isSubscribed: rawSubscribed, hasPurchased: rawPurchased,
             bananasLeft: rawBananas, startTime: Date.now(),
             botOffline: false, loadingAttempts: 0,
             unlockedPhotos: urlUnlockedPhotos,
-            filesData: null,
-            apiUrl: API_URL
+            filesData: null
         };
         
-        async function fetchFilesFromBot() {
-            if (!state.postId) {
-                debugLog(`❌ fetchFiles: postId отсутствует`, 'error');
-                return null;
+        async function fetchFilesDirect() {
+            console.log('📁 Прямая загрузка с GitHub (без бота)');
+            const folders = ['general', 'banana', 'strawberry'];
+            const result = { general: [], banana: [], strawberry: [] };
+            
+            for (const folder of folders) {
+                const url = `https://api.github.com/repos/${GITHUB_REPO}/contents/posts/${state.postId}/${folder}`;
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 5000);
+                    const res = await fetch(url, {
+                        headers: { 'Accept': 'application/vnd.github.v3+json' },
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
+                    
+                    if (res.status === 404) continue;
+                    if (!res.ok) continue;
+                    
+                    const data = await res.json();
+                    const files = data
+                        .filter(f => f.name.match(/\.(jpg|jpeg|png)$/i))
+                        .map(f => f.name);
+                    result[folder] = files;
+                    console.log(`✅ ${folder}: ${files.length} фото (прямая загрузка)`);
+                } catch(e) {
+                    console.log(`⚠️ Не удалось загрузить ${folder}: ${e.message}`);
+                }
             }
-            const url = `${state.apiUrl}/api/get-files?post=${state.postId}`;
-            debugLog(`📡 GET ${url}`, 'info');
+            return result;
+        }
+        
+        async function fetchFilesFromBot() {
+            if (!state.postId) return null;
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
-                const res = await fetch(url, { signal: controller.signal });
+                const res = await fetch(`${TUNNEL_URL}/api/get-files`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ post_id: state.postId }),
+                    signal: controller.signal
+                });
                 clearTimeout(timeoutId);
-                debugLog(`📡 ответ: ${res.status}`, res.ok ? 'success' : 'error');
                 if (!res.ok) return null;
                 const data = await res.json();
-                debugLog(`📡 файлы: general=${data.general?.length || 0}, banana=${data.banana?.length || 0}, strawberry=${data.strawberry?.length || 0}`, 'success');
+                if (data.error) return null;
                 return data;
             } catch(e) {
-                debugLog(`❌ fetchFiles: ${e.message}`, 'error');
                 return null;
             }
         }
         
         async function checkPurchase() {
             if (!state.userId || !state.postId) return false;
-            const url = `${state.apiUrl}/api/check-purchase?user=${state.userId}&post=${state.postId}`;
-            debugLog(`🪙 GET ${url}`, 'info');
+            if (state.botOffline) return false;
             try {
-                const res = await fetch(url);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                const res = await fetch(`${TUNNEL_URL}/api/check-purchase`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId }),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
                 const data = await res.json();
-                debugLog(`🪙 покупка: ${data.purchased}`, data.purchased ? 'success' : 'warning');
-                if (data.purchased) state.hasPurchased = true;
-                return data.purchased;
+                if (data.purchased) {
+                    state.hasPurchased = true;
+                    return true;
+                }
+                return false;
             } catch(e) {
-                debugLog(`❌ checkPurchase: ${e.message}`, 'error');
                 return state.hasPurchased;
             }
         }
         
-        async function fetchUnlockedPhotos() {
-            if (!state.userId || !state.postId) return;
-            const url = `${state.apiUrl}/api/get-unlocked-photos?user=${state.userId}&post=${state.postId}`;
-            debugLog(`🍌 GET ${url}`, 'info');
-            try {
-                const res = await fetch(url);
-                const data = await res.json();
-                if (data.unlocked_photos) {
-                    state.unlockedPhotos = data.unlocked_photos;
-                    state.bananasLeft = data.available_bananas;
-                    debugLog(`🍌 разблокировано: ${state.unlockedPhotos.length}, бананов: ${state.bananasLeft}`, 'success');
-                }
-            } catch(e) {
-                debugLog(`❌ fetchUnlocked: ${e.message}`, 'error');
+        function findBlurName(originalName, fileList, type) {
+            let baseName = originalName;
+            if (type === 'banana') {
+                const blurPattern = originalName.replace('.jpg', '_blur.jpg');
+                return fileList.find(f => f === blurPattern);
+            } else if (type === 'strawberry') {
+                const blurPattern = originalName.replace('.jpg', '_blur.jpg');
+                return fileList.find(f => f === blurPattern);
             }
-        }
-        
-        async function checkSubscription() {
-            if (!state.userId) return false;
-            const url = `${state.apiUrl}/api/check-subscription?user=${state.userId}&post=${state.postId}`;
-            debugLog(`🍓 GET ${url}`, 'info');
-            try {
-                const res = await fetch(url);
-                const data = await res.json();
-                const isSubscribed = data.is_subscribed === true;
-                debugLog(`🍓 подписка: ${isSubscribed}`, isSubscribed ? 'success' : 'warning');
-                if (isSubscribed !== state.isSubscribed) state.isSubscribed = isSubscribed;
-                return isSubscribed;
-            } catch(e) {
-                debugLog(`❌ checkSubscription: ${e.message}`, 'error');
-                return state.isSubscribed;
-            }
-        }
-        
-        function getPhotoUrl(folder, filename) {
-            if (!state.postId || !state.userId) return null;
-            const url = `${state.apiUrl}/api/get-photo?post=${state.postId}&folder=${folder}&file=${filename}&user=${state.userId}&t=${Date.now()}`;
-            debugLog(`📸 URL: ${url.substring(0, 100)}...`, 'info');
-            return url;
+            return null;
         }
         
         function buildFileList(filesData) {
+            const baseUrl = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/posts/${state.postId}`;
             const files = [];
-            debugLog(`📦 BUILD FILE LIST: userId=${state.userId}, postId=${state.postId}`, 'info');
-            debugLog(`📦 isSubscribed=${state.isSubscribed}, hasPurchased=${state.hasPurchased}`, 'info');
             
-            // GENERAL
             for (const fileName of filesData.general || []) {
                 if (fileName.match(/\.(jpg|jpeg|png)$/i)) {
-                    const url = getPhotoUrl('general', fileName);
-                    if (url) {
-                        files.push({ name: fileName, url: url, type: 'general', isBlurred: false, isBanana: false });
-                        debugLog(`✅ GENERAL: ${fileName}`, 'success');
-                    }
+                    files.push({
+                        name: fileName,
+                        url: `${baseUrl}/general/${fileName}`,
+                        type: 'general',
+                        isBlurred: false,
+                        isBanana: false
+                    });
                 }
             }
             
-            // BANANA
-            const bananaOriginals = (filesData.banana || []).filter(f => !f.includes('_blur') && f.match(/\.(jpg|jpeg|png)$/i));
+            const bananaOriginals = (filesData.banana || []).filter(f => 
+                !f.includes('_blur') && f.match(/\.(jpg|jpeg|png)$/i)
+            );
             for (const originalName of bananaOriginals) {
                 const isUnlocked = state.isSubscribed || state.hasPurchased || state.unlockedPhotos.includes(originalName);
-                const displayName = isUnlocked ? originalName : originalName.replace('.jpg', '_blur.jpg');
-                const url = getPhotoUrl('banana', displayName);
-                if (url) {
-                    files.push({
-                        name: originalName, originalName: originalName, url: url,
-                        originalUrl: getPhotoUrl('banana', originalName),
-                        type: 'banana', isBlurred: !isUnlocked, isBanana: true
-                    });
-                    debugLog(`✅ BANANA: ${originalName} -> ${displayName}`, 'success');
+                const blurName = originalName.replace('.jpg', '_blur.jpg');
+                const hasBlur = filesData.banana.includes(blurName);
+                
+                let imageUrl;
+                if (isUnlocked) {
+                    imageUrl = `${baseUrl}/banana/${originalName}`;
+                } else if (hasBlur) {
+                    imageUrl = `${baseUrl}/banana/${blurName}`;
+                } else {
+                    imageUrl = 'https://via.placeholder.com/600x800/333/fff?text=No+Access';
                 }
+                
+                files.push({
+                    name: originalName,
+                    originalName: originalName,
+                    url: imageUrl,
+                    originalUrl: `${baseUrl}/banana/${originalName}`,
+                    type: 'banana',
+                    isBlurred: !isUnlocked,
+                    isBanana: true
+                });
             }
             
-            // STRAWBERRY
-            const strawberryOriginals = (filesData.strawberry || []).filter(f => !f.includes('_blur') && f.match(/\.(jpg|jpeg|png)$/i));
+            const strawberryOriginals = (filesData.strawberry || []).filter(f => 
+                !f.includes('_blur') && f.match(/\.(jpg|jpeg|png)$/i)
+            );
             for (const originalName of strawberryOriginals) {
                 const hasAccess = state.hasPurchased || state.isSubscribed;
-                const displayName = hasAccess ? originalName : originalName.replace('.jpg', '_blur.jpg');
-                const url = getPhotoUrl('strawberry', displayName);
-                if (url) {
-                    files.push({
-                        name: originalName, originalName: originalName, url: url,
-                        originalUrl: getPhotoUrl('strawberry', originalName),
-                        type: 'strawberry', isBlurred: !hasAccess, isBanana: false
-                    });
-                    debugLog(`✅ STRAWBERRY: ${originalName} -> ${displayName}`, 'success');
+                const blurName = originalName.replace('.jpg', '_blur.jpg');
+                const hasBlur = filesData.strawberry.includes(blurName);
+                
+                let imageUrl;
+                if (hasAccess) {
+                    imageUrl = `${baseUrl}/strawberry/${originalName}`;
+                } else if (hasBlur) {
+                    imageUrl = `${baseUrl}/strawberry/${blurName}`;
+                } else {
+                    imageUrl = 'https://via.placeholder.com/600x800/333/fff?text=No+Access';
                 }
+                
+                files.push({
+                    name: originalName,
+                    originalName: originalName,
+                    url: imageUrl,
+                    originalUrl: `${baseUrl}/strawberry/${originalName}`,
+                    type: 'strawberry',
+                    isBlurred: !hasAccess,
+                    isBanana: false
+                });
             }
             
-            debugLog(`📦 ИТОГО: ${files.length} фото`, files.length > 0 ? 'success' : 'error');
             return files;
         }
         
@@ -677,23 +624,34 @@
                 return;
             }
             
-            debugLog(`🚀 LOAD GALLERY: ${state.postId}`, 'info');
-            
             let filesData = await fetchFilesFromBot();
+            
             if (!filesData) {
                 state.botOffline = true;
                 document.getElementById('offline-badge').style.display = 'block';
-                showError('Бот недоступен');
-                return;
+                console.log('📴 Бот недоступен, переключаемся в офлайн-режим');
+                
+                filesData = await fetchFilesDirect();
+                
+                if (!filesData || (Object.values(filesData).every(arr => arr.length === 0))) {
+                    showError('Нет соединения с GitHub');
+                    return;
+                }
+                
+                state.isSubscribed = false;
+                state.hasPurchased = false;
+                state.unlockedPhotos = [];
+                state.bananasLeft = 3;
+            } else {
+                state.botOffline = false;
+                document.getElementById('offline-badge').style.display = 'none';
+                
+                await checkPurchase();
+                await checkSubscription();
+                await fetchUnlockedPhotos();
             }
             
-            state.botOffline = false;
-            document.getElementById('offline-badge').style.display = 'none';
-            
-            await checkPurchase();
-            await checkSubscription();
-            await fetchUnlockedPhotos();
-            
+            state.filesData = filesData;
             const files = buildFileList(filesData);
             
             if (files.length === 0) {
@@ -709,74 +667,92 @@
             showImage(0);
             setupNavigation();
             setupSwipeListeners();
-            
-            debugLog(`✅ ГАЛЕРЕЯ ЗАГРУЖЕНА: ${files.length} фото`, 'success');
-        }
-        
-        function onImageLoadError() {
-            const img = document.getElementById('image');
-            if (!img) return;
-            errorCounter++;
-            debugLog(`❌ Ошибка загрузки (${errorCounter}): ${img.src.substring(0, 80)}`, 'error');
-            if (errorCounter > 3) {
-                img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Crect width="100" height="100" fill="%23333"/%3E%3Ctext x="50" y="55" text-anchor="middle" fill="%23fff" font-size="12"%3EError%3C/text%3E%3C/svg%3E';
-                return;
-            }
-            setTimeout(() => {
-                if (state.files && state.files[state.index]) {
-                    const file = state.files[state.index];
-                    img.src = file.url + '&retry=' + Date.now();
-                }
-            }, 2000);
         }
         
         function showImage(i) {
             if (!state.files || state.files.length === 0) return;
+            
             state.index = (i + state.files.length) % state.files.length;
             const img = document.getElementById('image');
             const file = state.files[state.index];
             if (!img || !file) return;
-            errorCounter = 0;
-            debugLog(`🖼 ${state.index+1}/${state.files.length}: ${file.name}`, 'info');
+            
             img.classList.remove('loaded');
-            img.src = file.url + '&v=' + Date.now();
+            img.src = file.url + '?t=' + Date.now();
+            
             const counterText = document.getElementById('counter-text');
-            if (counterText) counterText.innerText = `${state.index+1}/${state.files.length}`;
+            if (counterText) {
+                counterText.innerText = `${state.index+1}/${state.files.length}`;
+            }
         }
         
         function next() { if (state.files && state.files.length) showImage(state.index + 1); }
         function prev() { if (state.files && state.files.length) showImage(state.index - 1); }
+        function onImageError() { setTimeout(() => showImage(state.index), 1000); }
         
         function setupNavigation() {
             const left = document.getElementById('nav-left');
             const right = document.getElementById('nav-right');
-            if (left) { const newLeft = left.cloneNode(true); left.parentNode.replaceChild(newLeft, left); newLeft.addEventListener('click', (e) => { e.stopPropagation(); prev(); }); }
-            if (right) { const newRight = right.cloneNode(true); right.parentNode.replaceChild(newRight, right); newRight.addEventListener('click', (e) => { e.stopPropagation(); next(); }); }
+            if (left) { 
+                const newLeft = left.cloneNode(true); 
+                left.parentNode.replaceChild(newLeft, left); 
+                newLeft.addEventListener('click', (e) => { e.stopPropagation(); prev(); }); 
+            }
+            if (right) { 
+                const newRight = right.cloneNode(true); 
+                right.parentNode.replaceChild(newRight, right); 
+                newRight.addEventListener('click', (e) => { e.stopPropagation(); next(); }); 
+            }
         }
         
         function setupSwipeListeners() {
-            if (tg && tg.disableVerticalSwipes) tg.disableVerticalSwipes();
+            if (tg && tg.disableVerticalSwipes) {
+                tg.disableVerticalSwipes();
+            }
+            
             document.addEventListener('touchstart', handleTouchStart, { passive: false });
             document.addEventListener('touchend', handleTouchEnd, { passive: false });
+            
             document.body.style.touchAction = 'pan-y pinch-zoom';
         }
         
         function handleTouchStart(e) {
-            if (e.target.closest('.bottom-btn') || e.target.closest('#bottom-bar')) return;
+            const target = e.target;
+            if (target.closest('.bottom-btn') || target.closest('#bottom-bar')) {
+                return;
+            }
+            
             touchStartX = e.changedTouches[0].screenX;
             touchStartY = e.changedTouches[0].screenY;
         }
         
         function handleTouchEnd(e) {
             if (touchStartX === 0) return;
+            
             touchEndX = e.changedTouches[0].screenX;
             touchEndY = e.changedTouches[0].screenY;
+            
             const deltaX = touchEndX - touchStartX;
             const deltaY = touchEndY - touchStartY;
-            if (Math.abs(deltaX) < Math.abs(deltaY)) { touchStartX = 0; return; }
-            if (Math.abs(deltaX) < minSwipeDistance) { touchStartX = 0; return; }
+            
+            if (Math.abs(deltaX) < Math.abs(deltaY)) {
+                touchStartX = 0;
+                return;
+            }
+            
+            if (Math.abs(deltaX) < minSwipeDistance) {
+                touchStartX = 0;
+                return;
+            }
+            
             e.preventDefault();
-            if (deltaX > 0) prev(); else next();
+            
+            if (deltaX > 0) {
+                prev();
+            } else {
+                next();
+            }
+            
             touchStartX = 0;
         }
         
@@ -785,9 +761,53 @@
             if (e.key === 'ArrowRight') { next(); e.preventDefault(); }
         });
         
+        async function fetchUnlockedPhotos() {
+            if (!state.userId || !state.postId) return;
+            if (state.botOffline) return;
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                const res = await fetch(`${TUNNEL_URL}/api/get-unlocked-photos`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId }),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                const data = await res.json();
+                if (data.unlocked_photos) {
+                    state.unlockedPhotos = data.unlocked_photos;
+                    state.bananasLeft = data.available_bananas;
+                    updateUI();
+                }
+            } catch(e) {}
+        }
+        
+        async function checkSubscription() {
+            if (!state.userId) return false;
+            if (state.botOffline) return state.isSubscribed;
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                const res = await fetch(`${TUNNEL_URL}/api/check-subscription`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId }),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                const data = await res.json();
+                const isSubscribed = data.is_subscribed === true;
+                if (isSubscribed !== state.isSubscribed) {
+                    state.isSubscribed = isSubscribed;
+                    updateUI();
+                }
+                return isSubscribed;
+            } catch(e) { return state.isSubscribed; }
+        }
+        
         function showMultilineToast(text, duration = 4000) {
             const toast = document.getElementById('toast');
             if (!toast) return;
+            
             toast.style.whiteSpace = 'normal';
             toast.style.wordBreak = 'break-word';
             toast.style.maxWidth = '80%';
@@ -796,6 +816,7 @@
             toast.style.textAlign = 'center';
             toast.style.lineHeight = '1.4';
             toast.style.padding = '12px 16px';
+            
             toast.textContent = text;
             toast.classList.add('show');
             setTimeout(() => {
@@ -817,6 +838,7 @@
                 showMultilineToast('📴 Бот недоступен, бананы нельзя тратить');
                 return;
             }
+            
             const currentFile = state.files[state.index];
             if (!currentFile || !currentFile.isBanana) {
                 showToast('🍌 Это фото нельзя разблокировать бананом');
@@ -826,12 +848,14 @@
                 showToast('✅ Уже разблокировано');
                 return;
             }
+            
             if (state.bananasLeft <= 0) {
                 showMultilineToast('У вас 0 бананов.\nКупите 🪙 доступ ко всем фото за 99₽\nили подпишитесь на 🍓');
                 return;
             }
+            
             try {
-                const res = await fetch(`${state.apiUrl}/api/webapp-data`, {
+                const res = await fetch(`${TUNNEL_URL}/api/webapp-data`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -841,18 +865,17 @@
                         details: { photo_name: currentFile.originalName || currentFile.name }
                     })
                 });
+                
                 const data = await res.json();
+                
                 if (data.success) {
                     state.bananasLeft = data.available;
                     if (!state.unlockedPhotos.includes(currentFile.originalName || currentFile.name)) {
                         state.unlockedPhotos.push(currentFile.originalName || currentFile.name);
                     }
-                    const newUrl = getPhotoUrl(currentFile.type, currentFile.originalName || currentFile.name);
-                    if (newUrl) {
-                        currentFile.url = newUrl;
-                        currentFile.isBlurred = false;
-                        showImage(state.index);
-                    }
+                    currentFile.isBlurred = false;
+                    currentFile.url = currentFile.originalUrl;
+                    showImage(state.index);
                     updateUI();
                     showToast('🍌 Банан потрачен!');
                 } else if (data.already_spent) {
@@ -867,12 +890,15 @@
         
         async function saveCurrentPhoto() {
             const canSave = state.isSubscribed || state.hasPurchased;
+            
             if (!canSave) {
                 showMultilineToast('Сохранить фото можно только\nподписчикам 🍓 или после покупки поста 🪙');
                 return;
             }
+            
             const f = state.files[state.index];
             if (!f) return;
+            
             try {
                 const res = await fetch(f.url);
                 const blob = await res.blob();
@@ -911,43 +937,102 @@
         let musicPlaying = false;
         const audio = document.getElementById('bg-music');
         let musicBtn = null;
+        
         function toggleMusic() {
-            if (musicPlaying) { audio.pause(); musicPlaying = false; if (musicBtn) musicBtn.style.opacity = '0.5'; showToast('🎵 Музыка выключена'); }
-            else { audio.play().catch(() => {}); musicPlaying = true; if (musicBtn) musicBtn.style.opacity = '1'; showToast('🎵 Музыка включена'); }
+            if (musicPlaying) { 
+                audio.pause(); 
+                musicPlaying = false; 
+                if (musicBtn) musicBtn.style.opacity = '0.5';
+                showToast('🎵 Музыка выключена'); 
+            } else { 
+                audio.play().catch(() => {});
+                musicPlaying = true; 
+                if (musicBtn) musicBtn.style.opacity = '1';
+                showToast('🎵 Музыка включена'); 
+            }
         }
         
         function updateUI() {
             const bananaBadge = document.getElementById('banana-count-badge');
-            if (bananaBadge) { bananaBadge.textContent = state.bananasLeft; bananaBadge.style.display = state.bananasLeft >= 0 ? 'flex' : 'none'; }
+            if (bananaBadge) {
+                bananaBadge.textContent = state.bananasLeft;
+                bananaBadge.style.display = state.bananasLeft >= 0 ? 'flex' : 'none';
+            }
+            
             const subBadgeIcon = document.getElementById('subscribed-badge-icon');
             if (subBadgeIcon) {
-                if (state.isSubscribed) { subBadgeIcon.textContent = '✔️'; subBadgeIcon.className = 'badge-icon subscribed-true'; subBadgeIcon.style.display = 'flex'; }
-                else { subBadgeIcon.textContent = '✖️'; subBadgeIcon.className = 'badge-icon subscribed-false'; subBadgeIcon.style.display = 'flex'; }
+                if (state.isSubscribed) {
+                    subBadgeIcon.textContent = '✔️';
+                    subBadgeIcon.className = 'badge-icon subscribed-true';
+                    subBadgeIcon.style.display = 'flex';
+                } else {
+                    subBadgeIcon.textContent = '✖️';
+                    subBadgeIcon.className = 'badge-icon subscribed-false';
+                    subBadgeIcon.style.display = 'flex';
+                }
             }
+            
             const purchasedBadgeIcon = document.getElementById('purchased-badge-icon');
             if (purchasedBadgeIcon) {
-                if (state.hasPurchased) { purchasedBadgeIcon.textContent = '✔️'; purchasedBadgeIcon.className = 'badge-icon purchased-true'; purchasedBadgeIcon.style.display = 'flex'; }
-                else { purchasedBadgeIcon.style.display = 'none'; }
+                if (state.hasPurchased) {
+                    purchasedBadgeIcon.textContent = '✔️';
+                    purchasedBadgeIcon.className = 'badge-icon purchased-true';
+                    purchasedBadgeIcon.style.display = 'flex';
+                } else {
+                    purchasedBadgeIcon.style.display = 'none';
+                }
             }
+            
             const subStatusModal = document.getElementById('sub-status-modal');
-            if (subStatusModal) subStatusModal.textContent = state.isSubscribed ? '✔️ есть' : '✖️ нет';
+            if (subStatusModal) {
+                subStatusModal.textContent = state.isSubscribed ? '✔️ есть' : '✖️ нет';
+            }
+            
             const purchasedStatusModal = document.getElementById('purchased-status-modal');
-            if (purchasedStatusModal) purchasedStatusModal.textContent = state.hasPurchased ? '✔️' : '';
+            if (purchasedStatusModal) {
+                purchasedStatusModal.textContent = state.hasPurchased ? '✔️' : '';
+            }
+            
             const saveBtn = document.getElementById('save-btn');
             if (saveBtn) saveBtn.classList.remove('disabled');
+            
             const bananaBtn = document.getElementById('banana-btn');
-            if (bananaBtn) { if (state.botOffline) bananaBtn.classList.add('disabled'); else bananaBtn.classList.remove('disabled'); }
+            if (bananaBtn) {
+                if (state.botOffline) {
+                    bananaBtn.classList.add('disabled');
+                } else {
+                    bananaBtn.classList.remove('disabled');
+                }
+            }
+            
             const strawberryBtn = document.getElementById('strawberry-btn');
-            if (strawberryBtn && state.botOffline) strawberryBtn.classList.add('disabled');
-            else if (strawberryBtn) strawberryBtn.classList.remove('disabled');
+            if (strawberryBtn && state.botOffline) {
+                strawberryBtn.classList.add('disabled');
+            } else if (strawberryBtn) {
+                strawberryBtn.classList.remove('disabled');
+            }
+            
             const coinBtn = document.getElementById('coin-btn');
-            if (coinBtn && state.botOffline) coinBtn.classList.add('disabled');
-            else if (coinBtn) coinBtn.classList.remove('disabled');
+            if (coinBtn && state.botOffline) {
+                coinBtn.classList.add('disabled');
+            } else if (coinBtn) {
+                coinBtn.classList.remove('disabled');
+            }
         }
         
-        function showInfo() { const modal = document.getElementById('info-modal'); if (modal) modal.classList.add('active'); }
-        function hideInfo(e) { if (e && e.target !== e.currentTarget) return; const modal = document.getElementById('info-modal'); if (modal) modal.classList.remove('active'); }
-        function forceReload() { localStorage.clear(); location.reload(); }
+        function showInfo() { 
+            const modal = document.getElementById('info-modal');
+            if (modal) modal.classList.add('active'); 
+        }
+        function hideInfo(e) { 
+            if (e && e.target !== e.currentTarget) return;
+            const modal = document.getElementById('info-modal');
+            if (modal) modal.classList.remove('active'); 
+        }
+        function forceReload() { 
+            localStorage.clear(); 
+            location.reload(); 
+        }
         function showToast(text) {
             const toast = document.getElementById('toast');
             if (!toast) return;
@@ -970,8 +1055,14 @@
         }
         
         async function init() {
-            if (!window.Telegram?.WebApp) { showError('Откройте в Telegram'); return; }
-            if (tg) { tg.ready(); tg.expand(); }
+            if (!window.Telegram?.WebApp) { 
+                showError('Откройте в Telegram'); 
+                return; 
+            }
+            if (tg) { 
+                tg.ready(); 
+                tg.expand(); 
+            }
             await loadGallery();
         }
         
@@ -984,6 +1075,7 @@
             const infoBtn = document.getElementById('info-btn');
             const modalCloseBtn = document.getElementById('modal-close-btn');
             const forceReloadItem = document.getElementById('force-reload-item');
+            
             if (strawberryBtn) strawberryBtn.addEventListener('click', handleStrawberry);
             if (bananaBtn) bananaBtn.addEventListener('click', spendBanana);
             if (coinBtn) coinBtn.addEventListener('click', handleCoin);
@@ -992,10 +1084,9 @@
             if (infoBtn) infoBtn.addEventListener('click', showInfo);
             if (modalCloseBtn) modalCloseBtn.addEventListener('click', () => hideInfo());
             if (forceReloadItem) forceReloadItem.addEventListener('click', forceReload);
+            
             if (musicBtn) musicBtn.style.opacity = '0.5';
         });
-        
-        window.onImageLoadError = onImageLoadError;
         
         init();
     </script>
