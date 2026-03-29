@@ -485,7 +485,7 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v22.0 - Простой личный кабинет');
+        console.log('🚀 v22.1 - Личный кабинет с параметром поста');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -1018,7 +1018,7 @@
             }
         }
         
-        // ==================== ПРОСТОЙ ЛИЧНЫЙ КАБИНЕТ ====================
+        // ==================== ЛИЧНЫЙ КАБИНЕТ С ПАРАМЕТРОМ ПОСТА ====================
         function showLoginModal() {
             if (state.botOffline) {
                 showMultilineToast('📴 Бот недоступен,\nличный кабинет временно недоступен');
@@ -1035,7 +1035,11 @@
         
         function enterCabinet() {
             hideLoginModal();
-            const botLink = `https://t.me/${PAYMENT_BOT_USERNAME}`;
+            // Формируем ссылку с параметром поста
+            let botLink = `https://t.me/${PAYMENT_BOT_USERNAME}`;
+            if (state.postId) {
+                botLink += `?start=buy_vip_${state.postId}`;
+            }
             const hasSeenWarning = localStorage.getItem('payment_warning_seen');
             
             if (hasSeenWarning) {
