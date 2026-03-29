@@ -418,7 +418,7 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v22.0 - Исправлены URL, убран бесконечный цикл onerror');
+        console.log('🚀 v23.0 - ИСПРАВЛЕНА ЗАГРУЗКА ФОТО: используется API_URL из параметров');
         
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
         const INTERFACE_BOT_USERNAME = 'k0tbezzabot';
@@ -431,7 +431,7 @@
         const minSwipeDistance = 50;
         
         // Флаг для предотвращения бесконечного цикла при ошибке загрузки
-        let isLoadingRetry = false;
+        let errorCounter = 0;
         
         // Отладочная панель
         const debugPanel = document.getElementById('debug-panel');
@@ -478,13 +478,15 @@
         
         const urlParams = new URLSearchParams(window.location.search);
         
-        // ИСПРАВЛЕНО: используем window.location.origin для надежности
-        const baseUrl = window.location.origin;
-        debugLog(`Base URL: ${baseUrl}`, 'info');
-        
-        // Получаем API URL из параметров (если есть, иначе используем baseUrl)
-        let API_URL = urlParams.get('api') || baseUrl;
-        debugLog(`API_URL: ${API_URL}`, 'info');
+        // ВАЖНО: API_URL берем из параметра api, который передает бот
+        let API_URL = urlParams.get('api');
+        if (!API_URL) {
+            // Если параметр не передан — используем дефолтный (но так быть не должно)
+            API_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
+            debugLog(`⚠️ API_URL не передан, используем дефолтный: ${API_URL}`, 'warning');
+        } else {
+            debugLog(`✅ API_URL из параметров: ${API_URL}`, 'success');
+        }
         
         function getPostId() {
             let postId = urlParams.get('post');
@@ -529,6 +531,7 @@
         
         debugLog(`Параметры: post=${rawPost}, user=${rawUser}, subscribed=${rawSubscribed}, purchased=${rawPurchased}, bananas=${rawBananas}`, 'info');
         debugLog(`Разблокированные фото из URL: ${urlUnlockedPhotos.length}`, 'info');
+        debugLog(`API_URL для запросов: ${API_URL}`, 'info');
         
         let state = {
             files: [], index: 0, postId: rawPost, userId: rawUser,
@@ -660,7 +663,7 @@
             }
         }
         
-        // ИСПРАВЛЕНО: функция возвращает URL, используя baseUrl (window.location.origin)
+        // ИСПРАВЛЕНО: функция возвращает URL, используя state.apiUrl (из параметра api)
         function getPhotoUrl(folder, filename) {
             if (!state.postId) {
                 debugLog(`❌ getPhotoUrl: postId отсутствует!`, 'error');
@@ -670,9 +673,9 @@
                 debugLog(`❌ getPhotoUrl: userId отсутствует!`, 'error');
                 return null;
             }
-            // Используем baseUrl для надежности
-            const url = `${baseUrl}/api/get-photo?post=${state.postId}&folder=${folder}&file=${filename}&user=${state.userId}&t=${Date.now()}`;
-            debugLog(`📸 Создан URL: ${url.substring(0, 120)}...`, 'info');
+            // ИСПРАВЛЕНО: используем state.apiUrl (из параметра api), а не window.location.origin
+            const url = `${state.apiUrl}/api/get-photo?post=${state.postId}&folder=${folder}&file=${filename}&user=${state.userId}&t=${Date.now()}`;
+            debugLog(`📸 Создан URL: ${url.substring(0, 100)}...`, 'info');
             return url;
         }
         
@@ -685,7 +688,7 @@
             const files = [];
             debugLog(`📦 Начинаем сборку списка файлов (без fetch)...`, 'info');
             debugLog(`📦 state.userId = ${state.userId}, state.postId = ${state.postId}`, 'info');
-            debugLog(`📦 baseUrl = ${baseUrl}`, 'info');
+            debugLog(`📦 state.apiUrl = ${state.apiUrl}`, 'info');
             
             // Общие фото
             const generalCount = filesData.general?.length || 0;
@@ -794,7 +797,6 @@
             
             debugLog(`🚀 Начинаем загрузку галереи для поста ${state.postId}`, 'info');
             debugLog(`🚀 API URL: ${state.apiUrl}`, 'info');
-            debugLog(`🚀 Base URL: ${baseUrl}`, 'info');
             
             // Загружаем список файлов
             let filesData = await fetchFilesFromBot();
@@ -837,8 +839,6 @@
             debugLog(`✅ Галерея загружена, ${files.length} фото`, 'success');
         }
         
-        // ИСПРАВЛЕНО: обработчик ошибки загрузки без бесконечного цикла
-        let errorCounter = 0;
         function onImageLoadError() {
             const img = document.getElementById('image');
             if (!img) return;
@@ -853,7 +853,7 @@
                 return;
             }
             
-            // Повторная попытка через 2 секунды (не мгновенно, чтобы не было цикла)
+            // Повторная попытка через 2 секунды
             setTimeout(() => {
                 if (state.files && state.files[state.index]) {
                     const file = state.files[state.index];
@@ -1247,7 +1247,6 @@
             if (musicBtn) musicBtn.style.opacity = '0.5';
         });
         
-        // ИСПРАВЛЕНО: привязываем обработчик ошибки к глобальной функции
         window.onImageLoadError = onImageLoadError;
         
         init();
