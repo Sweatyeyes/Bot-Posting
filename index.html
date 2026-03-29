@@ -284,8 +284,8 @@
         }
         #error small { display: block; margin-top: 10px; color: #999; font-size: 14px; }
         
-        /* Модальное окно для подтверждения оплаты */
-        #payment-modal {
+        /* Простое модальное окно для личного кабинета */
+        #login-modal {
             position: fixed;
             inset: 0;
             background: rgba(0,0,0,0.9);
@@ -296,48 +296,34 @@
             justify-content: center;
             padding: 20px;
         }
-        #payment-modal.active { display: flex; }
+        #login-modal.active { display: flex; }
         
-        .payment-modal-content {
+        .login-modal-content {
             background: #2d2d2d;
             border-radius: 20px;
             padding: 25px;
-            max-width: 320px;
+            max-width: 280px;
             width: 100%;
             border: 1px solid #ffd700;
             text-align: center;
             animation: slideUp 0.3s ease;
         }
         
-        .payment-modal-title {
+        .login-modal-title {
             color: #ffd700;
             font-size: 24px;
             font-weight: bold;
-            margin-bottom: 15px;
-        }
-        
-        .payment-modal-text {
-            color: #fff;
-            font-size: 16px;
             margin-bottom: 20px;
-            line-height: 1.4;
         }
         
-        .payment-modal-price {
-            color: #2ea6ff;
-            font-size: 28px;
-            font-weight: bold;
-            margin: 15px 0;
-        }
-        
-        .payment-modal-buttons {
+        .login-modal-buttons {
             display: flex;
             flex-direction: column;
             gap: 10px;
-            margin-top: 20px;
+            margin-top: 10px;
         }
         
-        .payment-modal-btn {
+        .login-modal-btn {
             padding: 12px 20px;
             border-radius: 10px;
             font-size: 16px;
@@ -345,32 +331,40 @@
             cursor: pointer;
             transition: all 0.2s;
             border: none;
+            text-align: center;
         }
         
-        .payment-modal-btn-primary {
+        .login-modal-btn-primary {
             background: #2ea6ff;
             color: white;
         }
         
-        .payment-modal-btn-primary:active {
+        .login-modal-btn-primary:active {
             transform: scale(0.98);
             background: #1e8ad9;
         }
         
-        .payment-modal-btn-secondary {
+        .login-modal-btn-secondary {
             background: #404040;
             color: white;
         }
         
-        .payment-modal-btn-secondary:active {
+        .login-modal-btn-secondary:active {
             transform: scale(0.98);
             background: #555;
         }
         
-        .payment-modal-note {
-            font-size: 12px;
-            color: #888;
+        .login-modal-note {
+            font-size: 11px;
+            color: #666;
             margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid #404040;
+        }
+        
+        .login-modal-note a {
+            color: #2ea6ff;
+            text-decoration: none;
         }
     </style>
 </head>
@@ -404,7 +398,7 @@
                 <span id="banana-count-badge" class="banana-count-badge">0</span>
             </button>
             <div id="counter">
-                <button class="bottom-btn" id="coin-btn" title="Купить пост">
+                <button class="bottom-btn" id="coin-btn" title="Личный кабинет">
                     🪙
                     <span id="purchased-badge-icon" class="badge-icon" style="display: none;"></span>
                 </button>
@@ -416,27 +410,23 @@
         </div>
     </div>
     
-    <!-- Модальное окно для подтверждения оплаты -->
-    <div id="payment-modal">
-        <div class="payment-modal-content">
-            <div class="payment-modal-title">🪙 Доступ к посту</div>
-            <div class="payment-modal-text">
-                После оплаты вам станут доступны все фото этого поста.
+    <!-- Простое модальное окно для личного кабинета -->
+    <div id="login-modal">
+        <div class="login-modal-content">
+            <div class="login-modal-title">🪙 ЛИЧНЫЙ КАБИНЕТ</div>
+            <div class="login-modal-buttons">
+                <button class="login-modal-btn login-modal-btn-primary" id="login-enter-btn">🔑 Войти</button>
+                <button class="login-modal-btn login-modal-btn-secondary" id="login-cancel-btn">◀️ Отмена</button>
             </div>
-            <div class="payment-modal-price">99 ₽</div>
-            <div class="payment-modal-buttons">
-                <button class="payment-modal-btn payment-modal-btn-primary" id="payment-confirm-btn">💳 Перейти к оплате</button>
-                <button class="payment-modal-btn payment-modal-btn-secondary" id="payment-cancel-btn">◀️ Отмена</button>
-            </div>
-            <div class="payment-modal-note">
-                Платёж будет обработан в боте @k0t_oplatabot
+            <div class="login-modal-note">
+                💳 Платежи обрабатываются в боте <a href="#" id="login-payment-bot-link">@k0t_oplatabot</a>
             </div>
         </div>
     </div>
     
     <div id="info-modal" onclick="hideInfo(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
-            <div class="modal-title">🍓 ИНФОРМАЦИЯ</div>
+            <div class="modal-title">ИНФОРМАЦИЯ</div>
             
             <div class="modal-item">
                 <div class="modal-icon">🍓</div>
@@ -458,7 +448,7 @@
                 <div class="modal-icon">🪙</div>
                 <div class="modal-text">
                     <div class="modal-text-title">Монета</div>
-                    <div class="modal-text-desc">Купить весь пост (99₽) <span id="purchased-status-modal"></span></div>
+                    <div class="modal-text-desc">Личный кабинет (Оплата доступа к скрытым фото поста или оплата подписки)</div>
                 </div>
             </div>
             
@@ -487,7 +477,7 @@
             </div>
             
             <div class="offline-note" id="offline-note" style="display: none;">📴 Оффлайн режим (бот недоступен)</div>
-            <button class="modal-close" id="modal-close-btn">Закрыть</button>
+            <button class="modal-close" id="info-modal-close-btn">Закрыть</button>
         </div>
     </div>
     
@@ -495,7 +485,7 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v20.0 - Подтверждение оплаты перед переходом');
+        console.log('🚀 v22.0 - Простой личный кабинет');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -1028,49 +1018,37 @@
             }
         }
         
-        // ==================== НОВАЯ ФУНКЦИЯ ОПЛАТЫ С ПОДТВЕРЖДЕНИЕМ ====================
-        let pendingPostId = null;
-        
-        function showPaymentModal() {
+        // ==================== ПРОСТОЙ ЛИЧНЫЙ КАБИНЕТ ====================
+        function showLoginModal() {
             if (state.botOffline) {
-                showMultilineToast('📴 Бот недоступен,\nоплата временно недоступна');
+                showMultilineToast('📴 Бот недоступен,\nличный кабинет временно недоступен');
                 return;
             }
-            
-            pendingPostId = state.postId;
-            const modal = document.getElementById('payment-modal');
+            const modal = document.getElementById('login-modal');
             if (modal) modal.classList.add('active');
         }
         
-        function hidePaymentModal() {
-            const modal = document.getElementById('payment-modal');
+        function hideLoginModal() {
+            const modal = document.getElementById('login-modal');
             if (modal) modal.classList.remove('active');
-            pendingPostId = null;
         }
         
-        function proceedToPayment() {
-            if (!pendingPostId) return;
-            
-            const botLink = `https://t.me/${PAYMENT_BOT_USERNAME}?start=buy_vip_${pendingPostId}`;
-            
-            // Проверяем, видел ли пользователь предупреждение раньше
+        function enterCabinet() {
+            hideLoginModal();
+            const botLink = `https://t.me/${PAYMENT_BOT_USERNAME}`;
             const hasSeenWarning = localStorage.getItem('payment_warning_seen');
             
             if (hasSeenWarning) {
-                // Уже видел — открываем сразу
                 if (tg) tg.openLink(botLink);
             } else {
-                // Первый раз — показываем предупреждение через openTelegramLink
                 localStorage.setItem('payment_warning_seen', 'true');
                 if (tg) tg.openTelegramLink(botLink);
             }
-            
-            hidePaymentModal();
-            showToast('🪙 Переход в платёжный бот...');
+            showToast('🔑 Переход в платёжный бот...');
         }
         
         function handleCoin() {
-            showPaymentModal();
+            showLoginModal();
         }
         
         function handleStrawberry() {
@@ -1182,15 +1160,18 @@
             const modal = document.getElementById('info-modal');
             if (modal) modal.classList.add('active'); 
         }
+        
         function hideInfo(e) { 
             if (e && e.target !== e.currentTarget) return;
             const modal = document.getElementById('info-modal');
             if (modal) modal.classList.remove('active'); 
         }
+        
         function forceReload() { 
             localStorage.clear(); 
             location.reload(); 
         }
+        
         function showToast(text) {
             const toast = document.getElementById('toast');
             if (!toast) return;
@@ -1231,10 +1212,13 @@
             const saveBtn = document.getElementById('save-btn');
             musicBtn = document.getElementById('music-btn');
             const infoBtn = document.getElementById('info-btn');
-            const modalCloseBtn = document.getElementById('modal-close-btn');
+            const infoModalCloseBtn = document.getElementById('info-modal-close-btn');
             const forceReloadItem = document.getElementById('force-reload-item');
-            const paymentConfirmBtn = document.getElementById('payment-confirm-btn');
-            const paymentCancelBtn = document.getElementById('payment-cancel-btn');
+            
+            // Кнопки модального окна личного кабинета
+            const loginEnterBtn = document.getElementById('login-enter-btn');
+            const loginCancelBtn = document.getElementById('login-cancel-btn');
+            const loginPaymentBotLink = document.getElementById('login-payment-bot-link');
             
             if (strawberryBtn) strawberryBtn.addEventListener('click', handleStrawberry);
             if (bananaBtn) bananaBtn.addEventListener('click', spendBanana);
@@ -1242,10 +1226,15 @@
             if (saveBtn) saveBtn.addEventListener('click', saveCurrentPhoto);
             if (musicBtn) musicBtn.addEventListener('click', toggleMusic);
             if (infoBtn) infoBtn.addEventListener('click', showInfo);
-            if (modalCloseBtn) modalCloseBtn.addEventListener('click', () => hideInfo());
+            if (infoModalCloseBtn) infoModalCloseBtn.addEventListener('click', () => hideInfo());
             if (forceReloadItem) forceReloadItem.addEventListener('click', forceReload);
-            if (paymentConfirmBtn) paymentConfirmBtn.addEventListener('click', proceedToPayment);
-            if (paymentCancelBtn) paymentCancelBtn.addEventListener('click', hidePaymentModal);
+            
+            if (loginEnterBtn) loginEnterBtn.addEventListener('click', enterCabinet);
+            if (loginCancelBtn) loginCancelBtn.addEventListener('click', hideLoginModal);
+            if (loginPaymentBotLink) loginPaymentBotLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (tg) tg.openLink(`https://t.me/${PAYMENT_BOT_USERNAME}`);
+            });
             
             if (musicBtn) musicBtn.style.opacity = '0.5';
         });
