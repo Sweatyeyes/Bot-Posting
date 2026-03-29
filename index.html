@@ -418,7 +418,7 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v24.0 - МАКСИМАЛЬНОЕ ЛОГИРОВАНИЕ');
+        console.log('🚀 v25.0 - CORS FIX: GET эндпоинты, правильные URL');
         
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
         const INTERFACE_BOT_USERNAME = 'k0tbezzabot';
@@ -473,8 +473,6 @@
         
         const urlParams = new URLSearchParams(window.location.search);
         
-        debugLog(`🔍 ПАРАМЕТРЫ URL: ${window.location.search}`, 'info');
-        
         // API_URL из параметра api (передается ботом)
         let API_URL = urlParams.get('api');
         debugLog(`🔍 api параметр из URL: "${API_URL}"`, 'info');
@@ -488,7 +486,6 @@
         
         function getPostId() {
             let postId = urlParams.get('post');
-            debugLog(`🔍 getPostId: из URL post=${postId}`, 'info');
             if (postId) return postId;
             const tgStartParam = urlParams.get('tgWebAppStartParam');
             if (tgStartParam) {
@@ -509,7 +506,6 @@
         
         function getUserId() {
             let userId = urlParams.get('user');
-            debugLog(`🔍 getUserId: из URL user=${userId}`, 'info');
             if (userId) return parseInt(userId);
             const user = tg?.initDataUnsafe?.user;
             if (user && user.id) return user.id;
@@ -529,14 +525,9 @@
         const unlockedParam = urlParams.get('unlocked') || '';
         const urlUnlockedPhotos = unlockedParam ? unlockedParam.split(',') : [];
         
-        debugLog(`📊 ПАРАМЕТРЫ СОСТОЯНИЯ:`, 'info');
-        debugLog(`   post=${rawPost}`, 'info');
-        debugLog(`   user=${rawUser}`, 'info');
-        debugLog(`   subscribed=${rawSubscribed}`, 'info');
-        debugLog(`   purchased=${rawPurchased}`, 'info');
-        debugLog(`   bananas=${rawBananas}`, 'info');
-        debugLog(`   unlocked=${urlUnlockedPhotos.length} фото`, 'info');
-        debugLog(`   API_URL=${API_URL}`, 'info');
+        debugLog(`📊 ПАРАМЕТРЫ: post=${rawPost}, user=${rawUser}`, 'info');
+        debugLog(`📊 subscribed=${rawSubscribed}, purchased=${rawPurchased}, bananas=${rawBananas}`, 'info');
+        debugLog(`📊 API_URL=${API_URL}`, 'info');
         
         let state = {
             files: [], index: 0, postId: rawPost, userId: rawUser,
@@ -550,226 +541,148 @@
         
         async function fetchFilesFromBot() {
             if (!state.postId) {
-                debugLog(`❌ fetchFilesFromBot: postId отсутствует`, 'error');
+                debugLog(`❌ fetchFiles: postId отсутствует`, 'error');
                 return null;
             }
-            const url = `${state.apiUrl}/api/get-files`;
-            debugLog(`📡 [fetchFiles] POST ${url}`, 'info');
-            debugLog(`📡 [fetchFiles] body: ${JSON.stringify({ post_id: state.postId })}`, 'info');
+            const url = `${state.apiUrl}/api/get-files?post=${state.postId}`;
+            debugLog(`📡 GET ${url}`, 'info');
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ post_id: state.postId }),
-                    signal: controller.signal
-                });
+                const res = await fetch(url, { signal: controller.signal });
                 clearTimeout(timeoutId);
-                debugLog(`📡 [fetchFiles] ответ: ${res.status} ${res.statusText}`, res.ok ? 'success' : 'error');
+                debugLog(`📡 ответ: ${res.status}`, res.ok ? 'success' : 'error');
                 if (!res.ok) return null;
                 const data = await res.json();
-                debugLog(`📡 [fetchFiles] данные получены`, 'success');
-                debugLog(`📡   general: ${data.general?.length || 0} фото`, 'info');
-                debugLog(`📡   banana: ${data.banana?.length || 0} фото`, 'info');
-                debugLog(`📡   strawberry: ${data.strawberry?.length || 0} фото`, 'info');
+                debugLog(`📡 файлы: general=${data.general?.length || 0}, banana=${data.banana?.length || 0}, strawberry=${data.strawberry?.length || 0}`, 'success');
                 return data;
             } catch(e) {
-                debugLog(`❌ [fetchFiles] ошибка: ${e.message}`, 'error');
+                debugLog(`❌ fetchFiles: ${e.message}`, 'error');
                 return null;
             }
         }
         
         async function checkPurchase() {
-            if (!state.userId || !state.postId) {
-                debugLog(`⚠️ checkPurchase: пропуск (нет userId или postId)`, 'warning');
-                return false;
-            }
-            const url = `${state.apiUrl}/api/check-purchase`;
-            debugLog(`🪙 [checkPurchase] POST ${url}`, 'info');
+            if (!state.userId || !state.postId) return false;
+            const url = `${state.apiUrl}/api/check-purchase?user=${state.userId}&post=${state.postId}`;
+            debugLog(`🪙 GET ${url}`, 'info');
             try {
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId })
-                });
+                const res = await fetch(url);
                 const data = await res.json();
-                debugLog(`🪙 [checkPurchase] результат: ${data.purchased}`, data.purchased ? 'success' : 'warning');
+                debugLog(`🪙 покупка: ${data.purchased}`, data.purchased ? 'success' : 'warning');
                 if (data.purchased) state.hasPurchased = true;
                 return data.purchased;
             } catch(e) {
-                debugLog(`❌ [checkPurchase] ошибка: ${e.message}`, 'error');
+                debugLog(`❌ checkPurchase: ${e.message}`, 'error');
                 return state.hasPurchased;
             }
         }
         
         async function fetchUnlockedPhotos() {
             if (!state.userId || !state.postId) return;
-            const url = `${state.apiUrl}/api/get-unlocked-photos`;
-            debugLog(`🍌 [fetchUnlocked] POST ${url}`, 'info');
+            const url = `${state.apiUrl}/api/get-unlocked-photos?user=${state.userId}&post=${state.postId}`;
+            debugLog(`🍌 GET ${url}`, 'info');
             try {
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId })
-                });
+                const res = await fetch(url);
                 const data = await res.json();
                 if (data.unlocked_photos) {
                     state.unlockedPhotos = data.unlocked_photos;
                     state.bananasLeft = data.available_bananas;
-                    debugLog(`🍌 [fetchUnlocked] разблокировано: ${state.unlockedPhotos.length}, бананов осталось: ${state.bananasLeft}`, 'success');
+                    debugLog(`🍌 разблокировано: ${state.unlockedPhotos.length}, бананов: ${state.bananasLeft}`, 'success');
                 }
             } catch(e) {
-                debugLog(`❌ [fetchUnlocked] ошибка: ${e.message}`, 'error');
+                debugLog(`❌ fetchUnlocked: ${e.message}`, 'error');
             }
         }
         
         async function checkSubscription() {
             if (!state.userId) return false;
-            const url = `${state.apiUrl}/api/check-subscription`;
-            debugLog(`🍓 [checkSubscription] POST ${url}`, 'info');
+            const url = `${state.apiUrl}/api/check-subscription?user=${state.userId}&post=${state.postId}`;
+            debugLog(`🍓 GET ${url}`, 'info');
             try {
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId })
-                });
+                const res = await fetch(url);
                 const data = await res.json();
                 const isSubscribed = data.is_subscribed === true;
-                debugLog(`🍓 [checkSubscription] результат: ${isSubscribed}`, isSubscribed ? 'success' : 'warning');
+                debugLog(`🍓 подписка: ${isSubscribed}`, isSubscribed ? 'success' : 'warning');
                 if (isSubscribed !== state.isSubscribed) state.isSubscribed = isSubscribed;
                 return isSubscribed;
             } catch(e) {
-                debugLog(`❌ [checkSubscription] ошибка: ${e.message}`, 'error');
+                debugLog(`❌ checkSubscription: ${e.message}`, 'error');
                 return state.isSubscribed;
             }
         }
         
         function getPhotoUrl(folder, filename) {
-            if (!state.postId) {
-                debugLog(`❌ getPhotoUrl: postId отсутствует!`, 'error');
-                return null;
-            }
-            if (!state.userId) {
-                debugLog(`❌ getPhotoUrl: userId отсутствует!`, 'error');
-                return null;
-            }
+            if (!state.postId || !state.userId) return null;
             const url = `${state.apiUrl}/api/get-photo?post=${state.postId}&folder=${folder}&file=${filename}&user=${state.userId}&t=${Date.now()}`;
-            debugLog(`📸 getPhotoUrl: ${folder}/${filename} -> ${url.substring(0, 100)}...`, 'info');
+            debugLog(`📸 URL: ${url.substring(0, 100)}...`, 'info');
             return url;
         }
         
         function buildFileList(filesData) {
             const files = [];
-            debugLog(`📦 ========== BUILD FILE LIST ==========`, 'info');
-            debugLog(`📦 state.userId=${state.userId}, state.postId=${state.postId}`, 'info');
-            debugLog(`📦 state.apiUrl=${state.apiUrl}`, 'info');
-            debugLog(`📦 state.isSubscribed=${state.isSubscribed}, state.hasPurchased=${state.hasPurchased}`, 'info');
-            debugLog(`📦 state.unlockedPhotos: ${JSON.stringify(state.unlockedPhotos)}`, 'info');
+            debugLog(`📦 BUILD FILE LIST: userId=${state.userId}, postId=${state.postId}`, 'info');
+            debugLog(`📦 isSubscribed=${state.isSubscribed}, hasPurchased=${state.hasPurchased}`, 'info');
             
             // GENERAL
-            const generalList = filesData.general || [];
-            debugLog(`📦 GENERAL: ${generalList.length} фото`, 'info');
-            for (const fileName of generalList) {
+            for (const fileName of filesData.general || []) {
                 if (fileName.match(/\.(jpg|jpeg|png)$/i)) {
                     const url = getPhotoUrl('general', fileName);
                     if (url) {
-                        files.push({
-                            name: fileName,
-                            url: url,
-                            type: 'general',
-                            isBlurred: false,
-                            isBanana: false,
-                            originalUrl: url
-                        });
-                        debugLog(`✅ GENERAL добавлено: ${fileName}`, 'success');
-                    } else {
-                        debugLog(`❌ GENERAL URL не создан: ${fileName}`, 'error');
+                        files.push({ name: fileName, url: url, type: 'general', isBlurred: false, isBanana: false });
+                        debugLog(`✅ GENERAL: ${fileName}`, 'success');
                     }
                 }
             }
             
             // BANANA
-            const bananaAll = filesData.banana || [];
-            debugLog(`📦 BANANA: всего ${bananaAll.length} файлов`, 'info');
-            const bananaOriginals = bananaAll.filter(f => !f.includes('_blur') && f.match(/\.(jpg|jpeg|png)$/i));
-            debugLog(`📦 BANANA оригиналов: ${bananaOriginals.length}`, 'info');
-            
+            const bananaOriginals = (filesData.banana || []).filter(f => !f.includes('_blur') && f.match(/\.(jpg|jpeg|png)$/i));
             for (const originalName of bananaOriginals) {
                 const isUnlocked = state.isSubscribed || state.hasPurchased || state.unlockedPhotos.includes(originalName);
-                debugLog(`📦 banana ${originalName}: unlocked=${isUnlocked}`, isUnlocked ? 'success' : 'warning');
-                
                 const displayName = isUnlocked ? originalName : originalName.replace('.jpg', '_blur.jpg');
                 const url = getPhotoUrl('banana', displayName);
-                const originalUrl = getPhotoUrl('banana', originalName);
-                
                 if (url) {
                     files.push({
-                        name: originalName,
-                        originalName: originalName,
-                        url: url,
-                        originalUrl: originalUrl,
-                        type: 'banana',
-                        isBlurred: !isUnlocked,
-                        isBanana: true
+                        name: originalName, originalName: originalName, url: url,
+                        originalUrl: getPhotoUrl('banana', originalName),
+                        type: 'banana', isBlurred: !isUnlocked, isBanana: true
                     });
-                    debugLog(`✅ BANANA добавлено: ${originalName} (показываем ${displayName})`, 'success');
-                } else {
-                    debugLog(`❌ BANANA URL не создан: ${originalName}`, 'error');
+                    debugLog(`✅ BANANA: ${originalName} -> ${displayName}`, 'success');
                 }
             }
             
             // STRAWBERRY
-            const strawberryAll = filesData.strawberry || [];
-            debugLog(`📦 STRAWBERRY: всего ${strawberryAll.length} файлов`, 'info');
-            const strawberryOriginals = strawberryAll.filter(f => !f.includes('_blur') && f.match(/\.(jpg|jpeg|png)$/i));
-            debugLog(`📦 STRAWBERRY оригиналов: ${strawberryOriginals.length}`, 'info');
-            
+            const strawberryOriginals = (filesData.strawberry || []).filter(f => !f.includes('_blur') && f.match(/\.(jpg|jpeg|png)$/i));
             for (const originalName of strawberryOriginals) {
                 const hasAccess = state.hasPurchased || state.isSubscribed;
-                debugLog(`📦 strawberry ${originalName}: hasAccess=${hasAccess}`, hasAccess ? 'success' : 'warning');
-                
                 const displayName = hasAccess ? originalName : originalName.replace('.jpg', '_blur.jpg');
                 const url = getPhotoUrl('strawberry', displayName);
-                const originalUrl = getPhotoUrl('strawberry', originalName);
-                
                 if (url) {
                     files.push({
-                        name: originalName,
-                        originalName: originalName,
-                        url: url,
-                        originalUrl: originalUrl,
-                        type: 'strawberry',
-                        isBlurred: !hasAccess,
-                        isBanana: false
+                        name: originalName, originalName: originalName, url: url,
+                        originalUrl: getPhotoUrl('strawberry', originalName),
+                        type: 'strawberry', isBlurred: !hasAccess, isBanana: false
                     });
-                    debugLog(`✅ STRAWBERRY добавлено: ${originalName} (показываем ${displayName})`, 'success');
-                } else {
-                    debugLog(`❌ STRAWBERRY URL не создан: ${originalName}`, 'error');
+                    debugLog(`✅ STRAWBERRY: ${originalName} -> ${displayName}`, 'success');
                 }
             }
             
-            debugLog(`📦 ИТОГО собрано файлов: ${files.length}`, files.length > 0 ? 'success' : 'error');
+            debugLog(`📦 ИТОГО: ${files.length} фото`, files.length > 0 ? 'success' : 'error');
             return files;
         }
         
         async function loadGallery() {
-            debugLog(`🚀 ========== LOAD GALLERY START ==========`, 'info');
-            
             if (!state.postId) {
-                debugLog(`❌ Не указан ID поста`, 'error');
                 showError('Не указан ID поста');
                 return;
             }
             
-            debugLog(`🚀 postId=${state.postId}`, 'info');
-            debugLog(`🚀 apiUrl=${state.apiUrl}`, 'info');
+            debugLog(`🚀 LOAD GALLERY: ${state.postId}`, 'info');
             
             let filesData = await fetchFilesFromBot();
             if (!filesData) {
                 state.botOffline = true;
                 document.getElementById('offline-badge').style.display = 'block';
-                debugLog(`❌ Бот недоступен (нет данных)`, 'error');
                 showError('Бот недоступен');
                 return;
             }
@@ -781,11 +694,9 @@
             await checkSubscription();
             await fetchUnlockedPhotos();
             
-            state.filesData = filesData;
             const files = buildFileList(filesData);
             
             if (files.length === 0) {
-                debugLog(`❌ В этом посте нет фото`, 'error');
                 showError('В этом посте нет фото');
                 return;
             }
@@ -799,16 +710,15 @@
             setupNavigation();
             setupSwipeListeners();
             
-            debugLog(`✅ Галерея загружена, ${files.length} фото`, 'success');
+            debugLog(`✅ ГАЛЕРЕЯ ЗАГРУЖЕНА: ${files.length} фото`, 'success');
         }
         
         function onImageLoadError() {
             const img = document.getElementById('image');
             if (!img) return;
             errorCounter++;
-            debugLog(`❌ Ошибка загрузки изображения (${errorCounter}): ${img.src.substring(0, 100)}`, 'error');
+            debugLog(`❌ Ошибка загрузки (${errorCounter}): ${img.src.substring(0, 80)}`, 'error');
             if (errorCounter > 3) {
-                debugLog(`⚠️ Слишком много ошибок, останавливаем`, 'warning');
                 img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Crect width="100" height="100" fill="%23333"/%3E%3Ctext x="50" y="55" text-anchor="middle" fill="%23fff" font-size="12"%3EError%3C/text%3E%3C/svg%3E';
                 return;
             }
@@ -827,8 +737,7 @@
             const file = state.files[state.index];
             if (!img || !file) return;
             errorCounter = 0;
-            debugLog(`🖼 Показ фото ${state.index+1}/${state.files.length}: ${file.name}`, 'info');
-            debugLog(`🖼 URL: ${file.url.substring(0, 100)}...`, 'info');
+            debugLog(`🖼 ${state.index+1}/${state.files.length}: ${file.name}`, 'info');
             img.classList.remove('loaded');
             img.src = file.url + '&v=' + Date.now();
             const counterText = document.getElementById('counter-text');
@@ -1061,7 +970,6 @@
         }
         
         async function init() {
-            debugLog(`🚀 INIT: проверка Telegram WebApp`, 'info');
             if (!window.Telegram?.WebApp) { showError('Откройте в Telegram'); return; }
             if (tg) { tg.ready(); tg.expand(); }
             await loadGallery();
