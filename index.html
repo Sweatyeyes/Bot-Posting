@@ -388,7 +388,7 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v18.0 - Упрощённое именование файлов');
+        console.log('🚀 v19.0 - Клубничка показывает статус подписки, оффлайн режим');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -641,7 +641,7 @@
                 state.isSubscribed = false;
                 state.hasPurchased = false;
                 state.unlockedPhotos = [];
-                state.bananasLeft = 3;
+                state.bananasLeft = 0;
             } else {
                 state.botOffline = false;
                 document.getElementById('offline-badge').style.display = 'none';
@@ -889,6 +889,12 @@
         }
         
         async function saveCurrentPhoto() {
+            // В оффлайн режиме сохранение недоступно
+            if (state.botOffline) {
+                showToast('📴 Оффлайн режим, сохранение недоступно');
+                return;
+            }
+            
             const canSave = state.isSubscribed || state.hasPurchased;
             
             if (!canSave) {
@@ -916,6 +922,21 @@
             }
         }
         
+        function handleStrawberry() {
+            // В оффлайн режиме показываем сообщение о недоступности
+            if (state.botOffline) {
+                showToast('📴 Оффлайн режим, проверка подписки недоступна');
+                return;
+            }
+            
+            // Показываем статус подписки
+            if (state.isSubscribed) {
+                showToast('🍓 У вас есть подписка!');
+            } else {
+                showToast('🍓 У вас нет подписки');
+            }
+        }
+        
         function handleCoin() {
             if (state.botOffline) {
                 showMultilineToast('📴 Бот недоступен,\nоплата временно недоступна');
@@ -923,15 +944,6 @@
             }
             if (tg) tg.openLink(`https://t.me/${PAYMENT_BOT_USERNAME}?start=buy_vip_${state.postId}`);
             showToast('🪙 Переход в платёжный бот...');
-        }
-        
-        function handleStrawberry() {
-            if (state.botOffline) {
-                showMultilineToast('📴 Бот недоступен,\nпроверка подписки временно недоступна');
-                return;
-            }
-            if (tg) tg.openLink('https://t.me/neuroticababes_bot');
-            showToast('🍓 Подпишитесь на канал');
         }
         
         let musicPlaying = false;
@@ -994,7 +1006,14 @@
             }
             
             const saveBtn = document.getElementById('save-btn');
-            if (saveBtn) saveBtn.classList.remove('disabled');
+            if (saveBtn) {
+                // В оффлайн режиме кнопка сохранения неактивна
+                if (state.botOffline) {
+                    saveBtn.classList.add('disabled');
+                } else {
+                    saveBtn.classList.remove('disabled');
+                }
+            }
             
             const bananaBtn = document.getElementById('banana-btn');
             if (bananaBtn) {
