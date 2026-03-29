@@ -418,7 +418,7 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v20.0 - Исправлена загрузка фото, детальное логирование');
+        console.log('🚀 v21.0 - Исправлена сборка списка (без fetch), фото грузятся через img src');
         
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
         const INTERFACE_BOT_USERNAME = 'k0tbezzabot';
@@ -539,7 +539,6 @@
                 return null;
             }
             debugLog(`📡 Запрос списка файлов для поста ${state.postId}`, 'info');
-            debugLog(`📡 URL: ${state.apiUrl}/api/get-files`, 'info');
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -653,50 +652,28 @@
             }
         }
         
-        // Функция загрузки фото через API бота
-        async function loadPhotoViaApi(folder, filename) {
-            // Проверяем наличие обязательных параметров
+        // Функция возвращает URL для фото (без fetch, без скачивания)
+        function getPhotoUrl(folder, filename) {
             if (!state.postId) {
-                debugLog(`❌ loadPhotoViaApi: postId отсутствует!`, 'error');
+                debugLog(`❌ getPhotoUrl: postId отсутствует!`, 'error');
                 return null;
             }
             if (!state.userId) {
-                debugLog(`❌ loadPhotoViaApi: userId отсутствует!`, 'error');
+                debugLog(`❌ getPhotoUrl: userId отсутствует!`, 'error');
                 return null;
             }
-            
             const url = `${state.apiUrl}/api/get-photo?post=${state.postId}&folder=${folder}&file=${filename}&user=${state.userId}&t=${Date.now()}`;
-            debugLog(`📸 Загрузка фото: ${folder}/${filename}`, 'info');
-            debugLog(`📸 URL: ${url.substring(0, 120)}...`, 'info');
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 8000);
-                const res = await fetch(url, { signal: controller.signal });
-                clearTimeout(timeoutId);
-                debugLog(`📸 Ответ /api/get-photo: ${res.status}`, res.ok ? 'success' : 'error');
-                if (res.ok) {
-                    const blob = await res.blob();
-                    debugLog(`📸 Фото загружено: ${filename}, размер: ${blob.size} байт`, 'success');
-                    return URL.createObjectURL(blob);
-                } else if (res.status === 403) {
-                    debugLog(`📸 Доступ запрещен (403) для ${filename}`, 'error');
-                } else if (res.status === 404) {
-                    debugLog(`📸 Файл не найден (404): ${filename}`, 'error');
-                }
-                return null;
-            } catch(e) {
-                debugLog(`📸 Ошибка загрузки фото ${filename}: ${e.message}`, 'error');
-                return null;
-            }
+            return url;
         }
         
         function findBlurName(originalName) {
             return originalName.replace('.jpg', '_blur.jpg');
         }
         
-        async function buildFileList(filesData) {
+        // Сборка списка файлов — без fetch, только URL
+        function buildFileList(filesData) {
             const files = [];
-            debugLog(`📦 Начинаем сборку списка файлов...`, 'info');
+            debugLog(`📦 Начинаем сборку списка файлов (без fetch)...`, 'info');
             debugLog(`📦 state.userId = ${state.userId}, state.postId = ${state.postId}`, 'info');
             
             // Общие фото
@@ -704,20 +681,19 @@
             debugLog(`📦 Обработка general фото: ${generalCount}`, 'info');
             for (const fileName of filesData.general || []) {
                 if (fileName.match(/\.(jpg|jpeg|png)$/i)) {
-                    debugLog(`📦 Загрузка general: ${fileName}`, 'info');
-                    const photoUrl = await loadPhotoViaApi('general', fileName);
-                    if (photoUrl) {
+                    const url = getPhotoUrl('general', fileName);
+                    if (url) {
                         files.push({
                             name: fileName,
-                            url: photoUrl,
+                            url: url,
                             type: 'general',
                             isBlurred: false,
                             isBanana: false,
-                            originalUrl: photoUrl
+                            originalUrl: url
                         });
                         debugLog(`✅ general добавлено: ${fileName}`, 'success');
                     } else {
-                        debugLog(`❌ general не загружено: ${fileName}`, 'error');
+                        debugLog(`❌ general URL не создан: ${fileName}`, 'error');
                     }
                 }
             }
@@ -731,28 +707,30 @@
                 const isUnlocked = state.isSubscribed || state.hasPurchased || state.unlockedPhotos.includes(originalName);
                 debugLog(`📦 banana ${originalName}: unlocked=${isUnlocked}`, isUnlocked ? 'success' : 'warning');
                 
-                let photoUrl;
+                let displayFileName;
                 if (isUnlocked) {
-                    photoUrl = await loadPhotoViaApi('banana', originalName);
+                    displayFileName = originalName;
                 } else {
-                    const blurName = findBlurName(originalName);
-                    debugLog(`📦 Показываем блюр: ${blurName}`, 'warning');
-                    photoUrl = await loadPhotoViaApi('banana', blurName);
+                    displayFileName = findBlurName(originalName);
+                    debugLog(`📦 Показываем блюр: ${displayFileName}`, 'warning');
                 }
                 
-                if (photoUrl) {
+                const url = getPhotoUrl('banana', displayFileName);
+                const originalUrl = getPhotoUrl('banana', originalName);
+                
+                if (url) {
                     files.push({
                         name: originalName,
                         originalName: originalName,
-                        url: photoUrl,
-                        originalUrl: await loadPhotoViaApi('banana', originalName),
+                        url: url,
+                        originalUrl: originalUrl,
                         type: 'banana',
                         isBlurred: !isUnlocked,
                         isBanana: true
                     });
                     debugLog(`✅ banana добавлено: ${originalName}`, 'success');
                 } else {
-                    debugLog(`❌ banana не загружено: ${originalName}`, 'error');
+                    debugLog(`❌ banana URL не создан: ${originalName}`, 'error');
                 }
             }
             
@@ -765,28 +743,30 @@
                 const hasAccess = state.hasPurchased || state.isSubscribed;
                 debugLog(`📦 strawberry ${originalName}: hasAccess=${hasAccess}`, hasAccess ? 'success' : 'warning');
                 
-                let photoUrl;
+                let displayFileName;
                 if (hasAccess) {
-                    photoUrl = await loadPhotoViaApi('strawberry', originalName);
+                    displayFileName = originalName;
                 } else {
-                    const blurName = findBlurName(originalName);
-                    debugLog(`📦 Показываем блюр: ${blurName}`, 'warning');
-                    photoUrl = await loadPhotoViaApi('strawberry', blurName);
+                    displayFileName = findBlurName(originalName);
+                    debugLog(`📦 Показываем блюр: ${displayFileName}`, 'warning');
                 }
                 
-                if (photoUrl) {
+                const url = getPhotoUrl('strawberry', displayFileName);
+                const originalUrl = getPhotoUrl('strawberry', originalName);
+                
+                if (url) {
                     files.push({
                         name: originalName,
                         originalName: originalName,
-                        url: photoUrl,
-                        originalUrl: await loadPhotoViaApi('strawberry', originalName),
+                        url: url,
+                        originalUrl: originalUrl,
                         type: 'strawberry',
                         isBlurred: !hasAccess,
                         isBanana: false
                     });
                     debugLog(`✅ strawberry добавлено: ${originalName}`, 'success');
                 } else {
-                    debugLog(`❌ strawberry не загружено: ${originalName}`, 'error');
+                    debugLog(`❌ strawberry URL не создан: ${originalName}`, 'error');
                 }
             }
             
@@ -824,7 +804,8 @@
             await fetchUnlockedPhotos();
             
             state.filesData = filesData;
-            const files = await buildFileList(filesData);
+            // Собираем список файлов (синхронно, без await)
+            const files = buildFileList(filesData);
             
             if (files.length === 0) {
                 debugLog('❌ В этом посте нет фото', 'error');
@@ -1007,7 +988,8 @@
                     if (!state.unlockedPhotos.includes(currentFile.originalName || currentFile.name)) {
                         state.unlockedPhotos.push(currentFile.originalName || currentFile.name);
                     }
-                    const newUrl = await loadPhotoViaApi(currentFile.type, currentFile.originalName || currentFile.name);
+                    // Обновляем URL фото на оригинал
+                    const newUrl = getPhotoUrl(currentFile.type, currentFile.originalName || currentFile.name);
                     if (newUrl) {
                         currentFile.url = newUrl;
                         currentFile.isBlurred = false;
@@ -1037,6 +1019,7 @@
             if (!f) return;
             
             try {
+                // Скачиваем фото через fetch и сохраняем
                 const res = await fetch(f.url);
                 const blob = await res.blob();
                 const url = URL.createObjectURL(blob);
@@ -1049,7 +1032,7 @@
                 URL.revokeObjectURL(url);
                 showToast('✅ Фото сохранено!');
             } catch(e) { 
-                showToast('❌ Ошибка保存'); 
+                showToast('❌ Ошибка сохранения'); 
             }
         }
         
