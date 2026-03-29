@@ -284,7 +284,7 @@
         }
         #error small { display: block; margin-top: 10px; color: #999; font-size: 14px; }
         
-        /* Модальное окно для личного кабинета */
+        /* Модальное окно для подтверждения оплаты */
         #payment-modal {
             position: fixed;
             inset: 0;
@@ -302,9 +302,10 @@
             background: #2d2d2d;
             border-radius: 20px;
             padding: 25px;
-            max-width: 350px;
+            max-width: 320px;
             width: 100%;
             border: 1px solid #ffd700;
+            text-align: center;
             animation: slideUp 0.3s ease;
         }
         
@@ -312,61 +313,21 @@
             color: #ffd700;
             font-size: 24px;
             font-weight: bold;
-            text-align: center;
             margin-bottom: 15px;
         }
         
         .payment-modal-text {
             color: #fff;
-            font-size: 14px;
-            text-align: center;
+            font-size: 16px;
             margin-bottom: 20px;
             line-height: 1.4;
         }
         
-        .payment-status {
-            background: #1a1a1a;
-            border-radius: 12px;
-            padding: 12px;
-            margin: 15px 0;
-        }
-        
-        .status-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid #404040;
-        }
-        
-        .status-item:last-child {
-            border-bottom: none;
-        }
-        
-        .status-label {
-            color: #aaa;
-            font-size: 14px;
-        }
-        
-        .status-value {
+        .payment-modal-price {
+            color: #2ea6ff;
+            font-size: 28px;
             font-weight: bold;
-            font-size: 14px;
-        }
-        
-        .status-value.subscribed-true {
-            color: #6bff6b;
-        }
-        
-        .status-value.subscribed-false {
-            color: #ff6b6b;
-        }
-        
-        .status-value.purchased-true {
-            color: #6bff6b;
-        }
-        
-        .status-value.purchased-false {
-            color: #ffaa00;
+            margin: 15px 0;
         }
         
         .payment-modal-buttons {
@@ -384,7 +345,6 @@
             cursor: pointer;
             transition: all 0.2s;
             border: none;
-            text-align: center;
         }
         
         .payment-modal-btn-primary {
@@ -407,49 +367,10 @@
             background: #555;
         }
         
-        .payment-modal-btn-warning {
-            background: #ffaa00;
-            color: #000;
-        }
-        
         .payment-modal-note {
-            font-size: 11px;
-            color: #666;
-            text-align: center;
+            font-size: 12px;
+            color: #888;
             margin-top: 15px;
-            padding-top: 10px;
-            border-top: 1px solid #404040;
-        }
-        
-        .payment-modal-note a {
-            color: #2ea6ff;
-            text-decoration: none;
-        }
-        
-        /* Вложенное меню оплаты */
-        .payment-submenu {
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #404040;
-        }
-        
-        .payment-submenu-title {
-            color: #ffd700;
-            font-size: 14px;
-            font-weight: bold;
-            text-align: center;
-            margin-bottom: 12px;
-        }
-        
-        .price-badge {
-            background: #ffd700;
-            color: #000;
-            font-size: 20px;
-            font-weight: bold;
-            text-align: center;
-            padding: 8px;
-            border-radius: 12px;
-            margin: 10px 0;
         }
     </style>
 </head>
@@ -483,7 +404,7 @@
                 <span id="banana-count-badge" class="banana-count-badge">0</span>
             </button>
             <div id="counter">
-                <button class="bottom-btn" id="coin-btn" title="Личный кабинет">
+                <button class="bottom-btn" id="coin-btn" title="Купить пост">
                     🪙
                     <span id="purchased-badge-icon" class="badge-icon" style="display: none;"></span>
                 </button>
@@ -495,59 +416,20 @@
         </div>
     </div>
     
-    <!-- Модальное окно для личного кабинета -->
+    <!-- Модальное окно для подтверждения оплаты -->
     <div id="payment-modal">
         <div class="payment-modal-content">
-            <div class="payment-modal-title">🪙 ЛИЧНЫЙ КАБИНЕТ</div>
+            <div class="payment-modal-title">🪙 Доступ к посту</div>
             <div class="payment-modal-text">
-                Здесь вы можете управлять подпиской и оплатить доступ к скрытым материалам этого поста.
+                После оплаты вам станут доступны все фото этого поста.
             </div>
-            
-            <div class="payment-status" id="payment-status">
-                <div class="status-item">
-                    <span class="status-label">🍓 Подписка:</span>
-                    <span class="status-value" id="modal-sub-status">загрузка...</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">🔓 Доступ к посту:</span>
-                    <span class="status-value" id="modal-purchased-status">загрузка...</span>
-                </div>
+            <div class="payment-modal-price">99 ₽</div>
+            <div class="payment-modal-buttons">
+                <button class="payment-modal-btn payment-modal-btn-primary" id="payment-confirm-btn">💳 Перейти к оплате</button>
+                <button class="payment-modal-btn payment-modal-btn-secondary" id="payment-cancel-btn">◀️ Отмена</button>
             </div>
-            
-            <div id="modal-main-buttons">
-                <div class="payment-modal-buttons">
-                    <button class="payment-modal-btn payment-modal-btn-primary" id="modal-cabinet-btn">📋 Перейти в личный кабинет</button>
-                    <button class="payment-modal-btn payment-modal-btn-secondary" id="modal-close-btn">◀️ Отмена</button>
-                </div>
-            </div>
-            
-            <div id="modal-payment-submenu" style="display: none;">
-                <div class="payment-submenu">
-                    <div class="payment-submenu-title">💳 ОПЛАТА ПОСТА</div>
-                    <div class="price-badge" id="modal-price">99 ₽</div>
-                    <div class="payment-modal-buttons">
-                        <button class="payment-modal-btn payment-modal-btn-primary" id="modal-pay-btn">💳 Оплатить</button>
-                        <button class="payment-modal-btn payment-modal-btn-secondary" id="modal-check-payment-btn">🔄 Проверить оплату</button>
-                        <button class="payment-modal-btn payment-modal-btn-secondary" id="modal-back-btn">◀️ Назад</button>
-                    </div>
-                </div>
-            </div>
-            
-            <div id="modal-already-purchased" style="display: none;">
-                <div class="payment-submenu">
-                    <div class="payment-submenu-title">✅ ДОСТУП ОТКРЫТ</div>
-                    <div class="payment-modal-text">
-                        Вы уже купили доступ к этому посту!
-                    </div>
-                    <div class="payment-modal-buttons">
-                        <button class="payment-modal-btn payment-modal-btn-primary" id="modal-open-gallery-btn">🖼 Открыть галерею</button>
-                        <button class="payment-modal-btn payment-modal-btn-secondary" id="modal-close-already-btn">◀️ Закрыть</button>
-                    </div>
-                </div>
-            </div>
-            
             <div class="payment-modal-note">
-                💳 Платежи будут обработаны в боте <a href="#" id="payment-bot-link">@k0t_oplatabot</a>
+                Платёж будет обработан в боте @k0t_oplatabot
             </div>
         </div>
     </div>
@@ -576,7 +458,7 @@
                 <div class="modal-icon">🪙</div>
                 <div class="modal-text">
                     <div class="modal-text-title">Монета</div>
-                    <div class="modal-text-desc">Личный кабинет (подписка и оплата)</div>
+                    <div class="modal-text-desc">Купить весь пост (99₽) <span id="purchased-status-modal"></span></div>
                 </div>
             </div>
             
@@ -605,7 +487,7 @@
             </div>
             
             <div class="offline-note" id="offline-note" style="display: none;">📴 Оффлайн режим (бот недоступен)</div>
-            <button class="modal-close" id="info-modal-close-btn">Закрыть</button>
+            <button class="modal-close" id="modal-close-btn">Закрыть</button>
         </div>
     </div>
     
@@ -613,7 +495,7 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v21.0 - Личный кабинет с управлением подпиской и оплатой');
+        console.log('🚀 v20.0 - Подтверждение оплаты перед переходом');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -1146,46 +1028,16 @@
             }
         }
         
-        // ==================== ЛИЧНЫЙ КАБИНЕТ ====================
-        function updateModalStatus() {
-            const modalSubStatus = document.getElementById('modal-sub-status');
-            const modalPurchasedStatus = document.getElementById('modal-purchased-status');
-            
-            if (modalSubStatus) {
-                if (state.isSubscribed) {
-                    modalSubStatus.textContent = '✅ активна';
-                    modalSubStatus.className = 'status-value subscribed-true';
-                } else {
-                    modalSubStatus.textContent = '❌ не активна';
-                    modalSubStatus.className = 'status-value subscribed-false';
-                }
-            }
-            
-            if (modalPurchasedStatus) {
-                if (state.hasPurchased) {
-                    modalPurchasedStatus.textContent = '✅ куплен';
-                    modalPurchasedStatus.className = 'status-value purchased-true';
-                } else {
-                    modalPurchasedStatus.textContent = '🔞 не куплен';
-                    modalPurchasedStatus.className = 'status-value purchased-false';
-                }
-            }
-        }
+        // ==================== НОВАЯ ФУНКЦИЯ ОПЛАТЫ С ПОДТВЕРЖДЕНИЕМ ====================
+        let pendingPostId = null;
         
         function showPaymentModal() {
             if (state.botOffline) {
-                showMultilineToast('📴 Бот недоступен,\nличный кабинет временно недоступен');
+                showMultilineToast('📴 Бот недоступен,\nоплата временно недоступна');
                 return;
             }
             
-            // Обновляем статусы
-            updateModalStatus();
-            
-            // Показываем основное меню
-            document.getElementById('modal-main-buttons').style.display = 'block';
-            document.getElementById('modal-payment-submenu').style.display = 'none';
-            document.getElementById('modal-already-purchased').style.display = 'none';
-            
+            pendingPostId = state.postId;
             const modal = document.getElementById('payment-modal');
             if (modal) modal.classList.add('active');
         }
@@ -1193,78 +1045,28 @@
         function hidePaymentModal() {
             const modal = document.getElementById('payment-modal');
             if (modal) modal.classList.remove('active');
-        }
-        
-        function showPaymentSubmenu() {
-            document.getElementById('modal-main-buttons').style.display = 'none';
-            document.getElementById('modal-payment-submenu').style.display = 'block';
-            document.getElementById('modal-already-purchased').style.display = 'none';
-        }
-        
-        function showAlreadyPurchased() {
-            document.getElementById('modal-main-buttons').style.display = 'none';
-            document.getElementById('modal-payment-submenu').style.display = 'none';
-            document.getElementById('modal-already-purchased').style.display = 'block';
-        }
-        
-        function goToCabinet() {
-            // Показываем подменю с оплатой или уже купленное
-            if (state.hasPurchased) {
-                showAlreadyPurchased();
-            } else {
-                showPaymentSubmenu();
-            }
+            pendingPostId = null;
         }
         
         function proceedToPayment() {
-            if (!state.postId) return;
+            if (!pendingPostId) return;
             
-            const botLink = `https://t.me/${PAYMENT_BOT_USERNAME}?start=buy_vip_${state.postId}`;
+            const botLink = `https://t.me/${PAYMENT_BOT_USERNAME}?start=buy_vip_${pendingPostId}`;
+            
+            // Проверяем, видел ли пользователь предупреждение раньше
             const hasSeenWarning = localStorage.getItem('payment_warning_seen');
             
             if (hasSeenWarning) {
+                // Уже видел — открываем сразу
                 if (tg) tg.openLink(botLink);
             } else {
+                // Первый раз — показываем предупреждение через openTelegramLink
                 localStorage.setItem('payment_warning_seen', 'true');
                 if (tg) tg.openTelegramLink(botLink);
             }
             
             hidePaymentModal();
             showToast('🪙 Переход в платёжный бот...');
-        }
-        
-        async function checkPaymentStatus() {
-            hidePaymentModal();
-            showToast('🔍 Проверяем статус оплаты...');
-            
-            await checkPurchase();
-            updateUI();
-            updateModalStatus();
-            
-            if (state.hasPurchased) {
-                showToast('✅ Доступ подтверждён!');
-                // Обновляем текущее фото если оно было заблюрено
-                const currentFile = state.files[state.index];
-                if (currentFile && currentFile.isBlurred && currentFile.isBanana) {
-                    currentFile.isBlurred = false;
-                    currentFile.url = currentFile.originalUrl;
-                    showImage(state.index);
-                }
-            } else {
-                showToast('⏳ Оплата ещё не обработана, попробуйте позже');
-            }
-            
-            // Показываем модальное окно с обновленными статусами
-            setTimeout(() => {
-                updateModalStatus();
-                showPaymentModal();
-            }, 500);
-        }
-        
-        function openGalleryFromModal() {
-            hidePaymentModal();
-            // Просто закрываем модальное окно, галерея уже открыта
-            showToast('🖼 Галерея открыта');
         }
         
         function handleCoin() {
@@ -1380,18 +1182,15 @@
             const modal = document.getElementById('info-modal');
             if (modal) modal.classList.add('active'); 
         }
-        
         function hideInfo(e) { 
             if (e && e.target !== e.currentTarget) return;
             const modal = document.getElementById('info-modal');
             if (modal) modal.classList.remove('active'); 
         }
-        
         function forceReload() { 
             localStorage.clear(); 
             location.reload(); 
         }
-        
         function showToast(text) {
             const toast = document.getElementById('toast');
             if (!toast) return;
@@ -1432,18 +1231,10 @@
             const saveBtn = document.getElementById('save-btn');
             musicBtn = document.getElementById('music-btn');
             const infoBtn = document.getElementById('info-btn');
-            const infoModalCloseBtn = document.getElementById('info-modal-close-btn');
-            const forceReloadItem = document.getElementById('force-reload-item');
-            
-            // Модальное окно личного кабинета
             const modalCloseBtn = document.getElementById('modal-close-btn');
-            const modalCabinetBtn = document.getElementById('modal-cabinet-btn');
-            const modalPayBtn = document.getElementById('modal-pay-btn');
-            const modalCheckPaymentBtn = document.getElementById('modal-check-payment-btn');
-            const modalBackBtn = document.getElementById('modal-back-btn');
-            const modalOpenGalleryBtn = document.getElementById('modal-open-gallery-btn');
-            const modalCloseAlreadyBtn = document.getElementById('modal-close-already-btn');
-            const paymentBotLink = document.getElementById('payment-bot-link');
+            const forceReloadItem = document.getElementById('force-reload-item');
+            const paymentConfirmBtn = document.getElementById('payment-confirm-btn');
+            const paymentCancelBtn = document.getElementById('payment-cancel-btn');
             
             if (strawberryBtn) strawberryBtn.addEventListener('click', handleStrawberry);
             if (bananaBtn) bananaBtn.addEventListener('click', spendBanana);
@@ -1451,25 +1242,10 @@
             if (saveBtn) saveBtn.addEventListener('click', saveCurrentPhoto);
             if (musicBtn) musicBtn.addEventListener('click', toggleMusic);
             if (infoBtn) infoBtn.addEventListener('click', showInfo);
-            if (infoModalCloseBtn) infoModalCloseBtn.addEventListener('click', () => hideInfo());
+            if (modalCloseBtn) modalCloseBtn.addEventListener('click', () => hideInfo());
             if (forceReloadItem) forceReloadItem.addEventListener('click', forceReload);
-            
-            // Обработчики модального окна
-            if (modalCloseBtn) modalCloseBtn.addEventListener('click', hidePaymentModal);
-            if (modalCabinetBtn) modalCabinetBtn.addEventListener('click', goToCabinet);
-            if (modalPayBtn) modalPayBtn.addEventListener('click', proceedToPayment);
-            if (modalCheckPaymentBtn) modalCheckPaymentBtn.addEventListener('click', checkPaymentStatus);
-            if (modalBackBtn) modalBackBtn.addEventListener('click', () => {
-                document.getElementById('modal-main-buttons').style.display = 'block';
-                document.getElementById('modal-payment-submenu').style.display = 'none';
-                document.getElementById('modal-already-purchased').style.display = 'none';
-            });
-            if (modalOpenGalleryBtn) modalOpenGalleryBtn.addEventListener('click', openGalleryFromModal);
-            if (modalCloseAlreadyBtn) modalCloseAlreadyBtn.addEventListener('click', hidePaymentModal);
-            if (paymentBotLink) paymentBotLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                if (tg) tg.openLink(`https://t.me/${PAYMENT_BOT_USERNAME}`);
-            });
+            if (paymentConfirmBtn) paymentConfirmBtn.addEventListener('click', proceedToPayment);
+            if (paymentCancelBtn) paymentCancelBtn.addEventListener('click', hidePaymentModal);
             
             if (musicBtn) musicBtn.style.opacity = '0.5';
         });
