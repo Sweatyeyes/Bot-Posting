@@ -173,19 +173,22 @@
         
         .rating-badge {
             position: absolute;
-            top: -8px;
-            right: -8px;
-            background: transparent;
-            color: #ffd700;
-            font-size: 11px;
+            top: -5px;
+            right: -5px;
+            background: #8B4513;
+            color: white;
+            font-size: 14px;
             font-weight: bold;
-            min-width: 20px;
-            height: 18px;
+            min-width: 22px;
+            height: 22px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 0 5px;
+            border: 2px solid #ffd700;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
             z-index: 600;
-            text-shadow: 0 0 4px rgba(0,0,0,0.5);
         }
         
         #cabinet-btn {
@@ -481,6 +484,7 @@
                 🍌
                 <span id="banana-count-badge" class="banana-badge">0</span>
             </button>
+            <button class="bottom-btn" id="music-btn" title="Музыка">🎵</button>
             <div id="counter">
                 <button class="bottom-btn" id="rating-btn" title="Оценить">
                     <span id="rating-icon">★</span>
@@ -488,11 +492,10 @@
                 </button>
                 <span id="counter-text">1/1</span>
             </div>
+            <button class="bottom-btn" id="save-btn" title="Сохранить фото">💾</button>
             <button class="bottom-btn" id="cabinet-btn" title="Личный кабинет">
                 <span id="cabinet-icon">♚</span>
             </button>
-            <button class="bottom-btn" id="music-btn" title="Музыка">🎵</button>
-            <button class="bottom-btn" id="save-btn" title="Сохранить фото">💾</button>
             <button class="bottom-btn" id="info-btn" title="Помощь">❓</button>
         </div>
     </div>
@@ -547,10 +550,10 @@
             </div>
             
             <div class="modal-item">
-                <div class="modal-icon"><span id="info-cabinet-icon">♚</span></div>
+                <div class="modal-icon">🎵</div>
                 <div class="modal-text">
-                    <div class="modal-text-title">Личный кабинет</div>
-                    <div class="modal-text-desc">Здесь можно купить бананы или оформить подписку.</div>
+                    <div class="modal-text-title">Музыка</div>
+                    <div class="modal-text-desc">Включить/выключить фоновую музыку</div>
                 </div>
             </div>
             
@@ -571,10 +574,10 @@
             </div>
             
             <div class="modal-item">
-                <div class="modal-icon">🎵</div>
+                <div class="modal-icon"><span id="info-cabinet-icon">♚</span></div>
                 <div class="modal-text">
-                    <div class="modal-text-title">Музыка</div>
-                    <div class="modal-text-desc">Включить/выключить фоновую музыку</div>
+                    <div class="modal-text-title">Личный кабинет</div>
+                    <div class="modal-text-desc">Здесь можно купить бананы или оформить подписку.</div>
                 </div>
             </div>
             
@@ -595,7 +598,7 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v24.0 - Новая панель кнопок: корона больше, оценка без рамки');
+        console.log('🚀 v25.0 - Новый порядок кнопок: бананы, музыка, звезда, счётчик, сохранить, корона, информация');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -1388,6 +1391,13 @@
             } else if (cabinetBtn) {
                 cabinetBtn.classList.remove('disabled');
             }
+            
+            const musicBtnElem = document.getElementById('music-btn');
+            if (musicBtnElem && state.botOffline) {
+                musicBtnElem.classList.add('disabled');
+            } else if (musicBtnElem) {
+                musicBtnElem.classList.remove('disabled');
+            }
         }
         
         function showInfo() { 
@@ -1441,10 +1451,10 @@
         
         document.addEventListener('DOMContentLoaded', () => {
             const bananaBtn = document.getElementById('banana-btn');
-            const cabinetBtn = document.getElementById('cabinet-btn');
+            const musicBtnElem = document.getElementById('music-btn');
             const ratingBtn = document.getElementById('rating-btn');
             const saveBtn = document.getElementById('save-btn');
-            musicBtn = document.getElementById('music-btn');
+            const cabinetBtn = document.getElementById('cabinet-btn');
             const infoBtn = document.getElementById('info-btn');
             const infoModalCloseBtn = document.getElementById('info-modal-close-btn');
             const forceReloadItem = document.getElementById('force-reload-item');
@@ -1457,10 +1467,10 @@
             const ratingStars = document.querySelectorAll('#rating-stars .rating-star');
             
             if (bananaBtn) bananaBtn.addEventListener('click', spendBanana);
-            if (cabinetBtn) cabinetBtn.addEventListener('click', handleCabinet);
+            if (musicBtnElem) musicBtnElem.addEventListener('click', toggleMusic);
             if (ratingBtn) ratingBtn.addEventListener('click', handleRating);
             if (saveBtn) saveBtn.addEventListener('click', saveCurrentPhoto);
-            if (musicBtn) musicBtn.addEventListener('click', toggleMusic);
+            if (cabinetBtn) cabinetBtn.addEventListener('click', handleCabinet);
             if (infoBtn) infoBtn.addEventListener('click', showInfo);
             if (infoModalCloseBtn) infoModalCloseBtn.addEventListener('click', () => hideInfo());
             if (forceReloadItem) forceReloadItem.addEventListener('click', forceReload);
@@ -1480,7 +1490,7 @@
                 });
             });
             
-            if (musicBtn) musicBtn.style.opacity = '0.5';
+            if (musicBtnElem) musicBtnElem.style.opacity = '0.5';
         });
         
         init();
