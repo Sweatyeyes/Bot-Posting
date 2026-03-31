@@ -173,21 +173,27 @@
         
         .rating-badge {
             position: absolute;
-            top: -5px;
-            right: -5px;
-            background: #2ea6ff;
-            color: white;
-            font-size: 12px;
+            top: -8px;
+            right: -8px;
+            background: transparent;
+            color: #ffd700;
+            font-size: 11px;
             font-weight: bold;
-            min-width: 32px;
-            height: 22px;
-            border-radius: 12px;
+            min-width: 20px;
+            height: 18px;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 0 6px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
             z-index: 600;
+            text-shadow: 0 0 4px rgba(0,0,0,0.5);
+        }
+        
+        #cabinet-btn {
+            font-size: 36px;
+        }
+        
+        #music-btn {
+            font-size: 32px;
         }
         
         #counter {
@@ -475,9 +481,6 @@
                 🍌
                 <span id="banana-count-badge" class="banana-badge">0</span>
             </button>
-            <button class="bottom-btn" id="cabinet-btn" title="Личный кабинет">
-                <span id="cabinet-icon">♚</span>
-            </button>
             <div id="counter">
                 <button class="bottom-btn" id="rating-btn" title="Оценить">
                     <span id="rating-icon">★</span>
@@ -485,8 +488,11 @@
                 </button>
                 <span id="counter-text">1/1</span>
             </div>
-            <button class="bottom-btn" id="save-btn" title="Сохранить фото">💾</button>
+            <button class="bottom-btn" id="cabinet-btn" title="Личный кабинет">
+                <span id="cabinet-icon">♚</span>
+            </button>
             <button class="bottom-btn" id="music-btn" title="Музыка">🎵</button>
+            <button class="bottom-btn" id="save-btn" title="Сохранить фото">💾</button>
             <button class="bottom-btn" id="info-btn" title="Помощь">❓</button>
         </div>
     </div>
@@ -589,7 +595,7 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v23.0 - Новая панель кнопок: бананы, личный кабинет, оценка');
+        console.log('🚀 v24.0 - Новая панель кнопок: корона больше, оценка без рамки');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -1095,7 +1101,6 @@
         function showRatingModal() {
             const modal = document.getElementById('rating-modal');
             if (modal) {
-                // Подсвечиваем текущую оценку пользователя
                 const stars = document.querySelectorAll('#rating-stars .rating-star');
                 stars.forEach(star => {
                     const value = parseInt(star.dataset.value);
@@ -1207,7 +1212,6 @@
                 return;
             }
             
-            // Если есть платная подписка — бананы не тратятся
             if (state.hasPaidSubscription) {
                 showToast('🍌 У вас подписка, бананы не тратятся!');
                 return;
@@ -1445,12 +1449,10 @@
             const infoModalCloseBtn = document.getElementById('info-modal-close-btn');
             const forceReloadItem = document.getElementById('force-reload-item');
             
-            // Модальное окно личного кабинета
             const loginEnterBtn = document.getElementById('login-enter-btn');
             const loginCancelBtn = document.getElementById('login-cancel-btn');
             const loginPaymentBotLink = document.getElementById('login-payment-bot-link');
             
-            // Модальное окно оценки
             const ratingCancelBtn = document.getElementById('rating-cancel-btn');
             const ratingStars = document.querySelectorAll('#rating-stars .rating-star');
             
