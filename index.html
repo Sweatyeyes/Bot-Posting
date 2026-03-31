@@ -147,8 +147,8 @@
             position: absolute;
             top: -5px;
             right: -5px;
-            background: #8B4513;
-            color: white;
+            background: #000;
+            color: #ffd700;
             font-size: 14px;
             font-weight: bold;
             min-width: 22px;
@@ -158,37 +158,36 @@
             align-items: center;
             justify-content: center;
             padding: 0 5px;
-            border: 2px solid #ffd700;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            border: 1px solid #ffd700;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
             z-index: 600;
         }
         
         .banana-badge.infinity {
-            font-size: 18px;
-            background: transparent;
-            border: none;
-            box-shadow: none;
-            min-width: auto;
+            font-size: 16px;
+            background: #000;
+            border: 1px solid #ffd700;
+            color: #ffd700;
         }
         
         .rating-badge {
             position: absolute;
             top: -5px;
             right: -5px;
-            background: white;
-            color: #000;
-            font-size: 12px;
+            background: #000;
+            color: #fff;
+            font-size: 14px;
             font-weight: bold;
-            min-width: 28px;
+            min-width: 22px;
             height: 22px;
             border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 0 6px;
+            padding: 0 5px;
+            border: 1px solid #fff;
             box-shadow: 0 1px 3px rgba(0,0,0,0.3);
             z-index: 600;
-            letter-spacing: 0.5px;
         }
         
         #cabinet-btn {
@@ -598,7 +597,7 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v26.0 - Корона увеличена, рейтинг в белом овале');
+        console.log('🚀 v27.0 - Новые стили баджей: чёрный фон, золотая/белая окантовка');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
