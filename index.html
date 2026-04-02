@@ -111,18 +111,6 @@
         
         .bottom-btn:active { transform: scale(0.9); }
         .bottom-btn.disabled { opacity: 0.3; pointer-events: none; }
-        .bottom-btn.offline { opacity: 0.7; filter: grayscale(50%); }
-        
-        .music-btn-off {
-            filter: grayscale(100%);
-            opacity: 0.5;
-        }
-        
-        .music-btn-playing { animation: pulse 1s infinite; }
-        @keyframes pulse {
-            0% { text-shadow: 0 0 5px #2ea6ff; }
-            100% { text-shadow: 0 0 20px #2ea6ff; }
-        }
         
         .banana-badge {
             position: absolute;
@@ -276,7 +264,6 @@
             opacity: 0;
         }
         #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-        #toast.warning { border-color: #ffaa00; background: rgba(0,0,0,0.95); }
         
         #error {
             display: none;
@@ -293,7 +280,6 @@
             border-radius: 10px;
             width: 80%;
         }
-        #error small { display: block; margin-top: 10px; color: #999; font-size: 14px; }
         
         .rating-stars {
             display: flex;
@@ -588,7 +574,7 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v29.0 - 5 звезд, исправленный рейтинг');
+        console.log('🚀 v30.0 - Исправленный рейтинг с 5 звездами');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -617,10 +603,6 @@
                 if (webAppStartParam.startsWith('buy_vip_')) return webAppStartParam.replace('buy_vip_', '');
                 return webAppStartParam;
             }
-            if (window.location.hash) {
-                const match = window.location.hash.match(/[?&]post=([^&]+)/);
-                if (match) return match[1];
-            }
             return null;
         }
         
@@ -629,11 +611,6 @@
             if (userId) return parseInt(userId);
             const user = tg?.initDataUnsafe?.user;
             if (user && user.id) return user.id;
-            const startParam = tg?.initDataUnsafe?.start_param;
-            if (startParam && startParam.includes(':')) {
-                const parts = startParam.split(':');
-                if (parts.length >= 2 && !isNaN(parseInt(parts[1]))) return parseInt(parts[1]);
-            }
             return null;
         }
         
@@ -646,7 +623,10 @@
         const urlUnlockedPhotos = unlockedParam ? unlockedParam.split(',') : [];
         const subscriptionEndDate = urlParams.get('subscription_end_date') || '';
         const hasPaidSubscription = rawSubscribed && subscriptionEndDate !== '';
+        
+        // ГЛАВНОЕ: ЧИТАЕМ ОЦЕНКУ ПОЛЬЗОВАТЕЛЯ ИЗ URL
         const userRatingFromUrl = parseInt(urlParams.get('user_rating')) || 0;
+        console.log('⭐ user_rating из URL:', userRatingFromUrl);
         
         let state = {
             files: [], index: 0, postId: rawPost, userId: rawUser,
@@ -657,10 +637,12 @@
             filesData: null,
             hasPaidSubscription: hasPaidSubscription,
             subscriptionEndDate: subscriptionEndDate,
-            userRating: userRatingFromUrl,
+            userRating: userRatingFromUrl,  // Устанавливаем из URL
             averageRating: 0,
             totalVotes: 0
         };
+        
+        console.log('⭐ Начальный state.userRating:', state.userRating);
         
         function isVideoFile(filename) {
             const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm'];
@@ -851,6 +833,8 @@
                 return;
             }
             
+            console.log('⭐ Загрузка галереи, userRating из state:', state.userRating);
+            
             let filesData = await fetchFilesFromBot();
             
             if (!filesData) {
@@ -878,6 +862,7 @@
                 await checkSubscription();
                 await fetchUnlockedPhotos();
                 await fetchAverageRating();
+                // Обновляем оценку пользователя с сервера (если изменилась)
                 await fetchUserRating();
             }
             
@@ -899,15 +884,15 @@
             showMedia(0);
             setupNavigation();
             setupSwipeListeners();
+            
+            console.log('⭐ Галерея загружена, финальный userRating:', state.userRating);
         }
         
         function showMedia(i) {
             if (!state.files || state.files.length === 0) return;
             
             state.index = (i + state.files.length) % state.files.length;
-            const mediaElement = document.getElementById('media');
             const file = state.files[state.index];
-            if (!mediaElement || !file) return;
             
             const isVideo = file.isVideo && !file.isBlurred;
             
@@ -1052,7 +1037,7 @@
         
         async function fetchAverageRating() {
             try {
-                const res = await fetch(`${TUNNEL_URL}/api/get-average-rating`, {
+                const res = await fetch(`${TUNNEL_URL}/api/get-average-rating?post=${state.postId || 'gallery'}`, {
                     method: 'GET',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -1077,6 +1062,7 @@
                 const data = await res.json();
                 if (data.rating) {
                     state.userRating = data.rating;
+                    console.log('⭐ Обновлён userRating с сервера:', state.userRating);
                 }
             } catch(e) {
                 console.log('Ошибка загрузки оценки пользователя:', e);
@@ -1085,6 +1071,7 @@
         
         function renderStars(rating) {
             const stars = document.querySelectorAll('#rating-stars .rating-star');
+            console.log('⭐ Рендерим звёзды с рейтингом:', rating);
             stars.forEach((star, idx) => {
                 const value = idx + 1;
                 if (rating >= value) {
@@ -1167,6 +1154,7 @@
         function showRatingModal() {
             const modal = document.getElementById('rating-modal');
             if (modal) {
+                console.log('⭐ Открываем модалку, userRating:', state.userRating);
                 renderStars(state.userRating);
                 modal.classList.add('active');
             }
@@ -1210,14 +1198,7 @@
         function enterCabinet() {
             hideLoginModal();
             const botLink = `https://t.me/${PAYMENT_BOT_USERNAME}`;
-            const hasSeenWarning = localStorage.getItem('payment_warning_seen');
-            
-            if (hasSeenWarning) {
-                if (tg) tg.openLink(botLink);
-            } else {
-                localStorage.setItem('payment_warning_seen', 'true');
-                if (tg) tg.openTelegramLink(botLink);
-            }
+            if (tg) tg.openTelegramLink(botLink);
             showToast('🔑 Переход в платёжный бот...');
         }
         
@@ -1409,13 +1390,6 @@
                 cabinetBtn.classList.add('disabled');
             } else if (cabinetBtn) {
                 cabinetBtn.classList.remove('disabled');
-            }
-            
-            const musicBtnElem = document.getElementById('music-btn');
-            if (musicBtnElem && state.botOffline) {
-                musicBtnElem.classList.add('disabled');
-            } else if (musicBtnElem) {
-                musicBtnElem.classList.remove('disabled');
             }
         }
         
