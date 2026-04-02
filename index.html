@@ -124,28 +124,6 @@
             100% { text-shadow: 0 0 20px #2ea6ff; }
         }
         
-        .badge-icon {
-            position: absolute;
-            top: -5px;
-            right: -5px;
-            font-size: 14px;
-            font-weight: bold;
-            z-index: 600;
-            text-shadow: 0 0 2px rgba(0,0,0,0.5);
-        }
-        
-        .badge-icon.subscribed-true {
-            color: #6bff6b;
-        }
-        
-        .badge-icon.subscribed-false {
-            color: #ff6b6b;
-        }
-        
-        .badge-icon.purchased-true {
-            color: #6bff6b;
-        }
-        
         .banana-badge {
             position: absolute;
             top: -5px;
@@ -193,13 +171,8 @@
             z-index: 600;
         }
         
-        #cabinet-btn {
-            font-size: 38px;
-        }
-        
-        #music-btn {
-            font-size: 32px;
-        }
+        #cabinet-btn { font-size: 38px; }
+        #music-btn { font-size: 32px; }
         
         #counter {
             color: white;
@@ -331,7 +304,7 @@
         }
         
         .rating-star {
-            font-size: 36px;
+            font-size: 42px;
             cursor: pointer;
             transition: all 0.2s;
             color: #666;
@@ -344,6 +317,7 @@
         
         .rating-star:hover {
             transform: scale(1.1);
+            color: #ffd700;
         }
         
         .rating-note {
@@ -374,6 +348,24 @@
             border: 1px solid #ffd700;
             text-align: center;
             animation: slideUp 0.3s ease;
+        }
+        
+        .current-rating {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #3d3d3d;
+            border-radius: 10px;
+        }
+        
+        .current-rating-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #ffd700;
+        }
+        
+        .current-rating-label {
+            font-size: 12px;
+            color: #aaa;
         }
         
         #login-modal {
@@ -503,19 +495,19 @@
     <div id="rating-modal">
         <div class="rating-modal-content">
             <div class="modal-title">⭐ ОЦЕНИТЕ ГАЛЕРЕЮ</div>
+            <div class="current-rating" id="current-rating-block" style="display: none;">
+                <div class="current-rating-label">Текущий средний рейтинг</div>
+                <div class="current-rating-value" id="current-average-rating">0</div>
+                <div class="current-rating-label" id="total-votes-label">0 оценок</div>
+            </div>
             <div class="rating-stars" id="rating-stars">
                 <span class="rating-star" data-value="1">☆</span>
                 <span class="rating-star" data-value="2">☆</span>
                 <span class="rating-star" data-value="3">☆</span>
                 <span class="rating-star" data-value="4">☆</span>
                 <span class="rating-star" data-value="5">☆</span>
-                <span class="rating-star" data-value="6">☆</span>
-                <span class="rating-star" data-value="7">☆</span>
-                <span class="rating-star" data-value="8">☆</span>
-                <span class="rating-star" data-value="9">☆</span>
-                <span class="rating-star" data-value="10">☆</span>
             </div>
-            <div class="rating-note">Нажмите на звезду, чтобы поставить оценку</div>
+            <div class="rating-note">Нажмите на звезду, чтобы поставить оценку (1-5)</div>
             <div class="login-modal-buttons" style="margin-top: 15px;">
                 <button class="login-modal-btn login-modal-btn-secondary" id="rating-cancel-btn">◀️ Отмена</button>
             </div>
@@ -559,7 +551,7 @@
                 <div class="modal-icon">⭐</div>
                 <div class="modal-text">
                     <div class="modal-text-title">Оценка</div>
-                    <div class="modal-text-desc">Оцените модель этой галереи. Ваша оценка повлияет на общий рейтинг.</div>
+                    <div class="modal-text-desc">Оцените модель этой галереи от 1 до 5 звёзд. Ваша оценка повлияет на общий рейтинг.</div>
                 </div>
             </div>
             
@@ -596,7 +588,7 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v28.0 - Поддержка видео');
+        console.log('🚀 v29.0 - 5 звезд, исправленный рейтинг');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -654,6 +646,7 @@
         const urlUnlockedPhotos = unlockedParam ? unlockedParam.split(',') : [];
         const subscriptionEndDate = urlParams.get('subscription_end_date') || '';
         const hasPaidSubscription = rawSubscribed && subscriptionEndDate !== '';
+        const userRatingFromUrl = parseInt(urlParams.get('user_rating')) || 0;
         
         let state = {
             files: [], index: 0, postId: rawPost, userId: rawUser,
@@ -664,8 +657,9 @@
             filesData: null,
             hasPaidSubscription: hasPaidSubscription,
             subscriptionEndDate: subscriptionEndDate,
-            userRating: 0,
-            averageRating: 0
+            userRating: userRatingFromUrl,
+            averageRating: 0,
+            totalVotes: 0
         };
         
         function isVideoFile(filename) {
@@ -1056,8 +1050,9 @@
                     headers: { 'Content-Type': 'application/json' }
                 });
                 const data = await res.json();
-                if (data.average_rating) {
+                if (data.average_rating !== undefined) {
                     state.averageRating = data.average_rating;
+                    state.totalVotes = data.total_votes || 0;
                     updateRatingDisplay();
                 }
             } catch(e) {
@@ -1068,7 +1063,7 @@
         async function fetchUserRating() {
             if (!state.userId) return;
             try {
-                const res = await fetch(`${TUNNEL_URL}/api/get-user-rating?user=${state.userId}`, {
+                const res = await fetch(`${TUNNEL_URL}/api/get-user-rating?user=${state.userId}&post=${state.postId || 'gallery'}`, {
                     method: 'GET',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -1079,6 +1074,20 @@
             } catch(e) {
                 console.log('Ошибка загрузки оценки пользователя:', e);
             }
+        }
+        
+        function renderStars(rating) {
+            const stars = document.querySelectorAll('#rating-stars .rating-star');
+            stars.forEach((star, idx) => {
+                const value = idx + 1;
+                if (rating >= value) {
+                    star.textContent = '★';
+                    star.classList.add('selected');
+                } else {
+                    star.textContent = '☆';
+                    star.classList.remove('selected');
+                }
+            });
         }
         
         async function submitRating(rating) {
@@ -1093,20 +1102,23 @@
                     body: JSON.stringify({
                         user_id: state.userId,
                         rating: rating,
-                        post_id: state.postId
+                        post_id: state.postId || 'gallery'
                     })
                 });
                 const data = await res.json();
                 if (data.success) {
                     state.userRating = rating;
                     state.averageRating = data.average_rating;
+                    state.totalVotes = data.total_votes;
                     updateRatingDisplay();
-                    showToast(`⭐ Оценка ${rating} сохранена!`);
+                    renderStars(rating);
+                    showToast(`⭐ Оценка ${rating} из 5 сохранена!`);
                     hideRatingModal();
                 } else {
                     showToast('❌ Ошибка при сохранении оценки');
                 }
             } catch(e) {
+                console.error('Submit rating error:', e);
                 showToast('❌ Ошибка соединения');
             }
         }
@@ -1114,6 +1126,10 @@
         function updateRatingDisplay() {
             const ratingValue = document.getElementById('rating-value');
             const ratingIcon = document.getElementById('rating-icon');
+            const currentRatingBlock = document.getElementById('current-rating-block');
+            const currentAverageRating = document.getElementById('current-average-rating');
+            const totalVotesLabel = document.getElementById('total-votes-label');
+            
             if (ratingValue && state.averageRating > 0) {
                 ratingValue.textContent = state.averageRating.toFixed(1);
                 ratingValue.style.display = 'flex';
@@ -1122,22 +1138,29 @@
                 ratingValue.style.display = 'none';
                 ratingIcon.textContent = '☆';
             }
+            
+            if (currentRatingBlock && state.averageRating > 0) {
+                currentAverageRating.textContent = state.averageRating.toFixed(1);
+                totalVotesLabel.textContent = `${state.totalVotes} ${getDeclension(state.totalVotes, 'оценка', 'оценки', 'оценок')}`;
+                currentRatingBlock.style.display = 'block';
+            } else if (currentRatingBlock) {
+                currentRatingBlock.style.display = 'none';
+            }
+        }
+        
+        function getDeclension(n, one, few, many) {
+            n = Math.abs(n) % 100;
+            if (n >= 5 && n <= 20) return many;
+            n %= 10;
+            if (n === 1) return one;
+            if (n >= 2 && n <= 4) return few;
+            return many;
         }
         
         function showRatingModal() {
             const modal = document.getElementById('rating-modal');
             if (modal) {
-                const stars = document.querySelectorAll('#rating-stars .rating-star');
-                stars.forEach(star => {
-                    const value = parseInt(star.dataset.value);
-                    if (state.userRating >= value) {
-                        star.textContent = '★';
-                        star.classList.add('selected');
-                    } else {
-                        star.textContent = '☆';
-                        star.classList.remove('selected');
-                    }
-                });
+                renderStars(state.userRating);
                 modal.classList.add('active');
             }
         }
@@ -1356,40 +1379,6 @@
                 bananaBadge.style.display = 'flex';
             }
             
-            const subBadgeIcon = document.getElementById('subscribed-badge-icon');
-            if (subBadgeIcon) {
-                if (state.isSubscribed || state.hasPaidSubscription) {
-                    subBadgeIcon.textContent = '✔️';
-                    subBadgeIcon.className = 'badge-icon subscribed-true';
-                    subBadgeIcon.style.display = 'flex';
-                } else {
-                    subBadgeIcon.textContent = '✖️';
-                    subBadgeIcon.className = 'badge-icon subscribed-false';
-                    subBadgeIcon.style.display = 'flex';
-                }
-            }
-            
-            const purchasedBadgeIcon = document.getElementById('purchased-badge-icon');
-            if (purchasedBadgeIcon) {
-                if (state.hasPurchased) {
-                    purchasedBadgeIcon.textContent = '✔️';
-                    purchasedBadgeIcon.className = 'badge-icon purchased-true';
-                    purchasedBadgeIcon.style.display = 'flex';
-                } else {
-                    purchasedBadgeIcon.style.display = 'none';
-                }
-            }
-            
-            const subStatusModal = document.getElementById('sub-status-modal');
-            if (subStatusModal) {
-                subStatusModal.textContent = (state.isSubscribed || state.hasPaidSubscription) ? '✔️ есть' : '✖️ нет';
-            }
-            
-            const purchasedStatusModal = document.getElementById('purchased-status-modal');
-            if (purchasedStatusModal) {
-                purchasedStatusModal.textContent = state.hasPurchased ? '✔️' : '';
-            }
-            
             const saveBtn = document.getElementById('save-btn');
             if (saveBtn) {
                 if (state.botOffline) {
@@ -1513,6 +1502,7 @@
                 });
             });
             
+            musicBtn = musicBtnElem;
             if (musicBtnElem) musicBtnElem.style.opacity = '0.5';
         });
         
