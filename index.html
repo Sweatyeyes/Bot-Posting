@@ -781,14 +781,21 @@
             for (const originalName of bananaOriginals) {
                 const isVideo = isVideoFile(originalName);
                 const isUnlocked = state.isSubscribed || state.hasPurchased || state.unlockedPhotos.includes(originalName) || state.hasPaidSubscription;
-                const blurName = originalName.replace(/\.(jpg|jpeg|png|mp4|mov|avi)$/i, '_blur.jpg');
+                
+                // Пробуем оба варианта имени блюр-файла
+                const blurName = originalName.replace(/\.(jpg|jpeg|png|mp4|mov|avi|mkv|webm)$/i, '_blur.jpg');
+                const frameBlurName = originalName.replace(/\.(mp4|mov|avi|mkv|webm)$/i, '_frame_blur.jpg');
+                
                 const hasBlur = bananaAll.includes(blurName);
+                const hasFrameBlur = bananaAll.includes(frameBlurName);
                 
                 let mediaUrl;
                 if (isUnlocked) {
                     mediaUrl = `${baseUrl}/banana/${originalName}`;
                 } else if (hasBlur) {
                     mediaUrl = `${baseUrl}/banana/${blurName}`;
+                } else if (hasFrameBlur) {
+                    mediaUrl = `${baseUrl}/banana/${frameBlurName}`;
                 } else {
                     mediaUrl = 'https://via.placeholder.com/600x800/333/fff?text=No+Access';
                 }
