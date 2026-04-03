@@ -614,7 +614,7 @@
     <div id="error"></div>
 
     <script>
-        console.log('🚀 v30.0 - Исправлен вызов fetchUserRating при загрузке');
+        console.log('🚀 v31.0 - Глобальный баланс бананов, 5 звезд, поддержка _frame_blur.jpg');
 
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -867,6 +867,8 @@
 
             return files;
         }
+
+        // НОВАЯ ФУНКЦИЯ: получаем ГЛОБАЛЬНЫЙ баланс бананов
         async function fetchBananaBalance() {
             if (!state.userId) return;
             try {
@@ -882,6 +884,7 @@
                 console.log('Ошибка загрузки баланса:', e);
             }
         }
+
         async function loadGallery() {
             if (!state.postId) {
                 showError('Не указан ID поста');
@@ -917,8 +920,8 @@
                 await checkSubscription();
                 await fetchUnlockedPhotos();
                 await fetchAverageRating();
-                // ВАЖНО: запрашиваем оценку пользователя ДО отображения галереи
                 await fetchUserRating();
+                // ВАЖНО: запрашиваем ГЛОБАЛЬНЫЙ баланс бананов
                 await fetchBananaBalance();
             }
 
@@ -943,6 +946,7 @@
 
             console.log('⭐ Финальный userRating после загрузки:', state.userRating);
             console.log('⭐ Финальный averageRating:', state.averageRating);
+            console.log('🍌 Финальный баланс бананов:', state.bananasLeft);
         }
 
         function showMedia(i) {
@@ -1063,9 +1067,12 @@
                 const data = await res.json();
                 if (data.unlocked_photos) {
                     state.unlockedPhotos = data.unlocked_photos;
+                    console.log('🍌 Разблокированные фото:', state.unlockedPhotos);
                     updateUI();
                 }
-            } catch(e) {}
+            } catch(e) {
+                console.log('Ошибка получения разблокированных:', e);
+            }
         }
 
         async function checkSubscription() {
