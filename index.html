@@ -591,7 +591,7 @@
     <div id="error"></div>
 
     <script>
-        console.log('🚀 v28.0 - 5 звезд, правильная логика');
+        console.log('🚀 v33.0 - Правильная трата бананов, поддержка _frame_blur.jpg');
 
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -644,11 +644,12 @@
         const rawUser = getUserId();
         const rawSubscribed = urlParams.get('subscribed') === 'true';
         const rawPurchased = urlParams.get('purchased') === 'true';
-        const rawBananas = parseInt(urlParams.get('bananas')) || 3;
+        const rawBananas = parseInt(urlParams.get('bananas')) || 0;
         const unlockedParam = urlParams.get('unlocked') || '';
         const urlUnlockedPhotos = unlockedParam ? unlockedParam.split(',') : [];
         const subscriptionEndDate = urlParams.get('subscription_end_date') || '';
         const hasPaidSubscription = rawSubscribed && subscriptionEndDate !== '';
+        const userRatingFromUrl = parseInt(urlParams.get('user_rating')) || 0;
 
         let state = {
             files: [], index: 0, postId: rawPost, userId: rawUser,
@@ -659,8 +660,9 @@
             filesData: null,
             hasPaidSubscription: hasPaidSubscription,
             subscriptionEndDate: subscriptionEndDate,
-            userRating: 0,
-            averageRating: 0
+            userRating: userRatingFromUrl,
+            averageRating: 0,
+            totalVotes: 0
         };
 
         function isVideoFile(filename) {
@@ -782,14 +784,19 @@
             for (const originalName of bananaOriginals) {
                 const isVideo = isVideoFile(originalName);
                 const isUnlocked = state.isSubscribed || state.hasPurchased || state.unlockedPhotos.includes(originalName) || state.hasPaidSubscription;
+                // Пробуем оба варианта: _blur.jpg и _frame_blur.jpg
                 const blurName = originalName.replace(/\.(jpg|jpeg|png|mp4|mov|avi)$/i, '_blur.jpg');
+                const frameBlurName = originalName.replace(/\.(mp4|mov|avi)$/i, '_frame_blur.jpg');
                 const hasBlur = bananaAll.includes(blurName);
+                const hasFrameBlur = bananaAll.includes(frameBlurName);
 
                 let mediaUrl;
                 if (isUnlocked) {
                     mediaUrl = `${baseUrl}/banana/${originalName}`;
                 } else if (hasBlur) {
                     mediaUrl = `${baseUrl}/banana/${blurName}`;
+                } else if (hasFrameBlur) {
+                    mediaUrl = `${baseUrl}/banana/${frameBlurName}`;
                 } else {
                     mediaUrl = 'https://via.placeholder.com/600x800/333/fff?text=No+Access';
                 }
@@ -845,6 +852,8 @@
                 return;
             }
 
+            console.log('🖼 Загрузка галереи, postId:', state.postId);
+
             let filesData = await fetchFilesFromBot();
 
             if (!filesData) {
@@ -873,6 +882,7 @@
                 await fetchUnlockedPhotos();
                 await fetchAverageRating();
                 await fetchUserRating();
+                await fetchBananaBalance();
             }
 
             state.filesData = filesData;
@@ -893,6 +903,9 @@
             showMedia(0);
             setupNavigation();
             setupSwipeListeners();
+
+            console.log('⭐ Финальный userRating:', state.userRating);
+            console.log('🍌 Финальный баланс:', state.bananasLeft);
         }
 
         function showMedia(i) {
@@ -1015,10 +1028,28 @@
                 const data = await res.json();
                 if (data.unlocked_photos) {
                     state.unlockedPhotos = data.unlocked_photos;
-                    state.bananasLeft = data.available_bananas;
+                    console.log('🍌 Разблокированные фото:', state.unlockedPhotos);
                     updateUI();
                 }
-            } catch(e) {}
+            } catch(e) {
+                console.log('Ошибка получения разблокированных:', e);
+            }
+        }
+
+        async function fetchBananaBalance() {
+            if (!state.userId) return;
+            try {
+                console.log('🍌 Запрос глобального баланса для user=', state.userId);
+                const res = await fetch(`${TUNNEL_URL}/api/get-banana-balance?user=${state.userId}`);
+                const data = await res.json();
+                if (data.balance !== undefined) {
+                    state.bananasLeft = data.balance;
+                    console.log('🍌 Глобальный баланс загружен:', state.bananasLeft);
+                    updateUI();
+                }
+            } catch(e) {
+                console.log('Ошибка загрузки баланса:', e);
+            }
         }
 
         async function checkSubscription() {
@@ -1046,14 +1077,16 @@
 
         async function fetchAverageRating() {
             try {
-                const res = await fetch(`${TUNNEL_URL}/api/get-average-rating`, {
+                const res = await fetch(`${TUNNEL_URL}/api/get-average-rating?post=${state.postId || 'gallery'}`, {
                     method: 'GET',
                     headers: { 'Content-Type': 'application/json' }
                 });
                 const data = await res.json();
-                if (data.average_rating) {
+                if (data.average_rating !== undefined) {
                     state.averageRating = data.average_rating;
+                    state.totalVotes = data.total_votes || 0;
                     updateRatingDisplay();
+                    console.log('⭐ Средний рейтинг:', state.averageRating);
                 }
             } catch(e) {
                 console.log('Ошибка загрузки рейтинга:', e);
@@ -1063,16 +1096,19 @@
         async function fetchUserRating() {
             if (!state.userId) return;
             try {
-                const res = await fetch(`${TUNNEL_URL}/api/get-user-rating?user=${state.userId}`, {
+                console.log('⭐ Запрос оценки пользователя user=', state.userId);
+                const res = await fetch(`${TUNNEL_URL}/api/get-user-rating?user=${state.userId}&post=${state.postId || 'gallery'}`, {
                     method: 'GET',
                     headers: { 'Content-Type': 'application/json' }
                 });
                 const data = await res.json();
+                console.log('⭐ Ответ:', data);
                 if (data.rating) {
                     state.userRating = data.rating;
+                    console.log('⭐ Установлена оценка:', state.userRating);
                 }
             } catch(e) {
-                console.log('Ошибка загрузки оценки пользователя:', e);
+                console.log('Ошибка загрузки оценки:', e);
             }
         }
 
@@ -1088,13 +1124,14 @@
                     body: JSON.stringify({
                         user_id: state.userId,
                         rating: rating,
-                        post_id: state.postId
+                        post_id: state.postId || 'gallery'
                     })
                 });
                 const data = await res.json();
                 if (data.success) {
                     state.userRating = rating;
                     state.averageRating = data.average_rating;
+                    state.totalVotes = data.total_votes;
                     updateRatingDisplay();
                     showToast(`⭐ Оценка ${rating} из 5 сохранена!`);
                     hideRatingModal();
@@ -1248,8 +1285,11 @@
                 return;
             }
 
-            if (state.bananasLeft <= 0) {
-                showMultilineToast('У вас 0 бананов.\nКупите в личном кабинете.\nЗавтра вам начислят 3 бесплатных банана.');
+            // ПРАВИЛЬНАЯ СТОИМОСТЬ: 5 бананов для видео, 1 для фото
+            const bananaCost = currentFile.isVideo ? 5 : 1;
+
+            if (state.bananasLeft < bananaCost) {
+                showMultilineToast(`У вас ${state.bananasLeft} бананов.\nДля ${currentFile.isVideo ? 'видео' : 'фото'} нужно ${bananaCost} банан${bananaCost > 1 ? 'ов' : ''}.`);
                 return;
             }
 
@@ -1261,7 +1301,10 @@
                         action: 'spend_banana',
                         user_id: state.userId,
                         post_id: state.postId,
-                        details: { photo_name: currentFile.originalName || currentFile.name }
+                        details: { 
+                            photo_name: currentFile.originalName || currentFile.name,
+                            amount: bananaCost  // ← 5 для видео, 1 для фото
+                        }
                     })
                 });
 
@@ -1276,7 +1319,7 @@
                     currentFile.url = currentFile.originalUrl;
                     showMedia(state.index);
                     updateUI();
-                    showToast('🍌 Банан потрачен!');
+                    showToast(`🍌 Потрачено ${bananaCost} банан${bananaCost > 1 ? 'ов' : ''}!`);
                 } else if (data.already_spent) {
                     showToast('🍌 Уже тратили на это');
                 } else {
@@ -1349,40 +1392,6 @@
                     bananaBadge.classList.remove('infinity');
                 }
                 bananaBadge.style.display = 'flex';
-            }
-
-            const subBadgeIcon = document.getElementById('subscribed-badge-icon');
-            if (subBadgeIcon) {
-                if (state.isSubscribed || state.hasPaidSubscription) {
-                    subBadgeIcon.textContent = '✔️';
-                    subBadgeIcon.className = 'badge-icon subscribed-true';
-                    subBadgeIcon.style.display = 'flex';
-                } else {
-                    subBadgeIcon.textContent = '✖️';
-                    subBadgeIcon.className = 'badge-icon subscribed-false';
-                    subBadgeIcon.style.display = 'flex';
-                }
-            }
-
-            const purchasedBadgeIcon = document.getElementById('purchased-badge-icon');
-            if (purchasedBadgeIcon) {
-                if (state.hasPurchased) {
-                    purchasedBadgeIcon.textContent = '✔️';
-                    purchasedBadgeIcon.className = 'badge-icon purchased-true';
-                    purchasedBadgeIcon.style.display = 'flex';
-                } else {
-                    purchasedBadgeIcon.style.display = 'none';
-                }
-            }
-
-            const subStatusModal = document.getElementById('sub-status-modal');
-            if (subStatusModal) {
-                subStatusModal.textContent = (state.isSubscribed || state.hasPaidSubscription) ? '✔️ есть' : '✖️ нет';
-            }
-
-            const purchasedStatusModal = document.getElementById('purchased-status-modal');
-            if (purchasedStatusModal) {
-                purchasedStatusModal.textContent = state.hasPurchased ? '✔️' : '';
             }
 
             const saveBtn = document.getElementById('save-btn');
