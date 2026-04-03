@@ -1037,20 +1037,22 @@
         }
 
         async function fetchBananaBalance() {
-            if (!state.userId) return;
-            try {
-                console.log('🍌 Запрос глобального баланса для user=', state.userId);
-                const res = await fetch(`${TUNNEL_URL}/api/get-banana-balance?user=${state.userId}`);
-                const data = await res.json();
-                if (data.balance !== undefined) {
-                    state.bananasLeft = data.balance;
-                    console.log('🍌 Глобальный баланс загружен:', state.bananasLeft);
-                    updateUI();
-                }
-            } catch(e) {
-                console.log('Ошибка загрузки баланса:', e);
-            }
+    if (!state.userId) return;
+    try {
+        console.log('🍌 Запрос баланса...');
+        const res = await fetch(`${TUNNEL_URL}/api/get-banana-balance?user=${state.userId}`);
+        const data = await res.json();
+        console.log('🍌 Ответ:', data);
+        if (data.balance !== undefined) {
+            state.bananasLeft = data.balance;
+            // Временный alert для отладки
+            alert(`Баланс загружен: ${state.bananasLeft}`);
+            updateUI();
         }
+    } catch(e) {
+        alert('Ошибка загрузки баланса: ' + e.message);
+    }
+}
 
         async function checkSubscription() {
             if (!state.userId) return false;
