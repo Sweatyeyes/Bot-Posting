@@ -6,6 +6,8 @@
     <title>Gallery</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #000; color: #fff; font-family: sans-serif; height: 100vh; overflow: hidden; touch-action: pan-y pinch-zoom; }
@@ -475,6 +477,35 @@
             color: #2ea6ff;
             text-decoration: none;
         }
+
+        /* ОТЛАДОЧНАЯ ПАНЕЛЬ ПОВЕРХ ФОТО */
+        #debug-panel {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(5px);
+            color: #0f0;
+            font-family: monospace;
+            font-size: 11px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            z-index: 10000;
+            max-width: 80%;
+            pointer-events: none;
+            text-shadow: 0 0 2px #000;
+            border: 1px solid #0f0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        #debug-panel.error {
+            color: #f00;
+            border-color: #f00;
+        }
+        #debug-panel.warning {
+            color: #ff0;
+            border-color: #ff0;
+        }
     </style>
 </head>
 <body>
@@ -517,6 +548,9 @@
             <button class="bottom-btn" id="info-btn" title="Помощь">❓</button>
         </div>
     </div>
+
+    <!-- ОТЛАДОЧНАЯ ПАНЕЛЬ -->
+    <div id="debug-panel">🟢 Инициализация...</div>
 
     <div id="rating-modal">
         <div class="rating-modal-content">
@@ -614,7 +648,17 @@
     <div id="error"></div>
 
     <script>
-        console.log('🚀 v31.0 - Глобальный баланс бананов, 5 звезд, поддержка _frame_blur.jpg');
+        console.log('🚀 v32.0 - ДОБАВЛЕНА ОТЛАДОЧНАЯ ПАНЕЛЬ');
+        
+        // Функция для вывода в отладочную панель
+        function debugLog(message, type = 'info') {
+            const panel = document.getElementById('debug-panel');
+            if (!panel) return;
+            const time = new Date().toLocaleTimeString();
+            panel.className = type;
+            panel.innerHTML = `[${time}] ${message}`;
+            console.log(`[${time}] ${message}`);
+        }
 
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -629,6 +673,7 @@
         const minSwipeDistance = 50;
 
         const urlParams = new URLSearchParams(window.location.search);
+        debugLog('Страница загружена, парсим URL параметры');
 
         function getPostId() {
             let postId = urlParams.get('post');
@@ -674,6 +719,8 @@
         const hasPaidSubscription = rawSubscribed && subscriptionEndDate !== '';
         const userRatingFromUrl = parseInt(urlParams.get('user_rating')) || 0;
 
+        debugLog(`📊 Параметры из URL: post=${rawPost}, user=${rawUser}, bananas=${rawBananas}, user_rating=${userRatingFromUrl}`);
+
         let state = {
             files: [], index: 0, postId: rawPost, userId: rawUser,
             isSubscribed: rawSubscribed, hasPurchased: rawPurchased,
@@ -688,6 +735,8 @@
             totalVotes: 0
         };
 
+        debugLog(`🏁 Начальное состояние: bananasLeft=${state.bananasLeft}, userRating=${state.userRating}`);
+
         function isVideoFile(filename) {
             const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm'];
             return videoExtensions.some(ext => filename.toLowerCase().endsWith(ext));
@@ -699,7 +748,7 @@
         }
 
         async function fetchFilesDirect() {
-            console.log('📁 Прямая загрузка с GitHub (без бота)');
+            debugLog('📁 Прямая загрузка с GitHub (без бота)');
             const folders = ['general', 'banana', 'strawberry'];
             const result = { general: [], banana: [], strawberry: [] };
 
@@ -722,9 +771,9 @@
                         .filter(f => isImageFile(f.name) || isVideoFile(f.name))
                         .map(f => f.name);
                     result[folder] = files;
-                    console.log(`✅ ${folder}: ${files.length} файлов (прямая загрузка)`);
+                    debugLog(`✅ ${folder}: ${files.length} файлов (прямая загрузка)`);
                 } catch(e) {
-                    console.log(`⚠️ Не удалось загрузить ${folder}: ${e.message}`);
+                    debugLog(`⚠️ Не удалось загрузить ${folder}: ${e.message}`, 'warning');
                 }
             }
             return result;
@@ -733,6 +782,7 @@
         async function fetchFilesFromBot() {
             if (!state.postId) return null;
             try {
+                debugLog(`📡 Запрос списка файлов для post=${state.postId}`);
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
                 const res = await fetch(`${TUNNEL_URL}/api/get-files`, {
@@ -745,8 +795,10 @@
                 if (!res.ok) return null;
                 const data = await res.json();
                 if (data.error) return null;
+                debugLog(`✅ Файлы получены: general=${data.general?.length || 0}, banana=${data.banana?.length || 0}, strawberry=${data.strawberry?.length || 0}`);
                 return data;
             } catch(e) {
+                debugLog(`❌ Ошибка запроса файлов: ${e.message}`, 'error');
                 return null;
             }
         }
@@ -755,6 +807,7 @@
             if (!state.userId || !state.postId) return false;
             if (state.botOffline) return false;
             try {
+                debugLog(`🪙 Проверка покупки: user=${state.userId}, post=${state.postId}`);
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
                 const res = await fetch(`${TUNNEL_URL}/api/check-purchase`, {
@@ -767,10 +820,13 @@
                 const data = await res.json();
                 if (data.purchased) {
                     state.hasPurchased = true;
+                    debugLog(`🪙 Пост куплен: true`);
                     return true;
                 }
+                debugLog(`🪙 Пост не куплен`);
                 return false;
             } catch(e) {
+                debugLog(`⚠️ Ошибка проверки покупки: ${e.message}`, 'warning');
                 return state.hasPurchased;
             }
         }
@@ -868,41 +924,45 @@
             return files;
         }
 
-        // НОВАЯ ФУНКЦИЯ: получаем ГЛОБАЛЬНЫЙ баланс бананов
+        // ГЛОБАЛЬНЫЙ БАЛАНС БАНАНОВ
         async function fetchBananaBalance() {
             if (!state.userId) return;
             try {
-                console.log('🍌 Запрашиваем глобальный баланс для user=', state.userId);
+                debugLog(`🍌 Запрос глобального баланса для user=${state.userId}`);
                 const res = await fetch(`${TUNNEL_URL}/api/get-banana-balance?user=${state.userId}`);
                 const data = await res.json();
                 if (data.balance !== undefined) {
                     state.bananasLeft = data.balance;
-                    console.log('🍌 ГЛОБАЛЬНЫЙ баланс загружен:', state.bananasLeft);
+                    debugLog(`🍌 ГЛОБАЛЬНЫЙ БАЛАНС загружен: ${state.bananasLeft}`);
                     updateUI();
+                } else {
+                    debugLog(`⚠️ Баланс не получен: ${JSON.stringify(data)}`, 'warning');
                 }
             } catch(e) {
-                console.log('Ошибка загрузки баланса:', e);
+                debugLog(`❌ Ошибка загрузки баланса: ${e.message}`, 'error');
             }
         }
 
         async function loadGallery() {
             if (!state.postId) {
+                debugLog('❌ Не указан ID поста', 'error');
                 showError('Не указан ID поста');
                 return;
             }
 
-            console.log('🖼 Загрузка галереи, postId:', state.postId);
+            debugLog(`🖼 Загрузка галереи, postId: ${state.postId}`);
 
             let filesData = await fetchFilesFromBot();
 
             if (!filesData) {
                 state.botOffline = true;
                 document.getElementById('offline-badge').style.display = 'block';
-                console.log('📴 Бот недоступен, переключаемся в офлайн-режим');
+                debugLog('📴 Бот недоступен, переключаемся в офлайн-режим', 'warning');
 
                 filesData = await fetchFilesDirect();
 
                 if (!filesData || (Object.values(filesData).every(arr => arr.length === 0))) {
+                    debugLog('❌ Нет соединения с GitHub', 'error');
                     showError('Нет соединения с GitHub');
                     return;
                 }
@@ -921,7 +981,7 @@
                 await fetchUnlockedPhotos();
                 await fetchAverageRating();
                 await fetchUserRating();
-                // ВАЖНО: запрашиваем ГЛОБАЛЬНЫЙ баланс бананов
+                // Запрашиваем ГЛОБАЛЬНЫЙ баланс бананов
                 await fetchBananaBalance();
             }
 
@@ -929,6 +989,7 @@
             const files = buildFileList(filesData);
 
             if (files.length === 0) {
+                debugLog('❌ В этом посте нет файлов', 'error');
                 showError('В этом посте нет файлов');
                 return;
             }
@@ -944,9 +1005,7 @@
             setupNavigation();
             setupSwipeListeners();
 
-            console.log('⭐ Финальный userRating после загрузки:', state.userRating);
-            console.log('⭐ Финальный averageRating:', state.averageRating);
-            console.log('🍌 Финальный баланс бананов:', state.bananasLeft);
+            debugLog(`✅ ГАЛЕРЕЯ ЗАГРУЖЕНА: бананы=${state.bananasLeft}, оценка=${state.userRating}, средний рейтинг=${state.averageRating}`);
         }
 
         function showMedia(i) {
@@ -1056,6 +1115,7 @@
             if (!state.userId || !state.postId) return;
             if (state.botOffline) return;
             try {
+                debugLog(`🍌 Запрос разблокированных фото для user=${state.userId}, post=${state.postId}`);
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
                 const res = await fetch(`${TUNNEL_URL}/api/get-unlocked-photos`, {
@@ -1067,11 +1127,11 @@
                 const data = await res.json();
                 if (data.unlocked_photos) {
                     state.unlockedPhotos = data.unlocked_photos;
-                    console.log('🍌 Разблокированные фото:', state.unlockedPhotos);
+                    debugLog(`🍌 Разблокировано фото: ${state.unlockedPhotos.length}`);
                     updateUI();
                 }
             } catch(e) {
-                console.log('Ошибка получения разблокированных:', e);
+                debugLog(`⚠️ Ошибка получения разблокированных: ${e.message}`, 'warning');
             }
         }
 
@@ -1079,6 +1139,7 @@
             if (!state.userId) return false;
             if (state.botOffline) return state.isSubscribed;
             try {
+                debugLog(`🍓 Проверка подписки для user=${state.userId}`);
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
                 const res = await fetch(`${TUNNEL_URL}/api/check-subscription`, {
@@ -1091,15 +1152,20 @@
                 const isSubscribed = data.is_subscribed === true;
                 if (isSubscribed !== state.isSubscribed) {
                     state.isSubscribed = isSubscribed;
+                    debugLog(`🍓 Подписка: ${isSubscribed}`);
                     updateUI();
                     updateCabinetIcon();
                 }
                 return isSubscribed;
-            } catch(e) { return state.isSubscribed; }
+            } catch(e) {
+                debugLog(`⚠️ Ошибка проверки подписки: ${e.message}`, 'warning');
+                return state.isSubscribed;
+            }
         }
 
         async function fetchAverageRating() {
             try {
+                debugLog(`⭐ Запрос среднего рейтинга для post=${state.postId || 'gallery'}`);
                 const res = await fetch(`${TUNNEL_URL}/api/get-average-rating?post=${state.postId || 'gallery'}`, {
                     method: 'GET',
                     headers: { 'Content-Type': 'application/json' }
@@ -1109,37 +1175,37 @@
                     state.averageRating = data.average_rating;
                     state.totalVotes = data.total_votes || 0;
                     updateRatingDisplay();
-                    console.log('⭐ Средний рейтинг загружен:', state.averageRating, 'голосов:', state.totalVotes);
+                    debugLog(`⭐ Средний рейтинг: ${state.averageRating} (${state.totalVotes} голосов)`);
                 }
             } catch(e) {
-                console.log('Ошибка загрузки рейтинга:', e);
+                debugLog(`⚠️ Ошибка загрузки рейтинга: ${e.message}`, 'warning');
             }
         }
 
         async function fetchUserRating() {
             if (!state.userId) return;
             try {
-                console.log('⭐ Запрашиваем оценку пользователя для user=', state.userId, 'post=', state.postId);
+                debugLog(`⭐ Запрос оценки пользователя user=${state.userId}, post=${state.postId || 'gallery'}`);
                 const res = await fetch(`${TUNNEL_URL}/api/get-user-rating?user=${state.userId}&post=${state.postId || 'gallery'}`, {
                     method: 'GET',
                     headers: { 'Content-Type': 'application/json' }
                 });
                 const data = await res.json();
-                console.log('⭐ Ответ сервера get-user-rating:', data);
+                debugLog(`⭐ Ответ сервера: rating=${data.rating}`);
                 if (data.rating) {
                     state.userRating = data.rating;
-                    console.log('⭐ Установлен userRating:', state.userRating);
+                    debugLog(`⭐ Установлена оценка пользователя: ${state.userRating}`);
                 } else {
-                    console.log('⭐ Оценка не найдена, оставляем значение из URL:', state.userRating);
+                    debugLog(`⭐ Оценка не найдена, оставляем из URL: ${state.userRating}`);
                 }
             } catch(e) {
-                console.log('Ошибка загрузки оценки пользователя:', e);
+                debugLog(`⚠️ Ошибка загрузки оценки: ${e.message}`, 'warning');
             }
         }
 
         function renderStars(rating) {
             const stars = document.querySelectorAll('#rating-stars .rating-star');
-            console.log('⭐ Рендерим звёзды с рейтингом:', rating);
+            debugLog(`⭐ Рендеринг звёзд с рейтингом: ${rating}`);
             stars.forEach((star, idx) => {
                 const value = idx + 1;
                 if (rating >= value) {
@@ -1154,10 +1220,12 @@
 
         async function submitRating(rating) {
             if (!state.userId) {
+                debugLog('❌ Нет user_id для сохранения оценки', 'error');
                 showToast('❌ Ошибка: не удалось определить пользователя');
                 return;
             }
             try {
+                debugLog(`⭐ Сохранение оценки: user=${state.userId}, rating=${rating}, post=${state.postId || 'gallery'}`);
                 const res = await fetch(`${TUNNEL_URL}/api/submit-rating`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1174,13 +1242,15 @@
                     state.totalVotes = data.total_votes;
                     updateRatingDisplay();
                     renderStars(rating);
+                    debugLog(`⭐ Оценка ${rating} сохранена! Новый средний: ${state.averageRating}`);
                     showToast(`⭐ Оценка ${rating} из 5 сохранена!`);
                     hideRatingModal();
                 } else {
+                    debugLog(`❌ Ошибка сохранения: ${data.error}`, 'error');
                     showToast('❌ Ошибка при сохранении оценки');
                 }
             } catch(e) {
-                console.error('Submit rating error:', e);
+                debugLog(`❌ Ошибка соединения при сохранении: ${e.message}`, 'error');
                 showToast('❌ Ошибка соединения');
             }
         }
@@ -1222,7 +1292,7 @@
         function showRatingModal() {
             const modal = document.getElementById('rating-modal');
             if (modal) {
-                console.log('⭐ Открываем модалку, userRating:', state.userRating);
+                debugLog(`⭐ Открытие модалки, текущий userRating=${state.userRating}`);
                 renderStars(state.userRating);
                 modal.classList.add('active');
             }
@@ -1340,8 +1410,10 @@
             }
 
             const bananaCost = currentFile.isVideo ? 5 : 1;
+            debugLog(`🍌 Попытка траты: ${bananaCost} банан(ов) на ${currentFile.isVideo ? 'видео' : 'фото'}, текущий баланс: ${state.bananasLeft}`);
 
             if (state.bananasLeft < bananaCost) {
+                debugLog(`❌ Не хватает бананов: нужно ${bananaCost}, есть ${state.bananasLeft}`, 'error');
                 showMultilineToast(`У вас ${state.bananasLeft} бананов.\nДля ${currentFile.isVideo ? 'видео' : 'фото'} нужно ${bananaCost} банан${bananaCost > 1 ? 'ов' : ''}.`);
                 return;
             }
@@ -1372,14 +1444,17 @@
                     currentFile.url = currentFile.originalUrl;
                     showMedia(state.index);
                     updateUI();
+                    debugLog(`✅ Потрачено ${bananaCost} банан(ов), новый баланс: ${state.bananasLeft}`);
                     showToast(`🍌 Потрачено ${bananaCost} банан${bananaCost > 1 ? 'ов' : ''}!`);
                 } else if (data.already_spent) {
+                    debugLog(`⚠️ Уже тратили на это фото/видео`, 'warning');
                     showToast('🍌 Уже тратили на это');
                 } else {
+                    debugLog(`❌ Ошибка при трате: ${JSON.stringify(data)}`, 'error');
                     showToast('❌ Ошибка');
                 }
             } catch(e) {
-                console.error('Spend banana error:', e);
+                debugLog(`❌ Ошибка соединения при трате: ${e.message}`, 'error');
                 showToast('❌ Ошибка соединения');
             }
         }
@@ -1519,18 +1594,22 @@
         }
 
         async function init() {
+            debugLog('🟢 Инициализация WebApp');
             if (!window.Telegram?.WebApp) { 
+                debugLog('❌ Не в Telegram', 'error');
                 showError('Откройте в Telegram'); 
                 return; 
             }
             if (tg) { 
                 tg.ready(); 
                 tg.expand(); 
+                debugLog('✅ Telegram WebApp готов');
             }
             await loadGallery();
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            debugLog('📄 DOM загружен');
             const bananaBtn = document.getElementById('banana-btn');
             const musicBtnElem = document.getElementById('music-btn');
             const ratingBtn = document.getElementById('rating-btn');
