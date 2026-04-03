@@ -617,19 +617,43 @@
 
         // ГЛОБАЛЬНЫЙ БАЛАНС
         async function fetchBananaBalance() {
-            if (!state.userId) return;
+            if (!state.userId) return 0;
+        
             try {
                 debugLog(`🍌 Запрос глобального баланса для user=${state.userId}`);
-                const res = await fetch(`${TUNNEL_URL}/api/get-banana-balance?user=${state.userId}`);
+        
+                const url = `${TUNNEL_URL}/api/get-banana-balance?user=${state.userId}`.replace(/\/+/g, '/'); // защита от двойных слешей
+        
+                const res = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    cache: 'no-store'        // чтобы не кэшировался старый ответ
+                });
+        
+                if (!res.ok) {
+                    throw new Error(`HTTP error! status: ${res.status}`);
+                }
+        
                 const data = await res.json();
+        
                 if (data.balance !== undefined) {
-                    state.bananasLeft = data.balance;
+                    state.bananasLeft = Number(data.balance) || 0;
                     debugLog(`🍌 ГЛОБАЛЬНЫЙ БАЛАНС = ${state.bananasLeft}`);
                     updateUI();
+                    return state.bananasLeft;
                 } else {
                     debugLog(`⚠️ Баланс не получен: ${JSON.stringify(data)}`, 'warning');
+                    state.bananasLeft = 0;
+                    return 0;
                 }
-            } catch(e) { debugLog(`❌ Ошибка: ${e.message}`, 'error'); }
+            } catch (e) {
+                debugLog(`❌ Ошибка баланса: ${e.message || e}`, 'error');
+                console.error('Banana balance fetch failed:', e);
+                state.bananasLeft = 0;
+                return 0;
+            }
         }
 
         async function loadGallery() {
@@ -774,48 +798,45 @@
         }
 
         async function fetchUserRating() {
-            if (!state.userId) return;
-            try {
-                debugLog(`⭐ Запрос оценки пользователя user=${state.userId}`);
-                const res = await fetch(`${TUNNEL_URL}/api/get-user-rating?user=${state.userId}&post=${state.postId || 'gallery'}`);
-                const data = await res.json();
-                debugLog(`⭐ Ответ: rating=${data.rating}`);
-                if (data.rating) {
-                    state.userRating = data.rating;
-                    debugLog(`⭐ Установлена оценка: ${state.userRating}`);
-                } else {
-                    debugLog(`⭐ Оценка не найдена, оставляем из URL: ${state.userRating}`);
-                }
-            } catch(e) { debugLog(`⚠️ Ошибка: ${e.message}`, 'warning'); }
+    if (!state.userId) return 0;
+
+    try {
+        debugLog(`⭐ Запрос оценки пользователя user=${state.userId}`);
+
+        const postParam = state.postId ? `&post=${state.postId}` : '';
+        const url = `${TUNNEL_URL}/api/get-user-rating?user=${state.userId}${postParam}`.replace(/\/+/g, '/');
+
+        const res = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            },
+            cache: 'no-store'
+        });
+
+        if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
         }
 
-        function renderStars(rating) {
-            const stars = document.querySelectorAll('#rating-stars .rating-star');
-            stars.forEach((star, idx) => {
-                if (rating >= idx + 1) { star.textContent = '★'; star.classList.add('selected'); }
-                else { star.textContent = '☆'; star.classList.remove('selected'); }
-            });
-        }
+        const data = await res.json();
 
-        async function submitRating(rating) {
-            if (!state.userId) { showToast('❌ Ошибка: не определён пользователь'); return; }
-            try {
-                debugLog(`⭐ Сохранение оценки: ${rating}`);
-                const res = await fetch(`${TUNNEL_URL}/api/submit-rating`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: state.userId, rating, post_id: state.postId || 'gallery' })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    state.userRating = rating;
-                    state.averageRating = data.average_rating;
-                    state.totalVotes = data.total_votes;
-                    updateRatingDisplay(); renderStars(rating);
-                    showToast(`⭐ Оценка ${rating} из 5 сохранена!`);
-                    hideRatingModal();
-                } else { showToast('❌ Ошибка сохранения'); }
-            } catch(e) { showToast('❌ Ошибка соединения'); }
+        if (data.rating !== undefined) {
+            state.userRating = Number(data.rating) || 0;
+            debugLog(`⭐ Оценка пользователя = ${state.userRating}`);
+            updateUI();
+            return state.userRating;
+        } else {
+            debugLog(`⚠️ Рейтинг не получен: ${JSON.stringify(data)}`, 'warning');
+            state.userRating = 0;
+            return 0;
         }
+    } catch (e) {
+        debugLog(`❌ Ошибка рейтинга: ${e.message || e}`, 'error');
+        console.error('User rating fetch failed:', e);
+        state.userRating = 0;
+        return 0;
+    }
+}
 
         function updateRatingDisplay() {
             const ratingValue = document.getElementById('rating-value');
