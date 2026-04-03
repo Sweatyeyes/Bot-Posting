@@ -521,7 +521,7 @@
                 <div class="modal-icon">🍌</div>
                 <div class="modal-text">
                     <div class="modal-text-title">Банан</div>
-                    <div class="modal-text-desc">Количество бананов. Если вы потратили все бананы — завтра вам будет начислено 3 бесплатных банана. Или можно купить в личном кабинете.</div>
+                    <div class="modal-text-desc">Ваш баланс бананов. 1 банан = разблокировка фото, 5 бананов = разблокировка видео. Бесплатные бананы начисляются ежедневно.</div>
                 </div>
             </div>
             
@@ -574,7 +574,7 @@
     <div id="error"></div>
     
     <script>
-        console.log('🚀 v30.0 - Исправленный рейтинг с 5 звездами');
+        console.log('🚀 v30.0 - Исправленный рейтинг с 5 звездами, правильные бананы');
         
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -618,28 +618,32 @@
         const rawUser = getUserId();
         const rawSubscribed = urlParams.get('subscribed') === 'true';
         const rawPurchased = urlParams.get('purchased') === 'true';
-        const rawBananas = parseInt(urlParams.get('bananas')) || 3;
+        // Глобальный баланс бананов (всего у пользователя)
+        const globalBananaBalance = parseInt(urlParams.get('bananas')) || 0;
         const unlockedParam = urlParams.get('unlocked') || '';
         const urlUnlockedPhotos = unlockedParam ? unlockedParam.split(',') : [];
         const subscriptionEndDate = urlParams.get('subscription_end_date') || '';
         const hasPaidSubscription = rawSubscribed && subscriptionEndDate !== '';
         
-        // ГЛАВНОЕ: ЧИТАЕМ ОЦЕНКУ ПОЛЬЗОВАТЕЛЯ ИЗ URL
+        // Читаем оценку пользователя из URL
         const userRatingFromUrl = parseInt(urlParams.get('user_rating')) || 0;
         console.log('⭐ user_rating из URL:', userRatingFromUrl);
+        console.log('🍌 Глобальный баланс бананов:', globalBananaBalance);
         
         let state = {
             files: [], index: 0, postId: rawPost, userId: rawUser,
             isSubscribed: rawSubscribed, hasPurchased: rawPurchased,
-            bananasLeft: rawBananas, startTime: Date.now(),
+            bananasLeft: globalBananaBalance,  // Глобальный баланс
+            startTime: Date.now(),
             botOffline: false, loadingAttempts: 0,
             unlockedPhotos: urlUnlockedPhotos,
             filesData: null,
             hasPaidSubscription: hasPaidSubscription,
             subscriptionEndDate: subscriptionEndDate,
-            userRating: userRatingFromUrl,  // Устанавливаем из URL
+            userRating: userRatingFromUrl,
             averageRating: 0,
-            totalVotes: 0
+            totalVotes: 0,
+            postBananasLimit: 3  // Лимит бананов на этот пост (будет обновлён)
         };
         
         console.log('⭐ Начальный state.userRating:', state.userRating);
@@ -853,7 +857,6 @@
                 state.hasPurchased = false;
                 state.hasPaidSubscription = false;
                 state.unlockedPhotos = [];
-                state.bananasLeft = 0;
             } else {
                 state.botOffline = false;
                 document.getElementById('offline-badge').style.display = 'none';
@@ -862,7 +865,6 @@
                 await checkSubscription();
                 await fetchUnlockedPhotos();
                 await fetchAverageRating();
-                // Обновляем оценку пользователя с сервера (если изменилась)
                 await fetchUserRating();
             }
             
@@ -1006,7 +1008,6 @@
                 const data = await res.json();
                 if (data.unlocked_photos) {
                     state.unlockedPhotos = data.unlocked_photos;
-                    state.bananasLeft = data.available_bananas;
                     updateUI();
                 }
             } catch(e) {}
@@ -1264,8 +1265,11 @@
                 return;
             }
             
-            if (state.bananasLeft <= 0) {
-                showMultilineToast('У вас 0 бананов.\nКупите в личном кабинете.\nЗавтра вам начислят 3 бесплатных банана.');
+            // Определяем стоимость: 5 бананов для видео, 1 для фото
+            const bananaCost = currentFile.isVideo ? 5 : 1;
+            
+            if (state.bananasLeft < bananaCost) {
+                showMultilineToast(`У вас ${state.bananasLeft} бананов.\nДля ${currentFile.isVideo ? 'видео' : 'фото'} нужно ${bananaCost} банан${bananaCost > 1 ? 'ов' : ''}.\nКупите бананы в личном кабинете.`);
                 return;
             }
             
@@ -1277,7 +1281,10 @@
                         action: 'spend_banana',
                         user_id: state.userId,
                         post_id: state.postId,
-                        details: { photo_name: currentFile.originalName || currentFile.name }
+                        details: { 
+                            photo_name: currentFile.originalName || currentFile.name,
+                            amount: bananaCost  // 1 для фото, 5 для видео
+                        }
                     })
                 });
                 
@@ -1292,13 +1299,14 @@
                     currentFile.url = currentFile.originalUrl;
                     showMedia(state.index);
                     updateUI();
-                    showToast('🍌 Банан потрачен!');
+                    showToast(`🍌 Потрачено ${bananaCost} банан${bananaCost > 1 ? 'ов' : ''}!`);
                 } else if (data.already_spent) {
                     showToast('🍌 Уже тратили на это');
                 } else {
                     showToast('❌ Ошибка');
                 }
             } catch(e) {
+                console.error('Spend banana error:', e);
                 showToast('❌ Ошибка соединения');
             }
         }
