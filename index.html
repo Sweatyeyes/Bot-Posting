@@ -554,7 +554,7 @@
                 <div class="modal-icon">⭐</div>
                 <div class="modal-text">
                     <div class="modal-text-title">Оценка</div>
-                    <div class="modal-text-desc">Оцените модель этой галереи от 1 до 5 звёзд. Ваша оценка повлияет на общий рейтинг.</div>
+                    <div class="modal-text-desc">Оцените модель этой галереи. Ваша оценка повлияет на общий рейтинг.</div>
                 </div>
             </div>
 
@@ -591,7 +591,7 @@
     <div id="error"></div>
 
     <script>
-        console.log('🚀 v28.0 - Поддержка видео, 5 звезд, правильная трата бананов');
+        console.log('🚀 v28.0 - 5 звезд, правильная логика');
 
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -1015,7 +1015,6 @@
                 const data = await res.json();
                 if (data.unlocked_photos) {
                     state.unlockedPhotos = data.unlocked_photos;
-                    // ПРАВКА 1: Оставляем обновление баланса (это важно!)
                     state.bananasLeft = data.available_bananas;
                     updateUI();
                 }
@@ -1064,7 +1063,7 @@
         async function fetchUserRating() {
             if (!state.userId) return;
             try {
-                const res = await fetch(`${TUNNEL_URL}/api/get-user-rating?user=${state.userId}&post=${state.postId || 'gallery'}`, {
+                const res = await fetch(`${TUNNEL_URL}/api/get-user-rating?user=${state.userId}`, {
                     method: 'GET',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -1089,7 +1088,7 @@
                     body: JSON.stringify({
                         user_id: state.userId,
                         rating: rating,
-                        post_id: state.postId || 'gallery'
+                        post_id: state.postId
                     })
                 });
                 const data = await res.json();
@@ -1249,11 +1248,8 @@
                 return;
             }
 
-            // ПРАВКА 2: Стоимость: 5 бананов для видео, 1 для фото
-            const bananaCost = currentFile.isVideo ? 5 : 1;
-
-            if (state.bananasLeft < bananaCost) {
-                showMultilineToast(`У вас ${state.bananasLeft} бананов.\nДля ${currentFile.isVideo ? 'видео' : 'фото'} нужно ${bananaCost} банан${bananaCost > 1 ? 'ов' : ''}.`);
+            if (state.bananasLeft <= 0) {
+                showMultilineToast('У вас 0 бананов.\nКупите в личном кабинете.\nЗавтра вам начислят 3 бесплатных банана.');
                 return;
             }
 
@@ -1265,11 +1261,7 @@
                         action: 'spend_banana',
                         user_id: state.userId,
                         post_id: state.postId,
-                        // ПРАВКА 3: Передаём amount
-                        details: { 
-                            photo_name: currentFile.originalName || currentFile.name,
-                            amount: bananaCost
-                        }
+                        details: { photo_name: currentFile.originalName || currentFile.name }
                     })
                 });
 
@@ -1284,7 +1276,7 @@
                     currentFile.url = currentFile.originalUrl;
                     showMedia(state.index);
                     updateUI();
-                    showToast(`🍌 Потрачено ${bananaCost} банан${bananaCost > 1 ? 'ов' : ''}!`);
+                    showToast('🍌 Банан потрачен!');
                 } else if (data.already_spent) {
                     showToast('🍌 Уже тратили на это');
                 } else {
