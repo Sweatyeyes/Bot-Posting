@@ -867,7 +867,21 @@
 
             return files;
         }
-
+        async function fetchBananaBalance() {
+            if (!state.userId) return;
+            try {
+                console.log('🍌 Запрашиваем глобальный баланс для user=', state.userId);
+                const res = await fetch(`${TUNNEL_URL}/api/get-banana-balance?user=${state.userId}`);
+                const data = await res.json();
+                if (data.balance !== undefined) {
+                    state.bananasLeft = data.balance;
+                    console.log('🍌 ГЛОБАЛЬНЫЙ баланс загружен:', state.bananasLeft);
+                    updateUI();
+                }
+            } catch(e) {
+                console.log('Ошибка загрузки баланса:', e);
+            }
+        }
         async function loadGallery() {
             if (!state.postId) {
                 showError('Не указан ID поста');
@@ -905,6 +919,7 @@
                 await fetchAverageRating();
                 // ВАЖНО: запрашиваем оценку пользователя ДО отображения галереи
                 await fetchUserRating();
+                await fetchBananaBalance();
             }
 
             state.filesData = filesData;
