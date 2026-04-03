@@ -1021,7 +1021,7 @@
                 const data = await res.json();
                 if (data.unlocked_photos) {
                     state.unlockedPhotos = data.unlocked_photos;
-                    state.bananasLeft = data.available_bananas;
+                    
                     updateUI();
                 }
             } catch(e) {}
