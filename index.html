@@ -878,6 +878,7 @@
 
                 await checkPurchase();
                 await fetchUnlockedPhotos();
+                // ИСПРАВЛЕНО: Принудительно запрашиваем средний рейтинг при каждой загрузке
                 await fetchAverageRating();
                 await fetchUserRating();
             }
@@ -902,6 +903,7 @@
             setupSwipeListeners();
 
             console.log('⭐ Финальный userRating:', state.userRating);
+            console.log('⭐ Финальный averageRating:', state.averageRating);
             console.log('🍌 Финальный баланс:', state.bananasLeft);
         }
 
@@ -1033,15 +1035,18 @@
             } catch(e) {}
         }
 
+        // ИСПРАВЛЕНА функция fetchAverageRating - добавляем параметр _=Date.now() для сброса кэша
         async function fetchAverageRating() {
+            if (!state.postId) return;
             try {
-                // ИСПРАВЛЕНО: передаём post_id текущего поста
-                const res = await fetch(`${TUNNEL_URL}/api/get-average-rating?post=${state.postId}`, {
+                const cacheBuster = Date.now();
+                const res = await fetch(`${TUNNEL_URL}/api/get-average-rating?post=${state.postId}&_=${cacheBuster}`, {
                     method: 'GET',
                     headers: { 'Content-Type': 'application/json' }
                 });
                 const data = await res.json();
-                if (data.average_rating) {
+                console.log('⭐ Получен средний рейтинг для поста', state.postId, ':', data);
+                if (data.average_rating !== undefined) {
                     state.averageRating = data.average_rating;
                     updateRatingDisplay();
                 }
@@ -1099,6 +1104,7 @@
         function updateRatingDisplay() {
             const ratingValue = document.getElementById('rating-value');
             const ratingIcon = document.getElementById('rating-icon');
+            console.log('⭐ updateRatingDisplay: averageRating=', state.averageRating);
             if (ratingValue && state.averageRating > 0) {
                 ratingValue.textContent = state.averageRating.toFixed(1);
                 ratingValue.style.display = 'flex';
