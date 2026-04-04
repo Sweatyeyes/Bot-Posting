@@ -784,7 +784,6 @@
             for (const originalName of bananaOriginals) {
                 const isVideo = isVideoFile(originalName);
                 const isUnlocked = state.isSubscribed || state.hasPurchased || state.unlockedPhotos.includes(originalName) || state.hasPaidSubscription;
-                // Пробуем оба варианта: _blur.jpg и _frame_blur.jpg
                 const blurName = originalName.replace(/\.(jpg|jpeg|png|mp4|mov|avi)$/i, '_blur.jpg');
                 const frameBlurName = originalName.replace(/\.(mp4|mov|avi)$/i, '_frame_blur.jpg');
                 const hasBlur = bananaAll.includes(blurName);
@@ -878,7 +877,6 @@
                 document.getElementById('offline-badge').style.display = 'none';
 
                 await checkPurchase();
-                await checkSubscription();
                 await fetchUnlockedPhotos();
                 await fetchAverageRating();
                 await fetchUserRating();
@@ -1027,7 +1025,6 @@
                 const data = await res.json();
                 if (data.unlocked_photos) {
                     state.unlockedPhotos = data.unlocked_photos;
-                    // Обновляем баланс из ответа сервера
                     if (data.available_bananas !== undefined) {
                         state.bananasLeft = data.available_bananas;
                     }
@@ -1036,32 +1033,10 @@
             } catch(e) {}
         }
 
-        async function checkSubscription() {
-            if (!state.userId) return false;
-            if (state.botOffline) return state.isSubscribed;
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-                const res = await fetch(`${TUNNEL_URL}/api/check-subscription`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId }),
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-                const data = await res.json();
-                const isSubscribed = data.is_subscribed === true;
-                if (isSubscribed !== state.isSubscribed) {
-                    state.isSubscribed = isSubscribed;
-                    updateUI();
-                    updateCabinetIcon();
-                }
-                return isSubscribed;
-            } catch(e) { return state.isSubscribed; }
-        }
-
         async function fetchAverageRating() {
             try {
-                const res = await fetch(`${TUNNEL_URL}/api/get-average-rating`, {
+                // ИСПРАВЛЕНО: передаём post_id текущего поста
+                const res = await fetch(`${TUNNEL_URL}/api/get-average-rating?post=${state.postId}`, {
                     method: 'GET',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -1263,7 +1238,6 @@
                 return;
             }
 
-            // ПРАВИЛЬНАЯ СТОИМОСТЬ: 5 бананов для видео, 1 для фото
             const bananaCost = currentFile.isVideo ? 5 : 1;
 
             if (state.bananasLeft < bananaCost) {
@@ -1279,7 +1253,7 @@
                         action: 'spend_banana',
                         user_id: state.userId,
                         post_id: state.postId,
-                        details: { 
+                        details: {
                             photo_name: currentFile.originalName || currentFile.name,
                             amount: bananaCost
                         }
