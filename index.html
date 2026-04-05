@@ -1215,9 +1215,17 @@
             showRatingModal();
         }
 
+        let activeToastTimeout = null;
+
         function showMultilineToast(text, duration = 4000) {
             const toast = document.getElementById('toast');
             if (!toast) return;
+
+            // Останавливаем предыдущий таймер, если есть
+            if (activeToastTimeout) {
+                clearTimeout(activeToastTimeout);
+                activeToastTimeout = null;
+            }
 
             toast.style.whiteSpace = 'normal';
             toast.style.wordBreak = 'break-word';
@@ -1230,8 +1238,10 @@
 
             toast.textContent = text;
             toast.classList.add('show');
-            setTimeout(() => {
+            
+            activeToastTimeout = setTimeout(() => {
                 toast.classList.remove('show');
+                activeToastTimeout = null;
                 setTimeout(() => {
                     toast.style.whiteSpace = 'nowrap';
                     toast.style.maxWidth = '';
@@ -1258,7 +1268,12 @@
 
             const currentFile = state.files[state.index];
             if (!currentFile || !currentFile.isBanana) {
-                showToast('🍌 Это нельзя разблокировать бананом');
+                // Для клубничного блюра (strawberry) показываем другое сообщение
+                if (currentFile && currentFile.type === 'strawberry') {
+                    showMultilineToast('🍓 Доступно только подписчикам');
+                } else {
+                    showMultilineToast('🍌 Это нельзя разблокировать бананом');
+                }
                 return;
             }
             if (!currentFile.isBlurred) {
