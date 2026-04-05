@@ -1183,12 +1183,11 @@
                 return;
             }
             try {
-                const cacheBuster = Date.now();
-                const url = `${TUNNEL_URL}/api/get-average-rating?post=${state.postId}&_=${cacheBuster}`;
-                addDebugLine(`📡 ОТПРАВЛЯЕМ ЗАПРОС: ${url}`);
-                const res = await fetch(url, {
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
+                addDebugLine(`📡 ОТПРАВЛЯЕМ POST-ЗАПРОС среднего рейтинга для post=${state.postId}`);
+                const res = await fetch(`${TUNNEL_URL}/api/get-average-rating`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ post_id: state.postId })
                 });
                 const data = await res.json();
                 addDebugLine(`📥 ПОЛУЧЕН ОТВЕТ: ${JSON.stringify(data)}`);
