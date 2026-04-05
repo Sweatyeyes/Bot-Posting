@@ -1314,31 +1314,30 @@
                 showToast('📴 Оффлайн режим, сохранение недоступно');
                 return;
             }
-
+        
             const canSave = state.isSubscribed || state.hasPurchased || state.hasPaidSubscription;
-
+        
             if (!canSave) {
                 showMultilineToast('Сохранить можно только\nподписчикам или после покупки поста');
                 return;
             }
-
+        
             const f = state.files[state.index];
             if (!f) return;
-
+        
             try {
-                const res = await fetch(f.url);
-                const blob = await res.blob();
-                const url = URL.createObjectURL(blob);
+                // Для Telegram WebView — открываем изображение в новой вкладке
+                // Пользователь может нажать "Сохранить" через контекстное меню (долгое нажатие)
                 const link = document.createElement('a');
-                link.href = url;
-                link.download = f.name;
+                link.href = f.url;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-                showToast('✅ Сохранено!');
+                showToast('✅ Изображение открыто. Нажмите и удерживайте для сохранения');
             } catch(e) {
-                showToast('❌ Ошибка сохранения');
+                showToast('❌ Ошибка открытия');
             }
         }
 
