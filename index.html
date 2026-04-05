@@ -248,67 +248,6 @@
             display: none;
         }
 
-        /* ОТЛАДОЧНАЯ ПАНЕЛЬ */
-        #debug-panel {
-            position: fixed;
-            bottom: 90px;
-            left: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.85);
-            backdrop-filter: blur(10px);
-            border: 1px solid #00ff00;
-            border-radius: 10px;
-            padding: 10px;
-            z-index: 10000;
-            font-family: monospace;
-            font-size: 11px;
-            color: #00ff00;
-            max-height: 200px;
-            overflow-y: auto;
-            pointer-events: auto;
-            transition: all 0.3s;
-        }
-        #debug-panel.collapsed {
-            height: 30px;
-            overflow: hidden;
-            padding: 5px 10px;
-        }
-        .debug-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            border-bottom: 1px solid #00ff00;
-            padding-bottom: 3px;
-        }
-        .debug-title {
-            font-size: 12px;
-        }
-        .debug-copy {
-            background: #00ff00;
-            color: #000;
-            border: none;
-            border-radius: 5px;
-            padding: 2px 8px;
-            font-size: 10px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        .debug-copy:active { opacity: 0.7; }
-        .debug-content {
-            font-size: 10px;
-            line-height: 1.4;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-        .debug-line {
-            margin: 2px 0;
-            border-left: 2px solid #00ff00;
-            padding-left: 6px;
-        }
-
         #info-modal {
             position: fixed;
             inset: 0;
@@ -561,17 +500,6 @@
         </div>
     </div>
 
-    <!-- ОТЛАДОЧНАЯ ПАНЕЛЬ -->
-    <div id="debug-panel" class="collapsed">
-        <div class="debug-header" onclick="toggleDebugPanel()">
-            <span class="debug-title">🐛 ОТЛАДКА (нажмите для раскрытия/скрытия)</span>
-            <button class="debug-copy" onclick="copyDebugLog(event)">📋 Копировать</button>
-        </div>
-        <div id="debug-content" class="debug-content">
-            <div class="debug-line">🟢 Ожидание загрузки...</div>
-        </div>
-    </div>
-
     <div id="rating-modal">
         <div class="rating-modal-content">
             <div class="modal-title">⭐ ОЦЕНИТЕ ГАЛЕРЕЮ</div>
@@ -663,68 +591,13 @@
     <div id="error"></div>
 
     <script>
-        console.log('🚀 v34.0 - Правильные бананы, блюр для видео, правильная трата');
+        console.log('🚀 v35.0 - Полная версия с подпиской и рейтингом');
 
         const TUNNEL_URL = 'https://unresident-hyperfine-nikola.ngrok-free.dev';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
         const INTERFACE_BOT_USERNAME = 'k0tbezzabot';
         const tg = window.Telegram?.WebApp;
         const GITHUB_REPO = 'Sweatyeyes/Bot-Posting';
-
-        // ========== ОТЛАДОЧНАЯ ПАНЕЛЬ ==========
-        let debugLines = [];
-        
-        function addDebugLine(text, isError = false) {
-            const timestamp = new Date().toLocaleTimeString();
-            const line = `[${timestamp}] ${text}`;
-            debugLines.push(line);
-            console.log(line);
-            
-            const debugContent = document.getElementById('debug-content');
-            if (debugContent) {
-                const color = isError ? '#ff6b6b' : '#00ff00';
-                const newLine = document.createElement('div');
-                newLine.className = 'debug-line';
-                newLine.style.borderLeftColor = color;
-                newLine.style.color = color;
-                newLine.innerHTML = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                debugContent.appendChild(newLine);
-                // Автоскролл вниз
-                const panel = document.getElementById('debug-panel');
-                if (panel && !panel.classList.contains('collapsed')) {
-                    newLine.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                }
-            }
-        }
-        
-        function toggleDebugPanel() {
-            const panel = document.getElementById('debug-panel');
-            if (panel) {
-                panel.classList.toggle('collapsed');
-            }
-        }
-        
-        async function copyDebugLog(event) {
-            event.stopPropagation();
-            const text = debugLines.join('\n');
-            try {
-                await navigator.clipboard.writeText(text);
-                addDebugLine('✅ Лог скопирован в буфер обмена');
-                showToast('📋 Лог скопирован');
-            } catch(e) {
-                addDebugLine('❌ Ошибка копирования: ' + e);
-            }
-        }
-        
-        function clearDebugLog() {
-            debugLines = [];
-            const debugContent = document.getElementById('debug-content');
-            if (debugContent) {
-                debugContent.innerHTML = '<div class="debug-line">🟢 Лог очищен</div>';
-            }
-            addDebugLine('🟢 Лог очищен');
-        }
-        // =====================================
 
         let touchStartX = 0;
         let touchStartY = 0;
@@ -792,12 +665,6 @@
             totalVotes: 0
         };
 
-        addDebugLine('📊 НАЧАЛЬНОЕ СОСТОЯНИЕ:');
-        addDebugLine(`  postId: ${state.postId}`);
-        addDebugLine(`  userId: ${state.userId}`);
-        addDebugLine(`  userRating из URL: ${state.userRating}`);
-        addDebugLine(`  averageRating: ${state.averageRating}`);
-
         function isVideoFile(filename) {
             const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm'];
             return videoExtensions.some(ext => filename.toLowerCase().endsWith(ext));
@@ -809,7 +676,7 @@
         }
 
         async function fetchFilesDirect() {
-            addDebugLine('📁 Прямая загрузка с GitHub (без бота)');
+            console.log('📁 Прямая загрузка с GitHub (без бота)');
             const folders = ['general', 'banana', 'strawberry'];
             const result = { general: [], banana: [], strawberry: [] };
 
@@ -832,9 +699,9 @@
                         .filter(f => isImageFile(f.name) || isVideoFile(f.name))
                         .map(f => f.name);
                     result[folder] = files;
-                    addDebugLine(`✅ ${folder}: ${files.length} файлов (прямая загрузка)`);
+                    console.log(`✅ ${folder}: ${files.length} файлов (прямая загрузка)`);
                 } catch(e) {
-                    addDebugLine(`⚠️ Не удалось загрузить ${folder}: ${e.message}`, true);
+                    console.log(`⚠️ Не удалось загрузить ${folder}: ${e.message}`);
                 }
             }
             return result;
@@ -882,6 +749,29 @@
                 return false;
             } catch(e) {
                 return state.hasPurchased;
+            }
+        }
+
+        async function fetchSubscriptionStatus() {
+            if (!state.userId) return;
+            try {
+                console.log(`📡 ЗАПРОС статуса подписки для user=${state.userId}, post=${state.postId}`);
+                const res = await fetch(`${TUNNEL_URL}/api/check-subscription`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: state.userId, post_id: state.postId })
+                });
+                const data = await res.json();
+                console.log(`📥 ОТВЕТ ПОДПИСКИ:`, data);
+                
+                state.isSubscribed = data.is_subscribed === true;
+                state.hasPaidSubscription = data.has_paid_subscription === true;
+                state.subscriptionEndDate = data.subscription_end_date || '';
+                
+                updateCabinetIcon();
+                console.log(`💎 Подписка: ${state.isSubscribed ? 'АКТИВНА' : 'НЕ АКТИВНА'}`);
+            } catch(e) {
+                console.log(`❌ Ошибка проверки подписки: ${e}`);
             }
         }
 
@@ -983,26 +873,23 @@
                 showError('Не указан ID поста');
                 return;
             }
-        
-            addDebugLine(`🖼 ЗАГРУЗКА ГАЛЕРЕИ, postId: ${state.postId}`);
-            addDebugLine(`📊 ТЕКУЩЕЕ СОСТОЯНИЕ ДО ЗАГРУЗКИ:`);
-            addDebugLine(`  averageRating: ${state.averageRating}`);
-            addDebugLine(`  userRating: ${state.userRating}`);
-        
+
+            console.log('🖼 ЗАГРУЗКА ГАЛЕРЕИ, postId:', state.postId);
+
             let filesData = await fetchFilesFromBot();
-        
+
             if (!filesData) {
                 state.botOffline = true;
                 document.getElementById('offline-badge').style.display = 'block';
-                addDebugLine('📴 Бот недоступен, переключаемся в офлайн-режим', true);
-        
+                console.log('📴 Бот недоступен, переключаемся в офлайн-режим');
+
                 filesData = await fetchFilesDirect();
-        
+
                 if (!filesData || (Object.values(filesData).every(arr => arr.length === 0))) {
                     showError('Нет соединения с GitHub');
                     return;
                 }
-        
+
                 state.isSubscribed = false;
                 state.hasPurchased = false;
                 state.hasPaidSubscription = false;
@@ -1011,31 +898,24 @@
             } else {
                 state.botOffline = false;
                 document.getElementById('offline-badge').style.display = 'none';
-        
+
                 await checkPurchase();
-                await fetchSubscriptionStatus();  // ← НОВЫЙ ВЫЗОВ
+                await fetchSubscriptionStatus();
                 await fetchUnlockedPhotos();
-                
-                addDebugLine('🔍 ВЫЗЫВАЕМ fetchAverageRating()...');
                 await fetchAverageRating();
-                addDebugLine('🔍 ВЫЗЫВАЕМ fetchUserRating()...');
                 await fetchUserRating();
             }
-        
-            addDebugLine(`📊 СОСТОЯНИЕ ПОСЛЕ ЗАГРУЗКИ ДАННЫХ:`);
-            addDebugLine(`  averageRating: ${state.averageRating}`);
-            addDebugLine(`  userRating: ${state.userRating}`);
-        
+
             state.filesData = filesData;
             const files = buildFileList(filesData);
-        
+
             if (files.length === 0) {
                 showError('В этом посте нет файлов');
                 return;
             }
-        
+
             state.files = files;
-        
+
             document.getElementById('loading').style.display = 'none';
             document.getElementById('gallery').style.display = 'block';
             updateUI();
@@ -1044,10 +924,10 @@
             showMedia(0);
             setupNavigation();
             setupSwipeListeners();
-        
-            addDebugLine(`⭐ Финальный userRating: ${state.userRating}`);
-            addDebugLine(`⭐ Финальный averageRating: ${state.averageRating}`);
-            addDebugLine(`🍌 Финальный баланс: ${state.bananasLeft}`);
+
+            console.log('⭐ Финальный userRating:', state.userRating);
+            console.log('⭐ Финальный averageRating:', state.averageRating);
+            console.log('🍌 Финальный баланс:', state.bananasLeft);
         }
 
         function showMedia(i) {
@@ -1179,48 +1059,37 @@
         }
 
         async function fetchAverageRating() {
-            if (!state.postId) {
-                addDebugLine('⚠️ fetchAverageRating: нет postId, пропускаем', true);
-                return;
-            }
+            if (!state.postId) return;
             try {
-                addDebugLine(`📡 ОТПРАВЛЯЕМ POST-ЗАПРОС среднего рейтинга для post=${state.postId}`);
                 const res = await fetch(`${TUNNEL_URL}/api/get-average-rating`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ post_id: state.postId })
                 });
                 const data = await res.json();
-                addDebugLine(`📥 ПОЛУЧЕН ОТВЕТ: ${JSON.stringify(data)}`);
+                console.log('⭐ Получен средний рейтинг:', data);
                 if (data.average_rating !== undefined) {
                     state.averageRating = data.average_rating;
-                    addDebugLine(`⭐ Установлен averageRating = ${state.averageRating}`);
                     updateRatingDisplay();
-                } else {
-                    addDebugLine(`⚠️ В ответе нет поля average_rating`, true);
                 }
             } catch(e) {
-                addDebugLine(`❌ Ошибка загрузки рейтинга: ${e}`, true);
+                console.log('Ошибка загрузки рейтинга:', e);
             }
         }
 
         async function fetchUserRating() {
             if (!state.userId) return;
             try {
-                const url = `${TUNNEL_URL}/api/get-user-rating?user=${state.userId}&post=${state.postId || 'gallery'}`;
-                addDebugLine(`📡 ЗАПРОС оценки пользователя: ${url}`);
-                const res = await fetch(url, {
+                const res = await fetch(`${TUNNEL_URL}/api/get-user-rating?user=${state.userId}&post=${state.postId || 'gallery'}`, {
                     method: 'GET',
                     headers: { 'Content-Type': 'application/json' }
                 });
                 const data = await res.json();
-                addDebugLine(`📥 ОТВЕТ оценки пользователя: ${JSON.stringify(data)}`);
                 if (data.rating) {
                     state.userRating = data.rating;
-                    addDebugLine(`⭐ Установлен userRating = ${state.userRating}`);
                 }
             } catch(e) {
-                addDebugLine(`❌ Ошибка загрузки оценки пользователя: ${e}`, true);
+                console.log('Ошибка загрузки оценки пользователя:', e);
             }
         }
 
@@ -1230,7 +1099,6 @@
                 return;
             }
             try {
-                addDebugLine(`⭐ ОТПРАВКА ОЦЕНКИ: user=${state.userId}, rating=${rating}, post=${state.postId}`);
                 const res = await fetch(`${TUNNEL_URL}/api/submit-rating`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1241,7 +1109,6 @@
                     })
                 });
                 const data = await res.json();
-                addDebugLine(`📥 ОТВЕТ СОХРАНЕНИЯ: ${JSON.stringify(data)}`);
                 if (data.success) {
                     state.userRating = rating;
                     state.averageRating = data.average_rating;
@@ -1252,7 +1119,6 @@
                     showToast('❌ Ошибка при сохранении оценки');
                 }
             } catch(e) {
-                addDebugLine(`❌ Ошибка соединения: ${e}`, true);
                 showToast('❌ Ошибка соединения');
             }
         }
@@ -1260,16 +1126,13 @@
         function updateRatingDisplay() {
             const ratingValue = document.getElementById('rating-value');
             const ratingIcon = document.getElementById('rating-icon');
-            addDebugLine(`⭐ updateRatingDisplay: averageRating=${state.averageRating}, userRating=${state.userRating}`);
             if (ratingValue && state.averageRating > 0) {
                 ratingValue.textContent = state.averageRating.toFixed(1);
                 ratingValue.style.display = 'flex';
                 ratingIcon.textContent = '★';
-                addDebugLine(`⭐ ПОКАЗЫВАЕМ рейтинг: ${state.averageRating.toFixed(1)}`);
             } else if (ratingValue) {
                 ratingValue.style.display = 'none';
                 ratingIcon.textContent = '☆';
-                addDebugLine(`⭐ СКРЫВАЕМ рейтинг (averageRating=${state.averageRating} <= 0)`);
             }
         }
 
