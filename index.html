@@ -983,26 +983,26 @@
                 showError('Не указан ID поста');
                 return;
             }
-
+        
             addDebugLine(`🖼 ЗАГРУЗКА ГАЛЕРЕИ, postId: ${state.postId}`);
             addDebugLine(`📊 ТЕКУЩЕЕ СОСТОЯНИЕ ДО ЗАГРУЗКИ:`);
             addDebugLine(`  averageRating: ${state.averageRating}`);
             addDebugLine(`  userRating: ${state.userRating}`);
-
+        
             let filesData = await fetchFilesFromBot();
-
+        
             if (!filesData) {
                 state.botOffline = true;
                 document.getElementById('offline-badge').style.display = 'block';
                 addDebugLine('📴 Бот недоступен, переключаемся в офлайн-режим', true);
-
+        
                 filesData = await fetchFilesDirect();
-
+        
                 if (!filesData || (Object.values(filesData).every(arr => arr.length === 0))) {
                     showError('Нет соединения с GitHub');
                     return;
                 }
-
+        
                 state.isSubscribed = false;
                 state.hasPurchased = false;
                 state.hasPaidSubscription = false;
@@ -1011,8 +1011,9 @@
             } else {
                 state.botOffline = false;
                 document.getElementById('offline-badge').style.display = 'none';
-
+        
                 await checkPurchase();
+                await fetchSubscriptionStatus();  // ← НОВЫЙ ВЫЗОВ
                 await fetchUnlockedPhotos();
                 
                 addDebugLine('🔍 ВЫЗЫВАЕМ fetchAverageRating()...');
@@ -1020,21 +1021,21 @@
                 addDebugLine('🔍 ВЫЗЫВАЕМ fetchUserRating()...');
                 await fetchUserRating();
             }
-
+        
             addDebugLine(`📊 СОСТОЯНИЕ ПОСЛЕ ЗАГРУЗКИ ДАННЫХ:`);
             addDebugLine(`  averageRating: ${state.averageRating}`);
             addDebugLine(`  userRating: ${state.userRating}`);
-
+        
             state.filesData = filesData;
             const files = buildFileList(filesData);
-
+        
             if (files.length === 0) {
                 showError('В этом посте нет файлов');
                 return;
             }
-
+        
             state.files = files;
-
+        
             document.getElementById('loading').style.display = 'none';
             document.getElementById('gallery').style.display = 'block';
             updateUI();
@@ -1043,7 +1044,7 @@
             showMedia(0);
             setupNavigation();
             setupSwipeListeners();
-
+        
             addDebugLine(`⭐ Финальный userRating: ${state.userRating}`);
             addDebugLine(`⭐ Финальный averageRating: ${state.averageRating}`);
             addDebugLine(`🍌 Финальный баланс: ${state.bananasLeft}`);
