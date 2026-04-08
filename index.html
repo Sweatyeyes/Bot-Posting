@@ -591,7 +591,7 @@
     <div id="error"></div>
 
     <script>
-        console.log('🚀 v36.1 - Видео со стандартным управлением');
+        console.log('🚀 v36.2 - Видео с loop и возвратом музыки');
 
         const TUNNEL_URL = 'https://srv1521019.hstgr.cloud';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -604,6 +604,10 @@
         let touchEndX = 0;
         let touchEndY = 0;
         const minSwipeDistance = 50;
+
+        // Переменные для управления музыкой при просмотре видео
+        let wasMusicPlayingBeforeVideo = false;
+        let musicCurrentTime = 0;
 
         const urlParams = new URLSearchParams(window.location.search);
 
@@ -939,14 +943,44 @@
 
             const isVideo = file.isVideo && !file.isBlurred;
             const container = document.getElementById('media-container');
+            const audio = document.getElementById('bg-music');
+            const musicBtn = document.getElementById('music-btn');
+
+            // Проверяем, что сейчас показывается (есть ли уже медиа-элемент на странице)
+            const currentMedia = document.getElementById('media');
+            const currentlyShowingVideo = currentMedia && currentMedia.tagName === 'VIDEO';
+            
+            // Если раньше было видео, а теперь не видео — возвращаем музыку
+            if (currentlyShowingVideo && !isVideo) {
+                if (wasMusicPlayingBeforeVideo) {
+                    audio.currentTime = musicCurrentTime;
+                    audio.play().catch(() => {});
+                    if (musicBtn) musicBtn.style.opacity = '1';
+                    musicPlaying = true;
+                    wasMusicPlayingBeforeVideo = false;
+                }
+            }
+            
+            // Если теперь видео — останавливаем музыку и запоминаем позицию
+            if (isVideo && musicPlaying) {
+                wasMusicPlayingBeforeVideo = true;
+                musicCurrentTime = audio.currentTime;
+                audio.pause();
+                musicPlaying = false;
+                if (musicBtn) musicBtn.style.opacity = '0.5';
+            }
 
             if (isVideo) {
-                // СТАРОЕ РЕШЕНИЕ ДЛЯ ВИДЕО: стандартные элементы управления, автовоспроизведение, зацикленный звук не мешает
-                const videoHtml = `<video id="media" src="${file.url + '?t=' + Date.now()}" controls autoplay playsinline onerror="onMediaError()" style="max-width:100%; max-height:100%; object-fit:contain;"></video>`;
+                const videoHtml = `<video id="media" src="${file.url + '?t=' + Date.now()}" controls autoplay playsinline loop onerror="onMediaError()" style="max-width:100%; max-height:100%; object-fit:contain;"></video>`;
                 container.innerHTML = videoHtml;
                 const video = document.getElementById('media');
                 if (video) {
                     video.addEventListener('loadeddata', () => video.classList.add('loaded'));
+                    // Дополнительная страховка: если loop по какой-то причине не сработал
+                    video.addEventListener('ended', () => {
+                        video.currentTime = 0;
+                        video.play().catch(() => {});
+                    });
                 }
             } else {
                 const imgHtml = `<img id="media" src="${file.url + '?t=' + Date.now()}" onload="this.classList.add('loaded')" onerror="onMediaError()" style="max-width:100%; max-height:100%; object-fit:contain;">`;
