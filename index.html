@@ -1,1 +1,127 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>DEBUG Gallery</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #111; color: #0f0; font-family: monospace; padding: 20px; font-size: 14px; }
+        #log { background: #000; padding: 15px; border-radius: 10px; border: 1px solid #0f0; }
+        .step { margin: 10px 0; padding: 5px; border-bottom: 1px solid #333; }
+        .success { color: #0f0; }
+        .error { color: #f00; }
+        .info { color: #ff0; }
+        #media-container { margin-top: 20px; text-align: center; }
+        img, video { max-width: 100%; max-height: 300px; border: 1px solid #0f0; }
+    </style>
+</head>
+<body>
+    <h2>🔍 DEBUG MODE</h2>
+    <div id="log"></div>
+    <div id="media-container"></div>
 
+    <script>
+        const logDiv = document.getElementById('log');
+        
+        function log(msg, type = 'info') {
+            const cls = type === 'error' ? 'error' : (type === 'success' ? 'success' : 'info');
+            logDiv.innerHTML += `<div class="step ${cls}">${msg}</div>`;
+            console.log(msg);
+        }
+
+        async function run() {
+            log('🚀 ШАГ 1: Запуск WebApp');
+            
+            // Проверяем Telegram
+            const tg = window.Telegram?.WebApp;
+            log(`📱 Telegram WebApp: ${tg ? '✅ ДА' : '❌ НЕТ'}`, tg ? 'success' : 'error');
+            
+            if (tg) {
+                tg.ready();
+                tg.expand();
+                log(`📱 Telegram версия: ${tg.version}`);
+                log(`📱 initData: ${tg.initData ? 'есть' : 'нет'}`);
+                log(`📱 start_param: ${tg.initDataUnsafe?.start_param || 'нет'}`);
+            }
+
+            // ШАГ 2: Получаем post_id
+            log('🔍 ШАГ 2: Определение post_id');
+            const urlParams = new URLSearchParams(window.location.search);
+            let postId = urlParams.get('post') || urlParams.get('tgWebAppStartParam');
+            
+            if (tg?.initDataUnsafe?.start_param) {
+                postId = tg.initDataUnsafe.start_param;
+            }
+            
+            log(`📌 post_id: ${postId || '❌ НЕ НАЙДЕН'}`, postId ? 'success' : 'error');
+            
+            if (!postId) {
+                log('❌ ОШИБКА: Не указан post_id', 'error');
+                return;
+            }
+
+            // ШАГ 3: Запрос к API
+            log('🌐 ШАГ 3: Запрос к API /api/get-files');
+            const API_URL = 'https://srv1521019.hstgr.cloud';
+            log(`📡 URL: ${API_URL}/api/get-files`);
+            
+            try {
+                const res = await fetch(`${API_URL}/api/get-files`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ post_id: postId })
+                });
+                
+                log(`📡 Статус ответа: ${res.status} ${res.statusText}`, res.ok ? 'success' : 'error');
+                
+                if (!res.ok) {
+                    log(`❌ Ошибка HTTP: ${res.status}`, 'error');
+                    return;
+                }
+                
+                const data = await res.json();
+                log(`📦 Получены данные: general=${data.general?.length || 0}, banana=${data.banana?.length || 0}, strawberry=${data.strawberry?.length || 0}`);
+                
+                // ШАГ 4: Формируем URL медиа
+                log('🖼 ШАГ 4: Формирование URL медиа');
+                const files = [];
+                const baseUrl = `${API_URL}/media/${postId}`;
+                
+                (data.general || []).forEach(f => files.push({ url: `${baseUrl}/general/${f}`, type: 'general' }));
+                (data.banana || []).filter(f => !f.includes('_blur')).forEach(f => files.push({ url: `${baseUrl}/banana/${f}`, type: 'banana' }));
+                (data.strawberry || []).filter(f => !f.includes('_blur')).forEach(f => files.push({ url: `${baseUrl}/strawberry/${f}`, type: 'strawberry' }));
+                
+                log(`📁 Всего файлов: ${files.length}`);
+                
+                if (files.length === 0) {
+                    log('⚠️ Нет файлов для отображения', 'error');
+                    return;
+                }
+                
+                // ШАГ 5: Загружаем первый файл
+                log('🖼 ШАГ 5: Загрузка первого файла');
+                const firstFile = files[0];
+                log(`📎 URL: ${firstFile.url}`);
+                
+                const container = document.getElementById('media-container');
+                const isVideo = /\.(mp4|mov|avi|webm)$/i.test(firstFile.url);
+                
+                if (isVideo) {
+                    container.innerHTML = `<video src="${firstFile.url}" controls autoplay playsinline onerror="document.getElementById('log').innerHTML += '<div class=\\'error\\'>❌ Ошибка загрузки видео</div>'"></video>`;
+                } else {
+                    container.innerHTML = `<img src="${firstFile.url}" onload="document.getElementById('log').innerHTML += '<div class=\\'success\\'>✅ Изображение загружено!</div>'" onerror="document.getElementById('log').innerHTML += '<div class=\\'error\\'>❌ Ошибка загрузки изображения: ' + this.src + '</div>'">`;
+                }
+                
+                log('✅ ГОТОВО! Файл должен отобразиться ниже', 'success');
+                
+            } catch (e) {
+                log(`❌ ОШИБКА: ${e.message}`, 'error');
+            }
+        }
+
+        run();
+    </script>
+</body>
+</html>
