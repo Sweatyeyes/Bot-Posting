@@ -591,7 +591,7 @@
     <div id="error"></div>
 
     <script>
-        console.log('🚀 v36.0 - Полная версия с подпиской и рейтингом');
+        console.log('🚀 v36.1 - Видео со стандартным управлением');
 
         const TUNNEL_URL = 'https://srv1521019.hstgr.cloud';
         const PAYMENT_BOT_USERNAME = 'k0t_oplatabot';
@@ -934,23 +934,22 @@
             if (!state.files || state.files.length === 0) return;
 
             state.index = (i + state.files.length) % state.files.length;
-            const mediaElement = document.getElementById('media');
             const file = state.files[state.index];
-            if (!mediaElement || !file) return;
+            if (!file) return;
 
             const isVideo = file.isVideo && !file.isBlurred;
+            const container = document.getElementById('media-container');
 
             if (isVideo) {
-                const videoHtml = `<video id="media" src="${file.url + '?t=' + Date.now()}" controls autoplay playsinline onloadeddata="this.classList.add('loaded')" onerror="onMediaError()" style="max-width:100%; max-height:100%; object-fit:contain;"></video>`;
-                const container = document.getElementById('media-container');
+                // СТАРОЕ РЕШЕНИЕ ДЛЯ ВИДЕО: стандартные элементы управления, автовоспроизведение, зацикленный звук не мешает
+                const videoHtml = `<video id="media" src="${file.url + '?t=' + Date.now()}" controls autoplay playsinline onerror="onMediaError()" style="max-width:100%; max-height:100%; object-fit:contain;"></video>`;
                 container.innerHTML = videoHtml;
-                const newVideo = document.getElementById('media');
-                if (newVideo) {
-                    newVideo.addEventListener('loadeddata', () => newVideo.classList.add('loaded'));
+                const video = document.getElementById('media');
+                if (video) {
+                    video.addEventListener('loadeddata', () => video.classList.add('loaded'));
                 }
             } else {
                 const imgHtml = `<img id="media" src="${file.url + '?t=' + Date.now()}" onload="this.classList.add('loaded')" onerror="onMediaError()" style="max-width:100%; max-height:100%; object-fit:contain;">`;
-                const container = document.getElementById('media-container');
                 container.innerHTML = imgHtml;
             }
 
@@ -1221,7 +1220,6 @@
             const toast = document.getElementById('toast');
             if (!toast) return;
 
-            // Останавливаем предыдущий таймер, если есть
             if (activeToastTimeout) {
                 clearTimeout(activeToastTimeout);
                 activeToastTimeout = null;
@@ -1260,7 +1258,6 @@
                 return;
             }
 
-            // Подписчикам показываем сообщение, что бананы тратятся только в боте
             if (state.hasPaidSubscription || state.isSubscribed) {
                 showMultilineToast('🍌 У вас подписка.\nБананы тратятся только на генерацию изображений в боте');
                 return;
@@ -1268,7 +1265,6 @@
 
             const currentFile = state.files[state.index];
             if (!currentFile || !currentFile.isBanana) {
-                // Для клубничного блюра (strawberry) показываем другое сообщение
                 if (currentFile && currentFile.type === 'strawberry') {
                     showMultilineToast('🍓 Доступно только подписчикам');
                 } else {
@@ -1376,7 +1372,6 @@
         function updateUI() {
             const bananaBadge = document.getElementById('banana-count-badge');
             if (bananaBadge) {
-                // Всегда показываем реальное количество бананов (без бесконечности)
                 bananaBadge.textContent = state.bananasLeft;
                 bananaBadge.classList.remove('infinity');
                 bananaBadge.style.display = 'flex';
